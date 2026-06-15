@@ -10,6 +10,9 @@ requires-python = ">=3.12"
 license = "BSD-3-Clause"
 dependencies = ["pydantic>=2"]
 
+[project.scripts]
+clio-parser = "clio_parser.cli:main"
+
 [project.optional-dependencies]
 # Heavy PDF-extraction stack. Kept OUT of core deps: Docling pulls ~500MB of
 # ML models on first run. Install with `uv sync --extra pdf` only when needed.

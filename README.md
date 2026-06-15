@@ -18,6 +18,34 @@ tools.
 
 clio-parser is designed to run on its own and to be **invoked as a subagent** by a host agent.
 
+## Invoked as a subagent
+
+A host (e.g. the CLIO agent) invokes clio-parser through a thin, host-agnostic adapter —
+`ClioParserSubagent` — either **in process** (import) or as a **subprocess** (the `clio-parser`
+CLI). The adapter imports nothing from the host repo, returns JSON-serializable dicts, and never
+raises across its surface.
+
+In process:
+
+```python
+from clio_parser import ClioParserSubagent
+
+sub = ClioParserSubagent()
+sub.capabilities()                                  # discovery manifest (name, version, actions)
+sub.run("review", {"paper": "# Paper\n..."})        # -> {"action","content","structured","metadata"}
+```
+
+As a subprocess:
+
+```bash
+clio-parser capabilities                            # print the action manifest as JSON
+clio-parser review --paper "# Paper ..."            # run an action; JSON to stdout, exit 1 on error
+clio-parser ask --question "..." --blocks-json '{...}'
+```
+
+The default path is hermetic (an offline echo client); real LLM / PDF / scholar / figure paths are
+opt-in behind their extras.
+
 ## Architecture
 
 ```
