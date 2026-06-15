@@ -21,6 +21,7 @@ detect the degraded OCR mode.
 
 from __future__ import annotations
 
+import os
 import re
 import tempfile
 from dataclasses import dataclass
@@ -141,6 +142,86 @@ def resolve_arxiv_url(source: str) -> str:
 
     # Local path or anything else: unchanged.
     return source
+
+
+def search_arxiv_pdf(query: str, *, max_results: int = 1, timeout: int = 15) -> str | None:
+    """Resolve a paper title or topic to an arXiv PDF URL via the arXiv API.
+
+    Queries the public arXiv Atom API and returns the canonical PDF URL of the
+    top match, or ``None`` if there is no match or the request fails. Network
+    call; uses only the standard library (lazily imported).
+
+    Args:
+        query: A paper title or free-text topic, e.g. ``"Attention Is All You Need"``.
+        max_results: How many results to request (the first is used).
+        timeout: Request timeout in seconds.
+
+    Returns:
+        ``https://arxiv.org/pdf/<id>.pdf`` for the top hit, or ``None``.
+    """
+    import urllib.parse
+    import urllib.request
+    import xml.etree.ElementTree as ET
+
+    ns = {"a": "http://www.w3.org/2005/Atom"}
+
+    def _first(search_query: str) -> str | None:
+        params = urllib.parse.urlencode(
+            {"search_query": search_query, "start": 0, "max_results": max_results}
+        )
+        url = f"http://export.arxiv.org/api/query?{params}"
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as resp:  # noqa: S310
+                root = ET.fromstring(resp.read())
+        except Exception:  # noqa: BLE001 - any failure -> unresolved
+            return None
+        entry = root.find("a:entry", ns)
+        id_el = entry.find("a:id", ns) if entry is not None else None
+        if id_el is None or not id_el.text:
+            return None
+        match = _ARXIV_ID_RE.search(id_el.text)
+        return f"https://arxiv.org/pdf/{match.group(0)}.pdf" if match else None
+
+    # Prefer an exact title-phrase match; fall back to a general topic search.
+    return _first(f'ti:"{query}"') or _first(f"all:{query}")
+
+
+def resolve_source(source: str) -> str:
+    """Resolve any ingest source to a fetchable URL or local path.
+
+    Accepts an arXiv id, an arXiv/http(s) URL, a local PDF path, **or a paper
+    title / topic** (resolved to an arXiv PDF via :func:`search_arxiv_pdf`).
+
+    Args:
+        source: arXiv id, URL, local path, or a paper title/topic string.
+
+    Returns:
+        A canonical arXiv PDF URL, the original URL/path, or the title's resolved
+        arXiv PDF URL.
+
+    Raises:
+        ExtractionError: A title/topic that matched nothing on arXiv.
+    """
+    stripped = source.strip()
+    # arXiv id or any URL -> the pure mapping handles these.
+    if _BARE_ARXIV_RE.match(stripped) or _is_url(stripped):
+        return resolve_arxiv_url(stripped)
+    # Path-like (existing file, a ``.pdf`` name, or contains a separator) -> path.
+    if (
+        Path(stripped).exists()
+        or stripped.lower().endswith(".pdf")
+        or "/" in stripped
+        or os.sep in stripped
+    ):
+        return stripped
+    # Otherwise treat the text as a paper title / topic and search arXiv.
+    found = search_arxiv_pdf(stripped)
+    if found is not None:
+        return found
+    raise ExtractionError(
+        f"could not resolve source {source!r}: not an arXiv id/URL or local PDF, "
+        "and no arXiv result for that title/topic"
+    )
 
 
 def download_pdf(url: str, dest_dir: Path) -> Path:
@@ -376,7 +457,8 @@ def process_pdf(
     :attr:`PdfConfig.use_postprocess` is set).
 
     Args:
-        source: A bare arXiv id, an arXiv/http(s) URL, or a local PDF path.
+        source: An arXiv id, an arXiv/http(s) URL, a local PDF path, or a paper
+            title/topic (resolved to an arXiv PDF via :func:`search_arxiv_pdf`).
         out_dir: Working directory for downloads and figures; a temporary
             directory is used when ``None``.
         config: Extraction configuration.
@@ -388,7 +470,7 @@ def process_pdf(
     work_dir = Path(out_dir) if out_dir is not None else Path(tempfile.mkdtemp(prefix="clio-pdf-"))
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    resolved = resolve_arxiv_url(str(source))
+    resolved = resolve_source(str(source))
     source_url: str | None = None
     if _is_url(resolved):
         source_url = resolved
@@ -417,6 +499,8 @@ __all__ = [
     "ExtractionDependencyError",
     "DownloadError",
     "resolve_arxiv_url",
+    "search_arxiv_pdf",
+    "resolve_source",
     "download_pdf",
     "extract",
     "process_pdf",
