@@ -24,6 +24,11 @@ rag = ["lancedb", "sentence-transformers", "numpy"]
 # the S2 HTTP client is lazy/gated, so the default suite needs none of this.
 # Install with `uv sync --extra scholar` for the real S2 client + thefuzz.
 scholar = ["thefuzz", "httpx"]
+# Figure rendering (matplotlib). Kept OUT of core deps: the figure agent's
+# default path only generates plot CODE (LLM text) and never imports matplotlib;
+# actual rendering is gated behind `render_plot_code` (subprocess + `live`
+# marker). Install with `uv sync --extra viz` to run the gated render tests.
+viz = ["matplotlib"]
 
 [dependency-groups]
 dev = ["pytest", "ruff", "mypy"]
@@ -50,6 +55,12 @@ ignore_missing_imports = true
 # Optional `scholar` extra is lazy-imported and absent from the default env.
 [[tool.mypy.overrides]]
 module = ["thefuzz.*"]
+ignore_missing_imports = true
+
+# Optional `viz` extra (matplotlib) is lazy-imported (only inside
+# `render_plot_code`) and absent from the default env.
+[[tool.mypy.overrides]]
+module = ["matplotlib.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
