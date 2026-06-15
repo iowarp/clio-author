@@ -4,14 +4,13 @@ Living status ledger. Maintained by the `progress` subagent (see `.claude/agents
 Status legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked.
 
 **Last updated:** 2026-06-15
-**Where we left off:** **M3 merged (PR #4). M4 code-complete and reviewed** on branch
-`feat/m4-review` — implemented the `Parallel` + `CriticRefine` harness patterns; `experts/`
-`review_models.py` (AgentReview rubric `PaperReview`/`MetaReview`/`PersonaSpec`, adapted Apache-2.0),
-`reviewer.py` (`ReviewerExpert`, structured rubric, never-raises/`parse_error`), `meta_reviewer.py`
-(`MetaReviewerExpert` deterministic aggregation + `run_panel` over `Parallel`). 167 hermetic tests
-pass; ruff + mypy clean; code-reviewed (APPROVE-WITH-NITS → fixed: `max_rounds` coercion + nits).
-Next: open the M4 PR, then **M5** (write/edit — `writer`/`editor` experts, wtf-p taxonomy; wire
-writer↔reviewer through `CriticRefine`). See the **Session log** below to resume.
+**Where we left off:** **M4 merged (PR #5). M5 code-complete and reviewed** on branch
+`feat/m5-writing` — `tools/files.py` (`SafeFiles`: sandbox-confined read/write_new/apply_edit,
+escape-tested) + `experts/{write_models,writer,editor,write_loop}.py` (wtf-p outline→plan→write→
+revise taxonomy; `ReviewerAsCritic` + `run_write_review_loop` over `CriticRefine` — writer↔reviewer
+loop terminates on Accept). 207 hermetic tests; ruff + mypy clean; reviewed (APPROVE-WITH-NITS →
+applied). The **write-papers** half is now functional. Autonomously continuing through **M6**
+(figures — PaperBanana), **M7** (hardening), **M8** (CLIO adapter). See the **Session log** to resume.
 
 ## Setup phases
 
@@ -32,7 +31,7 @@ writer↔reviewer through `CriticRefine`). See the **Session log** below to resu
 | M2 | Memory blocks + selective injection + `rag` retrieval; `paper_qa` | ✅ | `retrieval/rag.py` (HashingEmbedder default + lazy LanceDb/SentenceTransformer) + `experts/paper_qa.py`; 109 hermetic tests; reviewed. Real-embedding backend gated (`rag` extra) |
 | M3 | Grounding: `scholar` (Semantic Scholar) + `citation` expert | ✅ | `retrieval/scholar.py` (pure verification + lazy S2 client) + `experts/citation.py` (suggestions-only, bib-safe); 140 hermetic tests; reviewed (CHANGES-NEEDED → fixed: cutoff gate + symlink-safe write). S2 calls gated (`scholar` extra) |
 | M4 | Review: `reviewer` + critic-refine pattern + multi-reviewer | ✅ | `Parallel`+`CriticRefine` patterns implemented; `experts/{review_models,reviewer,meta_reviewer}.py` (AgentReview rubric, `run_panel`); 167 hermetic tests; reviewed (APPROVE-WITH-NITS → fixed). `RoundRobin` still stub |
-| M5 | Write/edit: `writer` + `editor` + file tools | ⬜ | |
+| M5 | Write/edit: `writer` + `editor` + file tools | ✅ | `tools/files.py` (SafeFiles, sandbox-verified) + `experts/{write_models,writer,editor,write_loop}.py` (`run_write_review_loop` via CriticRefine); 207 hermetic tests; reviewed (APPROVE-WITH-NITS → applied) |
 | M6 | Figures (optional): `figure_agent` generation | ⬜ | |
 | M7 | Harden gaps: table fidelity, generalized equations, baseline eval report | ⬜ | |
 | M8 | CLIO integration: thin `clio_adapter` so CLIO can invoke the harness | ⬜ | deferred |
@@ -186,3 +185,4 @@ runs). Use `planner` to produce the M0 build plan first. (Optionally commit P0�
 - 2026-06-15 — PR #2 (M1) merged; **M2 retrieval + paper_qa** complete + reviewed on `feat/m2-retrieval` (109 hermetic tests).
 - 2026-06-15 — PR #3 (M2) merged; **M3 citation grounding** complete + reviewed (CHANGES-NEEDED → fixed) on `feat/m3-citation` (140 hermetic tests).
 - 2026-06-15 — PR #4 (M3) merged; **M4 review** complete + reviewed (APPROVE-WITH-NITS → fixed) on `feat/m4-review` (167 hermetic tests; `Parallel`+`CriticRefine` patterns implemented).
+- 2026-06-15 — PR #5 (M4) merged; **M5 write/edit** complete + reviewed (APPROVE-WITH-NITS → applied) on `feat/m5-writing` (207 hermetic tests; SafeFiles + writer/editor + write-review loop).
