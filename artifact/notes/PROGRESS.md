@@ -4,13 +4,14 @@ Living status ledger. Maintained by the `progress` subagent (see `.claude/agents
 Status legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked.
 
 **Last updated:** 2026-06-15
-**Where we left off:** **M1 code-complete and reviewed** on branch `feat/m1-processing` — full
-processing track: `ingest/postprocess/` (6 passes) + `blocks.py` + `docling_extract.py` (Docling +
-PyMuPDF fallback + arXiv→PDF) + `experts/ingestor.py` + baseline harness. 89 hermetic tests pass; 3
-port-equivalence baseline tests byte-match phagocyte; ruff + mypy clean; code-reviewed
-(APPROVE-WITH-NITS, fixes applied). The real-PDF baseline run is gated (`live`/`baseline`) and needs
-`uv sync --extra pdf` + network (not run in the sandbox). Next: open the M1 PR, then **M2**
-(retrieval + selective injection). See the **Session log** below to resume.
+**Where we left off:** **M1 merged (PR #2). M2 code-complete and reviewed** on branch
+`feat/m2-retrieval` — `retrieval/rag.py` (`HashingEmbedder` hermetic default + lazy
+LanceDb/SentenceTransformer backend behind the `rag` extra; `RagRetriever`; `inject_context`;
+`render_scored`) + `experts/paper_qa.py` (`PaperQAExpert`, never-raises, grounded Q&A with cited
+block ids). 109 hermetic tests pass; ruff + mypy clean; code-reviewed (APPROVE-WITH-NITS, nits
+applied). M1→M2 hand-off verified (ingestor blocks → paper_qa). Next: open the M2 PR, then **M3**
+(citation grounding — Semantic Scholar from PaperOrchestra + `citation` expert). See the **Session
+log** below to resume.
 
 ## Setup phases
 
@@ -28,7 +29,7 @@ port-equivalence baseline tests byte-match phagocyte; ruff + mypy clean; code-re
 |---|---|---|---|
 | M0 | Harness skeleton (`BaseAgent`, `AgentProtocol`, engine, patterns, session, types) + trivial expert; `ClioParserAgent.invoke()` runs | ✅ | `clio_parser/harness/` + `agent.py` + `experts/echo.py` + `llm/client.py`; 4 tests pass, ruff/mypy clean |
 | M1 | Processing track: `ingest/` port + `ingestor` expert → Markdown + memory blocks; baseline diff | ✅ | `ingest/{postprocess,blocks,docling_extract}` + `experts/ingestor.py` + `tests/baselines/`; 89 hermetic tests + 3 port-equivalence (byte-match phagocyte); reviewed. Live real-PDF run gated (needs `pdf` extra + network) |
-| M2 | Memory blocks + selective injection + `rag` retrieval; `paper_qa` | ⬜ | |
+| M2 | Memory blocks + selective injection + `rag` retrieval; `paper_qa` | ✅ | `retrieval/rag.py` (HashingEmbedder default + lazy LanceDb/SentenceTransformer) + `experts/paper_qa.py`; 109 hermetic tests; reviewed. Real-embedding backend gated (`rag` extra) |
 | M3 | Grounding: `scholar` (Semantic Scholar) + `citation` expert | ⬜ | |
 | M4 | Review: `reviewer` + critic-refine pattern + multi-reviewer | ⬜ | |
 | M5 | Write/edit: `writer` + `editor` + file tools | ⬜ | |
@@ -48,6 +49,22 @@ port-equivalence baseline tests byte-match phagocyte; ruff + mypy clean; code-re
 
 Newest first. Each entry: what we decided, what we did, and where we stopped — so the next session
 can continue from the last conversation without re-deriving context.
+
+### 2026-06-15 — Session 4: merge PR #2 (M1), build M2 (retrieval + paper_qa)
+**Done this session:**
+- Merged **PR #2** (M1) to `main`. Started branch `feat/m2-retrieval`.
+- **M2 complete:** `retrieval/rag.py` — `Embedder` protocol, deterministic `HashingEmbedder`
+  (hermetic default, lexical), `RagRetriever` (cosine, kinds filter, stable tie-break),
+  `inject_context`/`render_scored`, and a lazy `SentenceTransformerEmbedder` + `LanceDbRetriever`
+  behind the optional `rag` extra. `experts/paper_qa.py` — `PaperQAExpert` (grounded Q&A, cited
+  block ids, never-raises; accepts `MemoryBlocks` or its dump). 109 hermetic tests; reviewed
+  (APPROVE-WITH-NITS, nits applied: lexical-limit docstring, LanceDb `kinds` pushdown, concurrency note).
+- Verified M1→M2 hand-off (ingestor blocks → paper_qa retrieval + citation).
+
+**Stopped at:** M2 code-complete, reviewed, fixed, verified on `feat/m2-retrieval` (committing now).
+
+**Next step:** open the M2 PR; then **M3** — citation grounding: `retrieval/scholar.py` (Semantic
+Scholar, fuzzy-match + date cutoff per PaperOrchestra) + a `citation` expert. See `DESIGN.md` §2.2/§2.3.
 
 ### 2026-06-15 — Session 3: merge PR #1, M1 hermetic core
 **Done this session:**
@@ -126,3 +143,4 @@ runs). Use `planner` to produce the M0 build plan first. (Optionally commit P0�
 - 2026-06-15 — P0–P4 complete; `.claude/` dev harness standardized; progress ledger + session log created; `doc-updater` agent added.
 - 2026-06-15 — branch pushed; README written; **M0 harness skeleton** complete (4 tests pass, ruff/mypy clean).
 - 2026-06-15 — PR #1 merged to `main`; **M1 processing track** complete + reviewed on `feat/m1-processing` (89 hermetic tests + 3 port-equivalence vs phagocyte).
+- 2026-06-15 — PR #2 (M1) merged; **M2 retrieval + paper_qa** complete + reviewed on `feat/m2-retrieval` (109 hermetic tests).
