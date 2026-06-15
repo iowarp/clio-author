@@ -1,0 +1,69 @@
+"""Hermetic tests for :class:`ClioParserSubagent`.
+
+The adapter must expose a discovery manifest covering every routed action and a
+``run`` method whose result always round-trips through ``json.dumps`` -- for a
+happy action, an error action, and a defensive bad-input case -- without ever
+raising.
+"""
+
+from __future__ import annotations
+
+import json
+
+from clio_parser.integration import ClioParserSubagent
+
+_ROUTED_ACTIONS = {
+    "ingest",
+    "ask",
+    "review",
+    "meta_review",
+    "cite",
+    "write",
+    "edit",
+    "describe_figures",
+    "plot",
+    "write_review",
+    "figure_refine",
+}
+
+
+def test_capabilities_shape_lists_all_actions() -> None:
+    caps = ClioParserSubagent().capabilities()
+    assert caps["name"] == "clio-parser"
+    assert isinstance(caps["version"], str) and caps["version"]
+    actions = {entry["action"] for entry in caps["actions"]}
+    assert actions == _ROUTED_ACTIONS
+    for entry in caps["actions"]:
+        assert {"action", "description", "payload_keys"} <= entry.keys()
+        assert isinstance(entry["payload_keys"], list)
+    # The manifest is JSON-serializable.
+    json.dumps(caps)
+
+
+def test_run_happy_action_is_json_serializable() -> None:
+    result = ClioParserSubagent().run("review", {"paper": "# Paper\nSome content."})
+    assert result["action"] == "review"
+    assert set(result) == {"action", "content", "structured", "metadata"}
+    # Round-trips cleanly through json.
+    assert json.loads(json.dumps(result)) == result
+
+
+def test_run_error_action_is_json_serializable_and_no_raise() -> None:
+    # Missing required inputs -> the expert flags an error rather than raising.
+    result = ClioParserSubagent().run("cite", {})
+    assert result["action"] == "cite"
+    assert "error" in result["metadata"]
+    json.dumps(result)
+
+
+def test_run_unknown_action_falls_through_to_echo() -> None:
+    result = ClioParserSubagent().run("totally-unknown", {"foo": "bar"})
+    assert result["action"] == "totally-unknown"
+    assert result["metadata"].get("agent", None) is None  # echo output has no error
+    json.dumps(result)
+
+
+def test_run_none_payload_does_not_raise() -> None:
+    result = ClioParserSubagent().run("ingest", None)
+    assert result["action"] == "ingest"
+    json.dumps(result)

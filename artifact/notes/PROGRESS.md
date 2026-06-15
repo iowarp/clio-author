@@ -4,13 +4,13 @@ Living status ledger. Maintained by the `progress` subagent (see `.claude/agents
 Status legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked.
 
 **Last updated:** 2026-06-15
-**Where we left off:** **M4 merged (PR #5). M5 code-complete and reviewed** on branch
-`feat/m5-writing` — `tools/files.py` (`SafeFiles`: sandbox-confined read/write_new/apply_edit,
-escape-tested) + `experts/{write_models,writer,editor,write_loop}.py` (wtf-p outline→plan→write→
-revise taxonomy; `ReviewerAsCritic` + `run_write_review_loop` over `CriticRefine` — writer↔reviewer
-loop terminates on Accept). 207 hermetic tests; ruff + mypy clean; reviewed (APPROVE-WITH-NITS →
-applied). The **write-papers** half is now functional. Autonomously continuing through **M6**
-(figures — PaperBanana), **M7** (hardening), **M8** (CLIO adapter). See the **Session log** to resume.
+**Where we left off:** **ALL MILESTONES COMPLETE (M0–M8).** M5/M6/M7 merged (PRs #6/#7/#8). **M8
+code-complete and reviewed** on branch `feat/m8-clio-adapter` (PR open): `ClioParserAgent` routes to
+all experts; `integration/clio_adapter.py` (`ClioParserSubagent`) + `cli.py` give CLIO a
+JSON-serializable, subprocess- and import-callable surface. **293 hermetic tests pass**; ruff + mypy
+clean. The full pipeline — ingest → retrieve/Q&A → ground citations → review → write/edit → figures
+— is built, tested, and invokable. Remaining: merge the M8 PR. Then the project is feature-complete
+through the planned roadmap. See the **Session log** to resume.
 
 ## Setup phases
 
@@ -34,7 +34,7 @@ applied). The **write-papers** half is now functional. Autonomously continuing t
 | M5 | Write/edit: `writer` + `editor` + file tools | ✅ | `tools/files.py` (SafeFiles, sandbox-verified) + `experts/{write_models,writer,editor,write_loop}.py` (`run_write_review_loop` via CriticRefine); 207 hermetic tests; reviewed (APPROVE-WITH-NITS → applied) |
 | M6 | Figures (optional): `figure_agent` generation | ✅ | `experts/{figure_models,figure_agent}.py` (describe + matplotlib code-gen; gated `render_plot_code`; `run_figure_refine` via CriticRefine); 224 hermetic tests; reviewed. Diagram image-gen + vision deferred |
 | M7 | Harden gaps: table fidelity, generalized equations, baseline eval report | ✅ | `ingest/tables.py` (GFM normalization, narrowed detection — prose/math/code/lists safe) + `eval/{report}.py` (metrics + report) + equation generality; 256 hermetic tests; reviewed (CHANGES-NEEDED → table over-detection fixed) |
-| M8 | CLIO integration: thin `clio_adapter` so CLIO can invoke the harness | ⬜ | deferred |
+| M8 | CLIO integration: thin `clio_adapter` so CLIO can invoke the harness | ✅ | `ClioParserAgent` routes to all experts; `integration/clio_adapter.py` (`ClioParserSubagent`: capabilities + run, JSON-serializable, CLIO-agnostic) + `cli.py` (`clio-parser`, generic `run <action>`); 293 hermetic tests; reviewed (APPROVE-WITH-NITS → applied) |
 
 ## Open decisions / pending inputs
 
@@ -188,3 +188,4 @@ runs). Use `planner` to produce the M0 build plan first. (Optionally commit P0�
 - 2026-06-15 — PR #5 (M4) merged; **M5 write/edit** complete + reviewed (APPROVE-WITH-NITS → applied) on `feat/m5-writing` (207 hermetic tests; SafeFiles + writer/editor + write-review loop).
 - 2026-06-15 — PR #6 (M5) merged; **M6 figures** complete + reviewed (APPROVE-WITH-NITS → applied) on `feat/m6-figures` (224 hermetic tests; figure_agent describe + plot-code).
 - 2026-06-15 — PR #7 (M6) merged; **M7 hardening** complete + reviewed (CHANGES-NEEDED → table over-detection fixed) on `feat/m7-hardening` (256 hermetic tests; tables + eval report + equation generality).
+- 2026-06-15 — PR #8 (M7) merged; **M8 CLIO adapter + main-agent routing** complete + reviewed (APPROVE-WITH-NITS → applied) on `feat/m8-clio-adapter` (293 hermetic tests). **Roadmap M0–M8 complete.**
