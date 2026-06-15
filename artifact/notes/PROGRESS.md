@@ -4,14 +4,14 @@ Living status ledger. Maintained by the `progress` subagent (see `.claude/agents
 Status legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked.
 
 **Last updated:** 2026-06-15
-**Where we left off:** **M1 merged (PR #2). M2 code-complete and reviewed** on branch
-`feat/m2-retrieval` — `retrieval/rag.py` (`HashingEmbedder` hermetic default + lazy
-LanceDb/SentenceTransformer backend behind the `rag` extra; `RagRetriever`; `inject_context`;
-`render_scored`) + `experts/paper_qa.py` (`PaperQAExpert`, never-raises, grounded Q&A with cited
-block ids). 109 hermetic tests pass; ruff + mypy clean; code-reviewed (APPROVE-WITH-NITS, nits
-applied). M1→M2 hand-off verified (ingestor blocks → paper_qa). Next: open the M2 PR, then **M3**
-(citation grounding — Semantic Scholar from PaperOrchestra + `citation` expert). See the **Session
-log** below to resume.
+**Where we left off:** **M2 merged (PR #3). M3 code-complete and reviewed** on branch
+`feat/m3-citation` — `retrieval/scholar.py` (Pydantic models, pure verification functions adapted
+from PaperOrchestra/Apache-2.0, lazy `SemanticScholarClient` + hermetic `FakeScholarClient`) +
+`experts/citation.py` (`CitationExpert`, suggestions-only, refuses overwriting `references.bib`,
+symlink-safe atomic write, never-raises). 140 hermetic tests pass; ruff + mypy clean; code-reviewed
+(CHANGES-NEEDED → both issues fixed: `cutoff_date` gate now applied; dangling-symlink write hole
+closed). Real S2 calls gated (`scholar` extra). Next: open the M3 PR, then **M4** (review —
+`reviewer` expert + critic-refine + AgentReview rubric). See the **Session log** below to resume.
 
 ## Setup phases
 
@@ -30,7 +30,7 @@ log** below to resume.
 | M0 | Harness skeleton (`BaseAgent`, `AgentProtocol`, engine, patterns, session, types) + trivial expert; `ClioParserAgent.invoke()` runs | ✅ | `clio_parser/harness/` + `agent.py` + `experts/echo.py` + `llm/client.py`; 4 tests pass, ruff/mypy clean |
 | M1 | Processing track: `ingest/` port + `ingestor` expert → Markdown + memory blocks; baseline diff | ✅ | `ingest/{postprocess,blocks,docling_extract}` + `experts/ingestor.py` + `tests/baselines/`; 89 hermetic tests + 3 port-equivalence (byte-match phagocyte); reviewed. Live real-PDF run gated (needs `pdf` extra + network) |
 | M2 | Memory blocks + selective injection + `rag` retrieval; `paper_qa` | ✅ | `retrieval/rag.py` (HashingEmbedder default + lazy LanceDb/SentenceTransformer) + `experts/paper_qa.py`; 109 hermetic tests; reviewed. Real-embedding backend gated (`rag` extra) |
-| M3 | Grounding: `scholar` (Semantic Scholar) + `citation` expert | ⬜ | |
+| M3 | Grounding: `scholar` (Semantic Scholar) + `citation` expert | ✅ | `retrieval/scholar.py` (pure verification + lazy S2 client) + `experts/citation.py` (suggestions-only, bib-safe); 140 hermetic tests; reviewed (CHANGES-NEEDED → fixed: cutoff gate + symlink-safe write). S2 calls gated (`scholar` extra) |
 | M4 | Review: `reviewer` + critic-refine pattern + multi-reviewer | ⬜ | |
 | M5 | Write/edit: `writer` + `editor` + file tools | ⬜ | |
 | M6 | Figures (optional): `figure_agent` generation | ⬜ | |
@@ -46,6 +46,26 @@ log** below to resume.
 - ⛔ **Phagocyte license** — unspecified upstream; confirm before lifting code verbatim (plan is a fresh port regardless).
 
 ## Session log (resume here)
+
+### 2026-06-15 — Session 5: merge PR #3 (M2), build M3 (citation grounding)
+**Done this session:**
+- Merged **PR #3** (M2) to `main`. Started branch `feat/m3-citation`.
+- **M3 complete:** `retrieval/scholar.py` — `Reference`/`Candidate`/`S2Record`/`VerifiedCitation`
+  models, `ScholarClient` protocol, lazy `SemanticScholarClient`, hermetic `FakeScholarClient`, and
+  pure verification (`fuzzy_ratio` thefuzz|difflib, `is_date_valid`, `best_match`, `dedupe`,
+  `verified_coverage` ≥90%, `to_bibtex`, `verify`). `experts/citation.py` — `CitationExpert`:
+  discover→verify→**suggestions only**; refuses overwriting `references.bib`; never raises.
+  Verification logic adapted from PaperOrchestra (Apache-2.0, attributed).
+- **Review = CHANGES-NEEDED → fixed:** (1) `cutoff_date` was a no-op → now gated in `best_match`;
+  (2) write guard bypassable via dangling symlink → hardened with `is_symlink()` refusal + atomic
+  `O_CREAT|O_EXCL|O_NOFOLLOW` write. 140 hermetic tests pass.
+
+**Stopped at:** M3 code-complete, reviewed, fixed, verified on `feat/m3-citation` (committing now).
+
+**Next step:** open the M3 PR; then **M4** — review: a `reviewer` expert using the `CriticRefine`
+pattern (implement the stub) + an AgentReview-style rubric (PaperOrchestra) + multi-reviewer via the
+`Parallel` pattern. See `DESIGN.md` §2.3.
+
 
 Newest first. Each entry: what we decided, what we did, and where we stopped — so the next session
 can continue from the last conversation without re-deriving context.
@@ -144,3 +164,4 @@ runs). Use `planner` to produce the M0 build plan first. (Optionally commit P0�
 - 2026-06-15 — branch pushed; README written; **M0 harness skeleton** complete (4 tests pass, ruff/mypy clean).
 - 2026-06-15 — PR #1 merged to `main`; **M1 processing track** complete + reviewed on `feat/m1-processing` (89 hermetic tests + 3 port-equivalence vs phagocyte).
 - 2026-06-15 — PR #2 (M1) merged; **M2 retrieval + paper_qa** complete + reviewed on `feat/m2-retrieval` (109 hermetic tests).
+- 2026-06-15 — PR #3 (M2) merged; **M3 citation grounding** complete + reviewed (CHANGES-NEEDED → fixed) on `feat/m3-citation` (140 hermetic tests).
