@@ -29,8 +29,12 @@ class Pattern:
 class Sequential(Pattern):
     """Run agents one after another, each appended to the session in order.
 
-    Each agent receives the same task and the (growing) shared session, so a
-    later agent can read earlier agents' outputs from ``session.history``.
+    Each agent receives the same task and the same shared
+    :class:`~clio_parser.harness.session.SessionContext`, which is threaded
+    through every agent. Because the session grows as agents run, a later agent
+    *may* read earlier agents' outputs from ``session.history``. No M0 expert
+    does so yet (:meth:`BaseAgent.run` ignores ``session.history``); the wiring
+    is in place for later milestones.
     """
 
     def run(

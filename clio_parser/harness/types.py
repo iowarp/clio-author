@@ -6,7 +6,7 @@ types form the wire format passed between agents, patterns, and the engine.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -20,7 +20,7 @@ class Message(BaseModel):
     role: Role
     content: str
     name: str | None = None
-    metadata: dict = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class Task(BaseModel):
@@ -28,7 +28,7 @@ class Task(BaseModel):
 
     id: str
     description: str
-    payload: dict = Field(default_factory=dict)
+    payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class AgentOutput(BaseModel):
@@ -36,5 +36,5 @@ class AgentOutput(BaseModel):
 
     agent: str
     content: str
-    structured: dict | None = None
-    metadata: dict = Field(default_factory=dict)
+    structured: dict[str, Any] | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)

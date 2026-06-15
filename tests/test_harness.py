@@ -43,6 +43,38 @@ def test_sequential_runs_agents_in_order() -> None:
     assert [o.agent for o in session.history] == ["first", "second"]
 
 
+def test_sequential_threads_shared_session() -> None:
+    """A later agent sees the prior agent's output already in session.history."""
+
+    class RecordingAgent:
+        """Tiny AgentProtocol impl that records the history it observes on run."""
+
+        def __init__(self, role: str) -> None:
+            self.role = role
+            self.observed: list[str] = []
+
+        @property
+        def name(self) -> str:
+            return self.role
+
+        def run(self, task: Task, session: SessionContext) -> AgentOutput:
+            self.observed = [o.agent for o in session.history]
+            output = AgentOutput(agent=self.name, content=task.description)
+            session.add(output)
+            return output
+
+    first = RecordingAgent("first")
+    second = RecordingAgent("second")
+    session = SessionContext(id="s3")
+
+    Sequential().run([first, second], Task(id="t3", description="go"), session)
+
+    # The first agent ran against an empty history.
+    assert first.observed == []
+    # The second agent observed the first agent's output already in the session.
+    assert second.observed == ["first"]
+
+
 def test_invalid_role_raises_validation_error() -> None:
     with pytest.raises(ValidationError):
         Message(role="not-a-role", content="x")  # type: ignore[arg-type]
