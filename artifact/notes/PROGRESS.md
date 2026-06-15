@@ -4,11 +4,13 @@ Living status ledger. Maintained by the `progress` subagent (see `.claude/agents
 Status legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked.
 
 **Last updated:** 2026-06-15
-**Where we left off:** **PR #1 merged to `main`.** **M1 in progress** on branch
-`feat/m1-processing`: the hermetic ingest core is done — `clio_parser/ingest/postprocess/` (6 passes)
-+ `blocks.py` (memory-block schemas + section walker); 67 tests pass, ruff + mypy clean, deps kept
-optional (`pdf` extra). Remaining for M1: `docling_extract.py`, the `ingestor` expert, and the
-baseline harness. See the **Session log** below to resume.
+**Where we left off:** **M1 code-complete and reviewed** on branch `feat/m1-processing` — full
+processing track: `ingest/postprocess/` (6 passes) + `blocks.py` + `docling_extract.py` (Docling +
+PyMuPDF fallback + arXiv→PDF) + `experts/ingestor.py` + baseline harness. 89 hermetic tests pass; 3
+port-equivalence baseline tests byte-match phagocyte; ruff + mypy clean; code-reviewed
+(APPROVE-WITH-NITS, fixes applied). The real-PDF baseline run is gated (`live`/`baseline`) and needs
+`uv sync --extra pdf` + network (not run in the sandbox). Next: open the M1 PR, then **M2**
+(retrieval + selective injection). See the **Session log** below to resume.
 
 ## Setup phases
 
@@ -25,7 +27,7 @@ baseline harness. See the **Session log** below to resume.
 | # | Milestone | Status | Notes |
 |---|---|---|---|
 | M0 | Harness skeleton (`BaseAgent`, `AgentProtocol`, engine, patterns, session, types) + trivial expert; `ClioParserAgent.invoke()` runs | ✅ | `clio_parser/harness/` + `agent.py` + `experts/echo.py` + `llm/client.py`; 4 tests pass, ruff/mypy clean |
-| M1 | Processing track: `ingest/` port + `ingestor` expert → Markdown + memory blocks; baseline diff | 🚧 | done: `ingest/postprocess/` (6 passes, MIT-adapted; equations clean-room) + `blocks.py` + 67 hermetic tests. todo: `docling_extract.py`, `ingestor` expert, baseline harness |
+| M1 | Processing track: `ingest/` port + `ingestor` expert → Markdown + memory blocks; baseline diff | ✅ | `ingest/{postprocess,blocks,docling_extract}` + `experts/ingestor.py` + `tests/baselines/`; 89 hermetic tests + 3 port-equivalence (byte-match phagocyte); reviewed. Live real-PDF run gated (needs `pdf` extra + network) |
 | M2 | Memory blocks + selective injection + `rag` retrieval; `paper_qa` | ⬜ | |
 | M3 | Grounding: `scholar` (Semantic Scholar) + `citation` expert | ⬜ | |
 | M4 | Review: `reviewer` + critic-refine pattern + multi-reviewer | ⬜ | |
@@ -58,12 +60,17 @@ can continue from the last conversation without re-deriving context.
   `sections.py` with false-positive guards (sentences/list items not promoted). 67 tests pass.
 - **Licensing:** 5 shared passes adapted from paper-to-md (MIT, attributed); equations clean-room.
 
-**Stopped at:** M1 hermetic core complete and verified (ruff/mypy/pytest clean); not yet committed
-at the time of writing → committed on `feat/m1-processing`.
+- **M1 part 2:** `ingest/docling_extract.py` (`PdfConfig`, `resolve_arxiv_url`, `download_pdf`,
+  Docling primary + PyMuPDF OCR fallback, `process_pdf`), `experts/ingestor.py` (`IngestorExpert`,
+  never-raises contract), and the gated `tests/baselines/` harness. Code-reviewed
+  (APPROVE-WITH-NITS); fixes applied (normalize extractor exceptions to `ExtractionError`, frozen
+  `PdfConfig`, stricter arxiv host check). 89 hermetic tests pass.
 
-**Next step:** M1 part 2 — `ingest/docling_extract.py` (Docling + PyMuPDF fallback + arXiv→PDF,
-gated `live`), the `experts/ingestor.py` expert (lazy-import, hermetic test via monkeypatched
-extraction), and the `tests/baselines/` harness. Then code-review and a PR. Plan: `M1-PLAN.md`.
+**Stopped at:** M1 code-complete, reviewed, fixed, and verified on `feat/m1-processing` (committed +
+pushed). Real-PDF baseline run gated (needs `pdf` extra + network).
+
+**Next step:** open the M1 PR (`feat/m1-processing` → `main`); then **M2** — retrieval + selective
+injection (`retrieval/rag.py` over the memory blocks) + a `paper_qa` path. See `DESIGN.md` §2.2.
 
 ### 2026-06-15 — Session 2: push, README, M0 skeleton
 **Decisions made:**
@@ -118,3 +125,4 @@ runs). Use `planner` to produce the M0 build plan first. (Optionally commit P0�
 
 - 2026-06-15 — P0–P4 complete; `.claude/` dev harness standardized; progress ledger + session log created; `doc-updater` agent added.
 - 2026-06-15 — branch pushed; README written; **M0 harness skeleton** complete (4 tests pass, ruff/mypy clean).
+- 2026-06-15 — PR #1 merged to `main`; **M1 processing track** complete + reviewed on `feat/m1-processing` (89 hermetic tests + 3 port-equivalence vs phagocyte).

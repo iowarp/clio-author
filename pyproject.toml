@@ -24,6 +24,14 @@ packages = ["clio_parser"]
 [tool.ruff]
 line-length = 100
 
+[tool.mypy]
+# Optional `pdf` extra is not installed in the default/dev env. These third-party
+# packages ship no stubs and are lazy-imported inside functions, so missing
+# imports here are expected and must not fail the type check.
+[[tool.mypy.overrides]]
+module = ["docling.*", "fitz", "httpx"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Keep the default suite hermetic: no network and no Docling/ML model loads.
