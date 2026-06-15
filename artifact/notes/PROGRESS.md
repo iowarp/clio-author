@@ -32,7 +32,7 @@ applied). The **write-papers** half is now functional. Autonomously continuing t
 | M3 | Grounding: `scholar` (Semantic Scholar) + `citation` expert | ✅ | `retrieval/scholar.py` (pure verification + lazy S2 client) + `experts/citation.py` (suggestions-only, bib-safe); 140 hermetic tests; reviewed (CHANGES-NEEDED → fixed: cutoff gate + symlink-safe write). S2 calls gated (`scholar` extra) |
 | M4 | Review: `reviewer` + critic-refine pattern + multi-reviewer | ✅ | `Parallel`+`CriticRefine` patterns implemented; `experts/{review_models,reviewer,meta_reviewer}.py` (AgentReview rubric, `run_panel`); 167 hermetic tests; reviewed (APPROVE-WITH-NITS → fixed). `RoundRobin` still stub |
 | M5 | Write/edit: `writer` + `editor` + file tools | ✅ | `tools/files.py` (SafeFiles, sandbox-verified) + `experts/{write_models,writer,editor,write_loop}.py` (`run_write_review_loop` via CriticRefine); 207 hermetic tests; reviewed (APPROVE-WITH-NITS → applied) |
-| M6 | Figures (optional): `figure_agent` generation | ⬜ | |
+| M6 | Figures (optional): `figure_agent` generation | ✅ | `experts/{figure_models,figure_agent}.py` (describe + matplotlib code-gen; gated `render_plot_code`; `run_figure_refine` via CriticRefine); 224 hermetic tests; reviewed. Diagram image-gen + vision deferred |
 | M7 | Harden gaps: table fidelity, generalized equations, baseline eval report | ⬜ | |
 | M8 | CLIO integration: thin `clio_adapter` so CLIO can invoke the harness | ⬜ | deferred |
 
@@ -186,3 +186,4 @@ runs). Use `planner` to produce the M0 build plan first. (Optionally commit P0�
 - 2026-06-15 — PR #3 (M2) merged; **M3 citation grounding** complete + reviewed (CHANGES-NEEDED → fixed) on `feat/m3-citation` (140 hermetic tests).
 - 2026-06-15 — PR #4 (M3) merged; **M4 review** complete + reviewed (APPROVE-WITH-NITS → fixed) on `feat/m4-review` (167 hermetic tests; `Parallel`+`CriticRefine` patterns implemented).
 - 2026-06-15 — PR #5 (M4) merged; **M5 write/edit** complete + reviewed (APPROVE-WITH-NITS → applied) on `feat/m5-writing` (207 hermetic tests; SafeFiles + writer/editor + write-review loop).
+- 2026-06-15 — PR #6 (M5) merged; **M6 figures** complete + reviewed (APPROVE-WITH-NITS → applied) on `feat/m6-figures` (224 hermetic tests; figure_agent describe + plot-code).
