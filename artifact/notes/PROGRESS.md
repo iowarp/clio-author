@@ -4,9 +4,9 @@ Living status ledger. Maintained by the `progress` subagent (see `.claude/agents
 Status legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked.
 
 **Last updated:** 2026-06-15
-**Where we left off:** Direction locked (standalone Python agent harness; not MCP/blueprint).
-Artifacts acquired & studied; design + dev-harness complete. Build not yet started — next is **M0**.
-Note: all P0–P4 work (`artifact/`, `.claude/`, `CLAUDE.md`) is currently **uncommitted** on `main`.
+**Where we left off:** **M0 complete** — the harness skeleton runs (`ClioParserAgent.invoke()`
+works; 4 tests pass, ruff + mypy clean). Setup + M0 committed on branch `setup/project-harness`
+(pushed). Next is **M1** (processing track: ingest port + `ingestor` expert).
 See the **Session log** below to resume from the last working session.
 
 ## Setup phases
@@ -23,7 +23,7 @@ See the **Session log** below to resume from the last working session.
 
 | # | Milestone | Status | Notes |
 |---|---|---|---|
-| M0 | Harness skeleton (`BaseAgent`, `AgentProtocol`, engine, patterns, session, types) + trivial expert; `ClioParserAgent.invoke()` runs | ⬜ | next up |
+| M0 | Harness skeleton (`BaseAgent`, `AgentProtocol`, engine, patterns, session, types) + trivial expert; `ClioParserAgent.invoke()` runs | ✅ | `clio_parser/harness/` + `agent.py` + `experts/echo.py` + `llm/client.py`; 4 tests pass, ruff/mypy clean |
 | M1 | Processing track: `ingest/` port + `ingestor` expert → Markdown + memory blocks; baseline diff | ⬜ | |
 | M2 | Memory blocks + selective injection + `rag` retrieval; `paper_qa` | ⬜ | |
 | M3 | Grounding: `scholar` (Semantic Scholar) + `citation` expert | ⬜ | |
@@ -35,7 +35,8 @@ See the **Session log** below to resume from the last working session.
 
 ## Open decisions / pending inputs
 
-- ⬜ **Agent framework** (plain Python+LiteLLM vs DSPy) — decide at M0 (prototype both).
+- ✅ **Agent framework** — plain Python + Pydantic v2 + a pluggable, synchronous `LLMClient` (M0);
+  DSPy / LiteLLM / async deferred to concrete `LLMClient` implementations at the seam.
 - ✅ **Writing scope** — all capabilities, phased (review → HITL writing → autonomous).
 - ⬜ **Default VLM / embedding models** for vision + RAG.
 - ⛔ **Phagocyte license** — unspecified upstream; confirm before lifting code verbatim (plan is a fresh port regardless).
@@ -44,6 +45,24 @@ See the **Session log** below to resume from the last working session.
 
 Newest first. Each entry: what we decided, what we did, and where we stopped — so the next session
 can continue from the last conversation without re-deriving context.
+
+### 2026-06-15 — Session 2: push, README, M0 skeleton
+**Decisions made:**
+- **Agent framework (M0):** plain Python + Pydantic v2 + a pluggable synchronous `LLMClient`
+  (`EchoLLMClient` stub for hermetic tests). DSPy/LiteLLM/async deferred to concrete client impls.
+
+**Done this session:**
+- Pushed branch `setup/project-harness` to GitHub; wrote and pushed a real `README.md`.
+- **M0 complete:** scaffolded `clio_parser/` (`harness/` types, protocol, base, session, patterns,
+  engine; `llm/client.py`; `experts/echo.py`; `agent.py`) + `pyproject.toml` + tests. `Sequential`
+  pattern implemented; `Parallel`/`RoundRobin`/`CriticRefine` are documented stubs.
+- Verified: `uv run pytest` → 4 passed; `ruff` + `mypy` clean; `invoke("hello world")` works.
+
+**Stopped at:** M0 done and verified; M0 commit pending push on `setup/project-harness`.
+
+**Next step:** M1 — processing track. Use `planner` to plan the fresh port of the paper-to-md /
+phagocyte post-processing into `clio_parser/ingest/`, then build the `ingestor` expert (PDF/arXiv →
+scientific Markdown + memory blocks) and a baseline diff. Optionally run `code-reviewer` on M0 first.
 
 ### 2026-06-15 — Session 1: artifacts, design, dev harness
 **Decisions made:**
@@ -79,3 +98,4 @@ runs). Use `planner` to produce the M0 build plan first. (Optionally commit P0�
 ## Changelog
 
 - 2026-06-15 — P0–P4 complete; `.claude/` dev harness standardized; progress ledger + session log created; `doc-updater` agent added.
+- 2026-06-15 — branch pushed; README written; **M0 harness skeleton** complete (4 tests pass, ruff/mypy clean).
