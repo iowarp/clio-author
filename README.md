@@ -92,8 +92,18 @@ out = agent.review("# Paper\n...")              # -> AgentOutput(content, struct
 ```
 
 Experts default to an offline `EchoLLMClient`; `ask` / `review` / `write` / `edit` need a real
-provider to produce useful output. See [`docs/USAGE.md`](docs/USAGE.md) for the `LLMClient` contract
-and a skeleton client.
+provider to produce useful output. The CLI selects one via the **`CLIO_LLM`** environment variable —
+`echo` (default, offline) · `claude` · `codex` · `ollama` (model via `CLIO_LLM_MODEL`):
+
+```bash
+CLIO_LLM=claude clio-parser review --paper "# Paper ..."     # real review from Claude
+CLIO_LLM=ollama CLIO_LLM_MODEL=qwen2.5:14b clio-parser run ask --json '{"question": "...", "blocks": { ... }}'
+```
+
+Ready-made providers live in `clio_parser.llm.providers` (`ClaudeCliLLMClient`, `CodexCliLLMClient`,
+`OllamaLLMClient`); for the in-process API pass one directly, e.g. `ClioParserAgent(llm=ClaudeCliLLMClient())`.
+See [`docs/USAGE.md`](docs/USAGE.md) for the `LLMClient` contract and a skeleton client, and
+`scripts/real_test.py` for an end-to-end real run.
 
 ## Testing
 

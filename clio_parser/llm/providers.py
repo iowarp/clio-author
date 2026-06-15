@@ -30,7 +30,34 @@ __all__ = [
     "CodexCliLLMClient",
     "OllamaLLMClient",
     "flatten_messages",
+    "resolve_llm",
 ]
+
+
+def resolve_llm(spec: str | None = None):
+    """Resolve an ``LLMClient`` from a short spec string (e.g. the ``CLIO_LLM`` env var).
+
+    ``None``/``"echo"`` -> offline ``EchoLLMClient`` (the default, keeps things
+    hermetic); ``"claude"`` -> :class:`ClaudeCliLLMClient`; ``"codex"`` ->
+    :class:`CodexCliLLMClient`; ``"ollama"`` -> :class:`OllamaLLMClient`. The model
+    is read from ``CLIO_LLM_MODEL`` and the Ollama URL from ``CLIO_OLLAMA_URL``.
+    """
+    name = (spec or "echo").strip().lower()
+    if name in ("", "echo"):
+        from clio_parser.llm.client import EchoLLMClient
+
+        return EchoLLMClient()
+    model = os.environ.get("CLIO_LLM_MODEL") or None
+    if name == "claude":
+        return ClaudeCliLLMClient(model=model)
+    if name == "codex":
+        return CodexCliLLMClient(model=model)
+    if name == "ollama":
+        return OllamaLLMClient(
+            model=model or "llama3.1:8b",
+            url=os.environ.get("CLIO_OLLAMA_URL", "http://localhost:11434"),
+        )
+    raise ValueError(f"unknown CLIO_LLM={spec!r} (use one of: claude, codex, ollama, echo)")
 
 
 def flatten_messages(messages: Sequence[Message]) -> str:
