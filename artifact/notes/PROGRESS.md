@@ -4,9 +4,10 @@ Living status ledger. Maintained by the `progress` subagent (see `.claude/agents
 Status legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked.
 
 **Last updated:** 2026-06-15
-**Where we left off:** **M0 complete** — the harness skeleton runs (`ClioParserAgent.invoke()`
-works; 4 tests pass, ruff + mypy clean). Setup + M0 committed on branch `setup/project-harness`
-(pushed). Next is **M1** (processing track: ingest port + `ingestor` expert).
+**Where we left off:** **M0 complete, reviewed, and fixed** — harness skeleton runs
+(`ClioParserAgent.invoke()`; 5 tests pass, ruff + mypy clean; BSD-3 LICENSE added). Branch
+`setup/project-harness` pushed; **PR #1** open against `main`. M1 is planned in `M1-PLAN.md`.
+Next: **execute M1** (processing track — ingest port + `ingestor` expert).
 See the **Session log** below to resume from the last working session.
 
 ## Setup phases
