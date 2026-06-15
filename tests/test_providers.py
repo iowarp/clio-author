@@ -43,3 +43,22 @@ def test_clients_expose_complete() -> None:
         providers.OllamaLLMClient(),
     ):
         assert callable(client.complete)
+
+
+def test_resolve_llm_default_and_echo() -> None:
+    from clio_parser.llm.client import EchoLLMClient
+
+    assert isinstance(providers.resolve_llm(None), EchoLLMClient)
+    assert isinstance(providers.resolve_llm("echo"), EchoLLMClient)
+    assert isinstance(providers.resolve_llm("CLAUDE".lower()), providers.ClaudeCliLLMClient)
+
+
+def test_resolve_llm_named_providers() -> None:
+    assert isinstance(providers.resolve_llm("claude"), providers.ClaudeCliLLMClient)
+    assert isinstance(providers.resolve_llm("codex"), providers.CodexCliLLMClient)
+    assert isinstance(providers.resolve_llm("ollama"), providers.OllamaLLMClient)
+
+
+def test_resolve_llm_unknown_raises() -> None:
+    with pytest.raises(ValueError, match="unknown CLIO_LLM"):
+        providers.resolve_llm("gpt-9000")

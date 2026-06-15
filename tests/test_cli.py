@@ -107,3 +107,22 @@ def test_write_accepts_outline_flag(capsys: pytest.CaptureFixture[str]) -> None:
     code, result = _run(capsys, ["write", "--outline", "1. Intro\n2. Method"])
     assert code == 0
     assert result["action"] == "write"
+
+
+def test_cli_clio_llm_env_accepted_for_capabilities(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # CLIO_LLM selects a real provider; `capabilities` builds it but never invokes it.
+    monkeypatch.setenv("CLIO_LLM", "claude")
+    code, result = _run(capsys, ["capabilities"])
+    assert code == 0
+    assert len(result["actions"]) == 11
+
+
+def test_cli_invalid_clio_llm_degrades_to_error(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CLIO_LLM", "bogus-model")
+    code, result = _run(capsys, ["capabilities"])
+    assert code == 1
+    assert "error" in result and "CLIO_LLM" in result["error"]

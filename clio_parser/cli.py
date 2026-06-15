@@ -13,12 +13,18 @@ A generic ``run <action>`` subcommand dispatches *any* adapter action by name
 The CLI degrades to error dicts rather than tracebacks: malformed ``--json`` and
 any unexpected failure are printed as ``{"error": ...}`` JSON. Imports of the
 adapter are lazy so ``--help`` and argument parsing stay cheap.
+
+The model is selected by the ``CLIO_LLM`` environment variable
+(``echo`` (default, offline) | ``claude`` | ``codex`` | ``ollama``); the model
+name comes from ``CLIO_LLM_MODEL`` and the Ollama URL from ``CLIO_OLLAMA_URL``.
+The default ``echo`` keeps the CLI fully offline unless a real model is requested.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 from collections.abc import Sequence
 from typing import Any
 
@@ -159,10 +165,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # Lazy import so `--help`/parsing never pays the import cost.
     from clio_parser.integration.clio_adapter import ClioParserSubagent
-
-    subagent = ClioParserSubagent()
+    from clio_parser.llm.providers import resolve_llm
 
     try:
+        # CLIO_LLM selects the model (default 'echo' = offline); an invalid value
+        # degrades to an error dict below rather than a traceback.
+        subagent = ClioParserSubagent(llm=resolve_llm(os.environ.get("CLIO_LLM")))
         if args.command == "capabilities":
             result: dict[str, Any] = subagent.capabilities()
         else:

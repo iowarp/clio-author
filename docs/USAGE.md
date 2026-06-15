@@ -263,6 +263,21 @@ That echo path is fine for `ingest` (deterministic), `meta_review` (arithmetic),
 (verification), and the code-extraction parts of `plot`/`describe_figures`, but `ask` / `review` /
 `write` / `edit` need a **real** provider to produce useful output.
 
+**Ready-made providers** ship in `clio_parser.llm.providers` (stdlib-only, lazy):
+`ClaudeCliLLMClient` (the `claude` CLI — session-based, no API key), `CodexCliLLMClient`
+(`codex exec`), and `OllamaLLMClient` (a local Ollama server). The **CLI** selects one via the
+`CLIO_LLM` env var (`echo` (default) | `claude` | `codex` | `ollama`; model via `CLIO_LLM_MODEL`,
+Ollama URL via `CLIO_OLLAMA_URL`):
+
+```bash
+CLIO_LLM=claude  clio-parser review --paper "# Paper ..."
+CLIO_LLM=codex   clio-parser run write --json '{"outline": {"title": "Introduction"}, "source": "..."}'
+CLIO_LLM=ollama  CLIO_LLM_MODEL=qwen2.5:14b clio-parser ask --question "..." --blocks-json '{ ... }'
+```
+
+In-process, pass a provider directly: `ClioParserAgent(llm=ClaudeCliLLMClient())` or
+`ClioParserSubagent(llm=resolve_llm("claude"))`. To write your own provider, implement the contract:
+
 The contract is a single synchronous method (`clio_parser.llm.client.LLMClient`, a runtime-checkable
 `Protocol`):
 
