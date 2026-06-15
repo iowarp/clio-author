@@ -33,7 +33,7 @@ applied). The **write-papers** half is now functional. Autonomously continuing t
 | M4 | Review: `reviewer` + critic-refine pattern + multi-reviewer | ✅ | `Parallel`+`CriticRefine` patterns implemented; `experts/{review_models,reviewer,meta_reviewer}.py` (AgentReview rubric, `run_panel`); 167 hermetic tests; reviewed (APPROVE-WITH-NITS → fixed). `RoundRobin` still stub |
 | M5 | Write/edit: `writer` + `editor` + file tools | ✅ | `tools/files.py` (SafeFiles, sandbox-verified) + `experts/{write_models,writer,editor,write_loop}.py` (`run_write_review_loop` via CriticRefine); 207 hermetic tests; reviewed (APPROVE-WITH-NITS → applied) |
 | M6 | Figures (optional): `figure_agent` generation | ✅ | `experts/{figure_models,figure_agent}.py` (describe + matplotlib code-gen; gated `render_plot_code`; `run_figure_refine` via CriticRefine); 224 hermetic tests; reviewed. Diagram image-gen + vision deferred |
-| M7 | Harden gaps: table fidelity, generalized equations, baseline eval report | ⬜ | |
+| M7 | Harden gaps: table fidelity, generalized equations, baseline eval report | ✅ | `ingest/tables.py` (GFM normalization, narrowed detection — prose/math/code/lists safe) + `eval/{report}.py` (metrics + report) + equation generality; 256 hermetic tests; reviewed (CHANGES-NEEDED → table over-detection fixed) |
 | M8 | CLIO integration: thin `clio_adapter` so CLIO can invoke the harness | ⬜ | deferred |
 
 ## Open decisions / pending inputs
@@ -187,3 +187,4 @@ runs). Use `planner` to produce the M0 build plan first. (Optionally commit P0�
 - 2026-06-15 — PR #4 (M3) merged; **M4 review** complete + reviewed (APPROVE-WITH-NITS → fixed) on `feat/m4-review` (167 hermetic tests; `Parallel`+`CriticRefine` patterns implemented).
 - 2026-06-15 — PR #5 (M4) merged; **M5 write/edit** complete + reviewed (APPROVE-WITH-NITS → applied) on `feat/m5-writing` (207 hermetic tests; SafeFiles + writer/editor + write-review loop).
 - 2026-06-15 — PR #6 (M5) merged; **M6 figures** complete + reviewed (APPROVE-WITH-NITS → applied) on `feat/m6-figures` (224 hermetic tests; figure_agent describe + plot-code).
+- 2026-06-15 — PR #7 (M6) merged; **M7 hardening** complete + reviewed (CHANGES-NEEDED → table over-detection fixed) on `feat/m7-hardening` (256 hermetic tests; tables + eval report + equation generality).

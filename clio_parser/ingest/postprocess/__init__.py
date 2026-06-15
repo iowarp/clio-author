@@ -5,11 +5,13 @@ This package layers an academic clean-up pass on top of raw (Docling/OCR)
 Markdown. It is pure-Python and has no heavy dependencies, so it can be tested
 hermetically. The passes run in a fixed order -- order matters:
 
-    sections -> citations -> equations -> figures -> bibliography -> cleanup
+    sections -> citations -> equations -> figures -> bibliography -> tables ->
+    cleanup
 
 The five passes ``sections``, ``citations``, ``figures``, ``bibliography`` and
 ``cleanup`` are adapted from the MIT-licensed paper-to-md project. The
-``equations`` pass is a clean-room re-implementation (see ``equations.py``).
+``equations`` and ``tables`` passes are clean-room re-implementations (see
+``equations.py`` and ``clio_parser.ingest.tables``).
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ from clio_parser.ingest.postprocess.figures import (
     process_figures,
 )
 from clio_parser.ingest.postprocess.sections import process_sections
+from clio_parser.ingest.tables import process_tables
 
 
 def process_markdown(content: str, images: list[str] | None = None) -> str:
@@ -44,6 +47,7 @@ def process_markdown(content: str, images: list[str] | None = None) -> str:
     content = process_equations(content)
     content = process_figures(content, images or [])
     content = process_bibliography(content)
+    content = process_tables(content)
     content = cleanup_text(content)
     return content
 
@@ -53,6 +57,7 @@ __all__ = [
     "process_sections",
     "process_citations",
     "process_equations",
+    "process_tables",
     "process_figures",
     "get_unembedded_figures",
     "process_bibliography",
