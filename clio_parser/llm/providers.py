@@ -84,7 +84,9 @@ class ClaudeCliLLMClient:
     full context per call, so statelessness is fine).
     """
 
-    def __init__(self, model: str | None = None, *, timeout: int = 300, binary: str = "claude") -> None:
+    def __init__(
+        self, model: str | None = None, *, timeout: int = 300, binary: str = "claude"
+    ) -> None:
         self.model = model
         self.timeout = timeout
         self.binary = binary
@@ -115,7 +117,9 @@ class CodexCliLLMClient:
     is just the completion text (no event noise).
     """
 
-    def __init__(self, model: str | None = None, *, timeout: int = 600, binary: str = "codex") -> None:
+    def __init__(
+        self, model: str | None = None, *, timeout: int = 600, binary: str = "codex"
+    ) -> None:
         self.model = model
         self.timeout = timeout
         self.binary = binary

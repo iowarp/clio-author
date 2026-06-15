@@ -98,7 +98,9 @@ def test_resolve_source_pdf_name_treated_as_path() -> None:
 
 
 def test_resolve_source_title_uses_arxiv_search(monkeypatch) -> None:
-    monkeypatch.setattr(_dx, "search_arxiv_pdf", lambda q, **k: "https://arxiv.org/pdf/1706.03762.pdf")
+    monkeypatch.setattr(
+        _dx, "search_arxiv_pdf", lambda q, **k: "https://arxiv.org/pdf/1706.03762.pdf"
+    )
     assert _dx.resolve_source("Attention Is All You Need") == "https://arxiv.org/pdf/1706.03762.pdf"
 
 
