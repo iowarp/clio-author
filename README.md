@@ -1,88 +1,142 @@
 # clio-parser
 
 A standalone, pure-Python **multi-agent harness for processing, reviewing, and writing scientific
-papers**. A main agent decomposes work across specialized **expert subagents**, backed by
-**retrieval** (RAG + Semantic Scholar + optional knowledge graph) and **read/write/edit** file
-tools.
+papers**. A main agent routes work to specialized **expert subagents**, backed by **retrieval** (RAG
++ Semantic Scholar) and **read/write/edit** file tools.
 
-> **Status:** early development. The architecture and project scaffolding are in place; the harness
-> implementation is in progress (milestone **M0**). See [`artifact/notes/PROGRESS.md`](artifact/notes/PROGRESS.md).
+clio-parser is a *harness invoked by a host* (e.g. the CLIO agent). It is **not** an MCP server and
+**not** a Markdown/blueprint agent — it is a normal Python package a host can call either in-process
+or as a subprocess. It runs **standalone** and is tested on its own.
 
-## Capabilities (two tracks)
+> **Status:** feature-complete through the planned roadmap (milestones **M0–M8**). 293 hermetic
+> tests pass; `ruff` + `mypy` clean. See [`artifact/notes/PROGRESS.md`](artifact/notes/PROGRESS.md).
 
-- **Processing** — convert an arXiv link or PDF into clean *scientific* Markdown with vision
-  (figures, tables, equations), stored as structured *memory blocks* for selective context
-  injection and question answering.
-- **Writing & editing** — outline → plan → draft → review → revise, with citations grounded against
-  external sources.
+## What it does
 
-clio-parser is designed to run on its own and to be **invoked as a subagent** by a host agent.
+The full capability chain is built and invokable:
 
-## Invoked as a subagent
+**ingest → retrieve / Q&A → cite → review → write / edit → figures**
 
-A host (e.g. the CLIO agent) invokes clio-parser through a thin, host-agnostic adapter —
-`ClioParserSubagent` — either **in process** (import) or as a **subprocess** (the `clio-parser`
-CLI). The adapter imports nothing from the host repo, returns JSON-serializable dicts, and never
-raises across its surface.
+- **Ingest** — convert an arXiv id / URL / PDF into clean scientific Markdown plus structured
+  *memory blocks* (sections, figures, equations).
+- **Retrieve / Q&A** — index memory blocks and answer questions grounded only in retrieved blocks,
+  citing the block ids used (selective context injection).
+- **Cite** — verify citation candidates against Semantic Scholar (fuzzy title match + recency gate)
+  and emit **suggestions only** (a `suggested.bib`); it never overwrites a user bibliography.
+- **Review** — produce structured, persona-conditioned peer reviews (AgentReview-style rubric) and
+  aggregate multiple reviews into an area-chair meta-review.
+- **Write / edit** — draft a single paper section grounded in scoped source material, and revise
+  existing prose to address reviewer feedback (diff-based file edits via a sandboxed `SafeFiles`).
+  A writer ↔ reviewer **critic-refine** loop is available.
+- **Figures** — describe/caption figures for context injection, and generate matplotlib **plot code**
+  (text only — generated code is never executed on the default path).
 
-In process:
+Eleven actions are exposed: `ingest`, `ask`, `review`, `meta_review`, `cite`, `write`, `edit`,
+`describe_figures`, `plot`, `write_review`, `figure_refine`. The full action catalog (payload keys
+and return shapes) is in [`docs/USAGE.md`](docs/USAGE.md).
+
+## Install
+
+Requires **Python ≥ 3.12** and [`uv`](https://docs.astral.sh/uv/).
+
+```bash
+uv sync          # core install (pydantic only) — fully hermetic, no network or model downloads
+```
+
+The core install runs every action offline using a deterministic echo LLM client and an in-memory
+retriever. Heavy paths are opt-in behind optional extras:
+
+| Extra | `uv sync --extra <name>` enables | Pulls in |
+|-------|----------------------------------|----------|
+| `pdf` | Real PDF/arXiv extraction in `ingest` (Docling primary, PyMuPDF OCR fallback) | `docling`, `pymupdf`, `pillow`, `httpx` |
+| `rag` | Real embeddings + vector store for retrieval (LanceDB + SentenceTransformer) | `lancedb`, `sentence-transformers`, `numpy` |
+| `scholar` | Real Semantic Scholar client + fuzzy matching for `cite` | `thefuzz`, `httpx` |
+| `viz` | Actual figure rendering via the gated `render_plot_code` helper | `matplotlib` |
+
+Without an extra, the corresponding action still runs: `ingest` returns an error-flagged result
+instead of extracting; retrieval falls back to a deterministic hashing embedder + in-memory index;
+`cite` requires an injected scholar client; `plot` emits code but never renders it.
+
+## Quickstart
+
+### CLI (subprocess)
+
+```bash
+clio-parser capabilities                       # print the action manifest as JSON
+clio-parser ingest 2601.23265                  # ingest an arXiv id / URL / PDF path
+clio-parser review --paper "# Paper\n..."      # structured peer review
+clio-parser ask --question "..." --blocks-json '{...}'
+clio-parser run meta_review --json '{"reviews": [ ... ]}'   # any action by name
+```
+
+Each command prints an indented-JSON result and exits `1` if the result carries an error.
+
+### In-process (Python API)
 
 ```python
 from clio_parser import ClioParserSubagent
 
 sub = ClioParserSubagent()
-sub.capabilities()                                  # discovery manifest (name, version, actions)
-sub.run("review", {"paper": "# Paper\n..."})        # -> {"action","content","structured","metadata"}
+sub.capabilities()                              # {"name", "version", "actions": [...]}
+sub.run("review", {"paper": "# Paper\n..."})    # {"action", "content", "structured", "metadata"}
 ```
 
-As a subprocess:
+`ClioParserSubagent` is the stable, JSON-serializable adapter surface (imports nothing from any
+host, never raises). For typed convenience there is also `ClioParserAgent`:
+
+```python
+from clio_parser import ClioParserAgent
+
+agent = ClioParserAgent()                       # defaults to an offline EchoLLMClient
+out = agent.review("# Paper\n...")              # -> AgentOutput(content, structured, metadata)
+```
+
+Experts default to an offline `EchoLLMClient`; `ask` / `review` / `write` / `edit` need a real
+provider to produce useful output. See [`docs/USAGE.md`](docs/USAGE.md) for the `LLMClient` contract
+and a skeleton client.
+
+## Testing
+
+The default suite is **hermetic**: no network, no Docling/ML model loads.
 
 ```bash
-clio-parser capabilities                            # print the action manifest as JSON
-clio-parser review --paper "# Paper ..."            # run an action; JSON to stdout, exit 1 on error
-clio-parser ask --question "..." --blocks-json '{...}'
+uv run pytest                                  # 293 hermetic tests
 ```
 
-The default path is hermetic (an offline echo client); real LLM / PDF / scholar / figure paths are
-opt-in behind their extras.
+Tests that need the outside world are **gated** behind markers and deselected by default:
+
+```bash
+uv run pytest -m live      --extra rag --extra scholar --extra viz   # network / real backends
+uv run pytest -m baseline  --extra pdf                               # reference-impl / real-PDF comparisons
+```
 
 ## Architecture
 
 ```
 clio_parser/
-  agent.py            MainAgent: plan -> delegate to experts -> critic-refine -> synthesize
-  harness/            BaseAgent, AgentProtocol, engine, patterns, session, types
-  experts/            ingestor · figure · retriever · reviewer · writer · editor · citation
-  ingest/             Docling + post-processing + tables + memory blocks
-  retrieval/          rag (vector) · scholar (citation grounding) · kg (optional)
-  tools/files.py      read / write / edit (diff-based)
-  llm/client.py       provider abstraction (local vision models, Ollama, API)
-tests/                unit tests + baseline comparisons
+  agent.py                MainAgent (ClioParserAgent): routes a Task to an expert by payload["action"]
+  harness/                BaseAgent, AgentProtocol, engine, patterns, session, types
+    patterns.py           Sequential | Parallel | CriticRefine  (RoundRobin: future work)
+  experts/                ingestor · paper_qa · reviewer · meta_reviewer · citation ·
+                          writer · editor · figure_agent  (+ review/write/figure models, loops)
+  ingest/                 Docling + PyMuPDF extract · postprocess · tables · memory blocks
+  retrieval/              rag (hashing default; LanceDB/SentenceTransformer extra) · scholar
+  tools/files.py          SafeFiles: sandboxed read / write / diff-based edit
+  llm/client.py           LLMClient protocol + EchoLLMClient (offline default)
+  eval/report.py          baseline metrics + report
+  integration/clio_adapter.py   ClioParserSubagent: JSON-serializable capabilities() + run()
+  cli.py                  `clio-parser` console entry point
+tests/                    hermetic unit tests + gated live/baseline comparisons
 ```
 
-The authoritative design is in [`artifact/notes/DESIGN.md`](artifact/notes/DESIGN.md); the
-comparative rationale across reference systems is in
-[`artifact/notes/SYNTHESIS.md`](artifact/notes/SYNTHESIS.md).
+The authoritative design is in [`artifact/notes/DESIGN.md`](artifact/notes/DESIGN.md). Project rules
+and standards are in [`CLAUDE.md`](CLAUDE.md).
 
-## Getting started
-
-Requires **Python ≥ 3.12** and [`uv`](https://docs.astral.sh/uv/).
-
-```bash
-uv sync          # install dependencies
-uv run pytest    # run the test suite
-```
-
-## Development
-
-This repository ships a Claude Code development harness under `.claude/` — specialized subagents
-(planner, designer, coder, code-reviewer, debugger, test-engineer, explorer, progress, doc-updater)
-and skills. Project rules and standards live in [`CLAUDE.md`](CLAUDE.md).
-
-Reference material (source repositories and papers used for study and as evaluation baselines) is
-fetched locally under `artifact/` and is **not** tracked in git; see
-[`artifact/notes/MANIFEST.md`](artifact/notes/MANIFEST.md) to reproduce it.
+**Future work (deferred):** the `RoundRobin` pattern (reviewer-discussion escalation), diagram
+image generation, and LLM vision captions for figures.
 
 ## License
 
-BSD-3-Clause (planned).
+BSD-3-Clause. Adapted concepts are cited in-source by repository URL and license:
+paper-to-md (MIT), PaperBanana / papervizagent (Apache-2.0), PaperOrchestra (Apache-2.0),
+wtf-p (MIT). AGPL-licensed concepts are re-implemented, not copied.
