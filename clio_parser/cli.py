@@ -47,8 +47,12 @@ def _build_parser() -> argparse.ArgumentParser:
             help="A JSON object merged into the action payload.",
         )
 
-    p_ingest = sub.add_parser("ingest", help="Ingest an arXiv id / URL / PDF into Markdown.")
-    p_ingest.add_argument("source", help="arXiv id, URL, or PDF path to ingest.")
+    p_ingest = sub.add_parser(
+        "ingest", help="Ingest an arXiv id / URL / PDF / paper title into Markdown."
+    )
+    p_ingest.add_argument(
+        "source", help="arXiv id, URL, local PDF path, or a paper title/topic to ingest."
+    )
     _add_json(p_ingest)
 
     p_ask = sub.add_parser("ask", help="Answer a question grounded in memory blocks.")

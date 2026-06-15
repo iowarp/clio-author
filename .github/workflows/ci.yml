@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: lint + type + hermetic tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Sync (core only — keeps the suite hermetic)
+        run: uv sync
+
+      - name: Ruff (lint + format check)
+        run: |
+          uv run ruff check clio_parser tests scripts
+          uv run ruff format --check clio_parser tests scripts
+
+      - name: Mypy
+        run: uv run mypy clio_parser
+
+      - name: Pytest (hermetic; live/baseline are deselected by default)
+        run: uv run pytest -q

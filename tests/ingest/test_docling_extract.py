@@ -77,3 +77,38 @@ def test_pdf_config_is_frozen() -> None:
 def test_error_hierarchy() -> None:
     assert issubclass(ExtractionDependencyError, ExtractionError)
     assert issubclass(ExtractionError, RuntimeError)
+
+
+# --- resolve_source: title / topic support (hermetic; search is mocked) --------
+from clio_parser.ingest import docling_extract as _dx  # noqa: E402
+
+
+def test_resolve_source_arxiv_id() -> None:
+    assert _dx.resolve_source("2601.23265") == "https://arxiv.org/pdf/2601.23265.pdf"
+
+
+def test_resolve_source_local_pdf_path(tmp_path) -> None:
+    p = tmp_path / "paper.pdf"
+    p.write_bytes(b"%PDF-1.4")
+    assert _dx.resolve_source(str(p)) == str(p)
+
+
+def test_resolve_source_pdf_name_treated_as_path() -> None:
+    assert _dx.resolve_source("some-paper.pdf") == "some-paper.pdf"
+
+
+def test_resolve_source_title_uses_arxiv_search(monkeypatch) -> None:
+    monkeypatch.setattr(_dx, "search_arxiv_pdf", lambda q, **k: "https://arxiv.org/pdf/1706.03762.pdf")
+    assert _dx.resolve_source("Attention Is All You Need") == "https://arxiv.org/pdf/1706.03762.pdf"
+
+
+def test_resolve_source_unresolvable_title_raises(monkeypatch) -> None:
+    monkeypatch.setattr(_dx, "search_arxiv_pdf", lambda q, **k: None)
+    with pytest.raises(ExtractionError, match="could not resolve"):
+        _dx.resolve_source("zzz definitely not a real paper title qqq")
+
+
+@pytest.mark.live
+def test_search_arxiv_pdf_live() -> None:
+    url = _dx.search_arxiv_pdf("Attention Is All You Need")
+    assert url is not None and url.startswith("https://arxiv.org/pdf/")
