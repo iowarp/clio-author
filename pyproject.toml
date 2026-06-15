@@ -14,6 +14,11 @@ dependencies = ["pydantic>=2"]
 # Heavy PDF-extraction stack. Kept OUT of core deps: Docling pulls ~500MB of
 # ML models on first run. Install with `uv sync --extra pdf` only when needed.
 pdf = ["docling>=2.0.0", "pymupdf>=1.26.6", "pillow>=10", "httpx"]
+# Heavy retrieval backend (real embeddings + vector store). Kept OUT of core
+# deps: sentence-transformers downloads model weights on first use. The default
+# `HashingEmbedder` + in-memory `RagRetriever` need none of this. Install with
+# `uv sync --extra rag` only when using the LanceDB / SentenceTransformer path.
+rag = ["lancedb", "sentence-transformers", "numpy"]
 
 [dependency-groups]
 dev = ["pytest", "ruff", "mypy"]
@@ -30,6 +35,11 @@ line-length = 100
 # imports here are expected and must not fail the type check.
 [[tool.mypy.overrides]]
 module = ["docling.*", "fitz", "httpx"]
+ignore_missing_imports = true
+
+# Optional `rag` extra is likewise lazy-imported and absent from the default env.
+[[tool.mypy.overrides]]
+module = ["lancedb.*", "sentence_transformers.*", "numpy"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
