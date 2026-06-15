@@ -1,0 +1,27 @@
+# Reference artifacts — cloned repos + downloaded papers (not project source).
+# Re-fetch via artifact/notes/MANIFEST.md.
+/artifact/repos/
+/artifact/papers/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.uv/
+build/
+dist/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Env / secrets
+.env
+.env.*
+*.key
+
+# OS / editor
+.DS_Store
+*.swp
