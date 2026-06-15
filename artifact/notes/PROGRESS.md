@@ -4,11 +4,11 @@ Living status ledger. Maintained by the `progress` subagent (see `.claude/agents
 Status legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked.
 
 **Last updated:** 2026-06-15
-**Where we left off:** **M0 complete, reviewed, and fixed** — harness skeleton runs
-(`ClioParserAgent.invoke()`; 5 tests pass, ruff + mypy clean; BSD-3 LICENSE added). Branch
-`setup/project-harness` pushed; **PR #1** open against `main`. M1 is planned in `M1-PLAN.md`.
-Next: **execute M1** (processing track — ingest port + `ingestor` expert).
-See the **Session log** below to resume from the last working session.
+**Where we left off:** **PR #1 merged to `main`.** **M1 in progress** on branch
+`feat/m1-processing`: the hermetic ingest core is done — `clio_parser/ingest/postprocess/` (6 passes)
++ `blocks.py` (memory-block schemas + section walker); 67 tests pass, ruff + mypy clean, deps kept
+optional (`pdf` extra). Remaining for M1: `docling_extract.py`, the `ingestor` expert, and the
+baseline harness. See the **Session log** below to resume.
 
 ## Setup phases
 
@@ -25,7 +25,7 @@ See the **Session log** below to resume from the last working session.
 | # | Milestone | Status | Notes |
 |---|---|---|---|
 | M0 | Harness skeleton (`BaseAgent`, `AgentProtocol`, engine, patterns, session, types) + trivial expert; `ClioParserAgent.invoke()` runs | ✅ | `clio_parser/harness/` + `agent.py` + `experts/echo.py` + `llm/client.py`; 4 tests pass, ruff/mypy clean |
-| M1 | Processing track: `ingest/` port + `ingestor` expert → Markdown + memory blocks; baseline diff | ⬜ | |
+| M1 | Processing track: `ingest/` port + `ingestor` expert → Markdown + memory blocks; baseline diff | 🚧 | done: `ingest/postprocess/` (6 passes, MIT-adapted; equations clean-room) + `blocks.py` + 67 hermetic tests. todo: `docling_extract.py`, `ingestor` expert, baseline harness |
 | M2 | Memory blocks + selective injection + `rag` retrieval; `paper_qa` | ⬜ | |
 | M3 | Grounding: `scholar` (Semantic Scholar) + `citation` expert | ⬜ | |
 | M4 | Review: `reviewer` + critic-refine pattern + multi-reviewer | ⬜ | |
@@ -46,6 +46,24 @@ See the **Session log** below to resume from the last working session.
 
 Newest first. Each entry: what we decided, what we did, and where we stopped — so the next session
 can continue from the last conversation without re-deriving context.
+
+### 2026-06-15 — Session 3: merge PR #1, M1 hermetic core
+**Done this session:**
+- Merged **PR #1** to `main` (setup + M0). Started branch `feat/m1-processing`.
+- **M1 part 1 (hermetic core):** built `clio_parser/ingest/postprocess/` (sections, citations,
+  equations, figures, bibliography, cleanup) + `blocks.py` (`FigureInfo`/`Equation`/`CodeBlock`/
+  `SectionBlock`/`MemoryBlocks` with `block_id`, `to_context`, `select`, and a section walker).
+  Deps kept optional (`pdf` extra); default test suite hermetic.
+- **Bug found + fixed:** top-level Arabic headings (`1. INTRODUCTION`) weren't promoted — fixed in
+  `sections.py` with false-positive guards (sentences/list items not promoted). 67 tests pass.
+- **Licensing:** 5 shared passes adapted from paper-to-md (MIT, attributed); equations clean-room.
+
+**Stopped at:** M1 hermetic core complete and verified (ruff/mypy/pytest clean); not yet committed
+at the time of writing → committed on `feat/m1-processing`.
+
+**Next step:** M1 part 2 — `ingest/docling_extract.py` (Docling + PyMuPDF fallback + arXiv→PDF,
+gated `live`), the `experts/ingestor.py` expert (lazy-import, hermetic test via monkeypatched
+extraction), and the `tests/baselines/` harness. Then code-review and a PR. Plan: `M1-PLAN.md`.
 
 ### 2026-06-15 — Session 2: push, README, M0 skeleton
 **Decisions made:**

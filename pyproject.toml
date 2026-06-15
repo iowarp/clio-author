@@ -10,6 +10,11 @@ requires-python = ">=3.12"
 license = "BSD-3-Clause"
 dependencies = ["pydantic>=2"]
 
+[project.optional-dependencies]
+# Heavy PDF-extraction stack. Kept OUT of core deps: Docling pulls ~500MB of
+# ML models on first run. Install with `uv sync --extra pdf` only when needed.
+pdf = ["docling>=2.0.0", "pymupdf>=1.26.6", "pillow>=10", "httpx"]
+
 [dependency-groups]
 dev = ["pytest", "ruff", "mypy"]
 
@@ -21,3 +26,10 @@ line-length = 100
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Keep the default suite hermetic: no network and no Docling/ML model loads.
+# `live` = needs network; `baseline` = compares against reference impls / real PDFs.
+markers = [
+    "live: tests that require network access (deselected by default)",
+    "baseline: tests that compare against reference impls or real PDFs (deselected by default)",
+]
+addopts = "-m 'not live and not baseline'"
