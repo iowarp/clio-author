@@ -12,6 +12,9 @@ from clio_parser.harness.protocol import AgentProtocol
 from clio_parser.harness.session import SessionContext
 from clio_parser.harness.types import AgentOutput, Task
 
+NO_CHANGES_SENTINEL = "No changes needed."
+"""Critic sentinel signalling the current draft needs no further revision."""
+
 
 class Pattern:
     """Base orchestration pattern."""
@@ -50,11 +53,24 @@ class Sequential(Pattern):
 
 
 class Parallel(Pattern):
-    """Run agents concurrently on the same task and collect all outputs.
+    """Run agents on the same task and collect outputs in input order.
 
-    Planned: dispatch each agent independently (async/threaded once the LLM
-    client gains an async path), preserving input order in the returned list,
-    then append all outputs to the session.
+    Every agent receives the *same* task and the same shared
+    :class:`~clio_parser.harness.session.SessionContext`. Outputs are collected
+    in the order the agents were supplied, regardless of when they would
+    complete under true concurrency.
+
+    Execution is **sequential-collect**, not threaded: the :class:`LLMClient`
+    protocol is synchronous and ``SessionContext`` is unlocked, so a thread pool
+    would only add contention without a thread-safe client. A threaded dispatch
+    path awaits a thread-safe / async ``LLMClient`` (and likely per-agent child
+    sessions for true blind isolation); the public contract -- input-order
+    results, single ``session.add`` per agent -- is designed to survive that
+    change.
+
+    Like :class:`Sequential`, this pattern does **not** add outputs to the
+    session itself: each agent owns its own :meth:`session.add`, so every output
+    is appended exactly once.
     """
 
     def run(
@@ -63,7 +79,10 @@ class Parallel(Pattern):
         task: Task,
         session: SessionContext,
     ) -> list[AgentOutput]:
-        raise NotImplementedError("planned for a later milestone")
+        outputs: list[AgentOutput] = []
+        for agent in agents:
+            outputs.append(agent.run(task, session))
+        return outputs
 
 
 class RoundRobin(Pattern):
@@ -84,12 +103,26 @@ class RoundRobin(Pattern):
 
 
 class CriticRefine(Pattern):
-    """Generator/critic refinement loop (independent synthesis).
+    """Producer/critic refinement loop (independent synthesis).
 
-    Planned: a primary agent drafts, one or more critic agents review against a
-    rubric, and the draft is revised until quality passes or a max-iteration
-    budget is reached. Mirrors the PaperBanana/papervizagent critic-refine loop
-    (Apache-2.0; adapted, not copied).
+    ``agents[0]`` is the *producer*; ``agents[1]`` is the *critic*. The producer
+    drafts once, then for up to ``task.payload["max_rounds"]`` (default ``3``)
+    rounds the critic reviews the current draft and the producer revises in
+    response. State is threaded through ``session.data``:
+
+    * ``session.data["draft"]`` -- the producer's latest ``content``.
+    * ``session.data["critic_feedback"]`` -- the critic's latest ``content``.
+
+    A round short-circuits when the critic's ``content.strip()`` equals
+    :data:`NO_CHANGES_SENTINEL`. The loop also stops as soon as any output is
+    error-flagged (``metadata["error"]`` present), so a degraded agent does not
+    spin the budget. With fewer than two agents the single agent runs once.
+
+    Returns the **full ordered history** of this run's outputs
+    (``list[AgentOutput]``); the final element is the last output produced. Never
+    raises -- agents are expected to flag failures on their output. Mirrors the
+    PaperBanana/papervizagent critic-refine loop (Apache-2.0; adapted, not
+    copied).
     """
 
     def run(
@@ -98,4 +131,45 @@ class CriticRefine(Pattern):
         task: Task,
         session: SessionContext,
     ) -> list[AgentOutput]:
-        raise NotImplementedError("planned for a later milestone")
+        outputs: list[AgentOutput] = []
+        if not agents:
+            return outputs
+
+        if len(agents) < 2:
+            outputs.append(agents[0].run(task, session))
+            return outputs
+
+        producer, critic = agents[0], agents[1]
+        try:
+            max_rounds = int(task.payload.get("max_rounds", 3))
+        except (TypeError, ValueError):
+            max_rounds = 3
+        max_rounds = max(0, max_rounds)
+
+        draft = producer.run(task, session)
+        outputs.append(draft)
+        if _is_error(draft):
+            return outputs
+        session.data["draft"] = draft.content
+
+        for _ in range(max_rounds):
+            review = critic.run(task, session)
+            outputs.append(review)
+            if _is_error(review):
+                break
+            session.data["critic_feedback"] = review.content
+            if review.content.strip() == NO_CHANGES_SENTINEL:
+                break
+
+            revision = producer.run(task, session)
+            outputs.append(revision)
+            if _is_error(revision):
+                break
+            session.data["draft"] = revision.content
+
+        return outputs
+
+
+def _is_error(output: AgentOutput) -> bool:
+    """True when ``output`` carries an ``error`` flag in its metadata."""
+    return "error" in output.metadata
