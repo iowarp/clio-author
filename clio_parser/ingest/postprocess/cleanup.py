@@ -13,10 +13,8 @@ Opt-in passes (``merge_paragraphs`` / ``fix_hyphenation``, both off by default)
 are more aggressive and can change wording, so callers must enable them.
 
 Markdown table rows (lines starting with ``|``) are never merged or rewritten by
-the structural passes -- table fidelity is preserved here and deferred to M7.
-
-.. # TODO(M7): tables.py -- first-class table extraction/repair lives in M7;
-   this module only guarantees it does not corrupt ``|``-delimited rows.
+the structural passes -- table fidelity is preserved here, and first-class table
+repair runs earlier in the pipeline (see :mod:`clio_parser.ingest.tables`).
 """
 
 from __future__ import annotations
