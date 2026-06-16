@@ -4,7 +4,7 @@ All notable changes to clio-parser are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [0.2.1]
+## [0.2.2]
 
 ### Added
 - **Citation backend auto-wiring.** The CLI now selects the citation backend via the `CLIO_SCHOLAR`
@@ -16,6 +16,16 @@ All notable changes to clio-parser are documented here. The format is based on
 - **Pinned `torch`/`torchvision` to the CPU index** in `pyproject.toml` (`[tool.uv.sources]` +
   `[[tool.uv.index]] pytorch-cpu`) and regenerated the lock, so `uv sync --all-extras` resolves
   matching CPU wheels and avoids the `torchvision::nms` mismatch. GPU users can override the index.
+
+## [0.2.1]
+
+### Added
+- **`format` output option** (`structured` (default) | `prose`) on the actions, so a host can
+  request prose output in addition to the structured result.
+- **CLI / subagent invocation docs** — how to run via `uv run` and invoke clio-parser as a subagent.
+
+### Changed
+- More concise README.
 
 ## [0.2.0]
 
@@ -61,6 +71,7 @@ All notable changes to clio-parser are documented here. The format is based on
 - BSD-3-Clause. Adapted from paper-to-md (MIT), PaperBanana/PaperOrchestra (Apache-2.0); protoneo
   concepts re-implemented (not copied). ~300 hermetic tests.
 
+[0.2.2]: https://github.com/SIslamMun/clio-Parser/releases/tag/v0.2.2
 [0.2.1]: https://github.com/SIslamMun/clio-Parser/releases/tag/v0.2.1
 [0.2.0]: https://github.com/SIslamMun/clio-Parser/releases/tag/v0.2.0
 [0.1.2]: https://github.com/SIslamMun/clio-Parser/releases/tag/v0.1.2
