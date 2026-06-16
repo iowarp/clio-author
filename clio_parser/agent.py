@@ -20,6 +20,7 @@ returns the echo output.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 from uuid import uuid4
 
@@ -98,7 +99,21 @@ class ClioParserAgent:
         )
         action = task_obj.payload.get("action")
         try:
-            return self._route(action, task_obj)
+            out = self._route(action, task_obj)
+            # format="prose": return a human-readable text answer (drop the JSON).
+            # Experts that write prose themselves (e.g. review) already set
+            # structured=None, so this only re-renders the data-shaped actions.
+            if (
+                str(task_obj.payload.get("format", "")).lower() == "prose"
+                and out.structured is not None
+            ):
+                return AgentOutput(
+                    agent=out.agent,
+                    content=_prose_view(action, out),
+                    structured=None,
+                    metadata={**out.metadata, "format": "prose"},
+                )
+            return out
         except Exception as exc:  # noqa: BLE001 - never raise across the public surface
             return AgentOutput(
                 agent="clio-parser",
@@ -205,6 +220,48 @@ class ClioParserAgent:
     def plot(self, spec: Any) -> AgentOutput:
         """Generate matplotlib plot code from ``spec`` (code text only)."""
         return self._invoke("plot", {"spec": spec})
+
+
+def _bullets(label: str, items: Any) -> str:
+    """Render ``items`` as a labelled bullet list (empty string when none)."""
+    if not items:
+        return ""
+    lines = "\n".join(f"- {it}" for it in items)
+    return f"{label}:\n{lines}\n\n"
+
+
+def _prose_view(action: Any, out: AgentOutput) -> str:
+    """Render an action's structured result as human-readable prose.
+
+    Used when a caller asks for ``format="prose"``. Actions whose ``content`` is
+    already prose/code (ask / write / edit / plot) just reuse it; the data-shaped
+    actions (cite / meta_review / describe_figures) are textualized from their
+    structured fields. Falls back to pretty-printed JSON if nothing else fits.
+    """
+    s = out.structured or {}
+    meta = out.metadata or {}
+    if action == "cite":
+        bib = s.get("suggested_bibtex") or ""
+        head = (
+            f"Verified {meta.get('num_verified', '?')}/{meta.get('num_candidates', '?')} citations."
+        )
+        return f"{head}\n\n{bib}".strip()
+    if action == "meta_review":
+        head = (
+            f"Meta-review across {s.get('reviewer_count', '?')} reviews — "
+            f"Decision: {s.get('decision')} (overall {s.get('overall')}/10).\n\n"
+        )
+        return (
+            head
+            + _bullets("Strengths", s.get("strengths"))
+            + _bullets("Weaknesses", s.get("weaknesses"))
+        ).strip()
+    if action == "describe_figures":
+        ds = s.get("descriptions") or []
+        rendered = "\n".join(f"Figure {d.get('figure_id')}: {d.get('description')}" for d in ds)
+        return rendered or out.content
+    # ask / write / edit / plot: content is already the human answer/draft/code.
+    return out.content or json.dumps(s, indent=2)
 
 
 __all__ = ["ClioParserAgent"]

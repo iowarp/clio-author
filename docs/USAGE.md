@@ -29,6 +29,12 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 > `--no-sync` if you installed extras via `uv pip install`. The bare `clio-parser …` form shown
 > below assumes an activated venv.
 
+> **Output format (`structured` vs `prose`).** Every action defaults to `structured` — JSON for a
+> host agent to branch on. Pass `--format prose` (CLI flag on `review`/`ask`/`cite`) or
+> `{"format": "prose"}` in any payload to get a human-readable text answer instead: `structured`
+> becomes `null` and the prose lands in `content`. `review` has the model *write* the prose;
+> the data-shaped actions (`cite`, `meta_review`, `describe_figures`) render their result as text.
+
 ---
 
 ## Action catalog (11 actions)

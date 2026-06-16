@@ -54,6 +54,15 @@ def _build_parser() -> argparse.ArgumentParser:
             help="A JSON object merged into the action payload.",
         )
 
+    def _add_format(p: argparse.ArgumentParser) -> None:
+        p.add_argument(
+            "--format",
+            dest="fmt",
+            choices=("structured", "prose"),
+            default="structured",
+            help="structured = JSON (default, for host agents); prose = plain text (for humans).",
+        )
+
     p_ingest = sub.add_parser(
         "ingest", help="Ingest an arXiv id / URL / PDF / paper title into Markdown."
     )
@@ -70,10 +79,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="A JSON MemoryBlocks dump to ground the answer in.",
     )
+    _add_format(p_ask)
     _add_json(p_ask)
 
-    p_review = sub.add_parser("review", help="Produce a structured peer review of a paper.")
+    p_review = sub.add_parser("review", help="Produce a peer review of a paper.")
     p_review.add_argument("--paper", default=None, help="The paper Markdown text to review.")
+    _add_format(p_review)
     _add_json(p_review)
 
     p_cite = sub.add_parser("cite", help="Verify citation candidates (suggestions only).")
@@ -83,6 +94,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="A JSON list of citation candidates.",
     )
+    _add_format(p_cite)
     _add_json(p_cite)
 
     p_write = sub.add_parser("write", help="Draft a paper section from an outline.")
@@ -143,13 +155,16 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         blocks = _parse_json(args.blocks_json, field="--blocks-json")
         if blocks is not None:
             payload["blocks"] = blocks
+        payload["format"] = args.fmt
     elif command == "review":
         if args.paper is not None:
             payload["paper"] = args.paper
+        payload["format"] = args.fmt
     elif command == "cite":
         candidates = _parse_json(args.candidates_json, field="--candidates-json")
         if candidates is not None:
             payload["candidates"] = candidates
+        payload["format"] = args.fmt
     elif command == "write":
         if args.source is not None:
             payload["source"] = args.source

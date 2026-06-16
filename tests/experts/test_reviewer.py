@@ -160,3 +160,18 @@ def test_reviewer_runs_via_engine_sequential() -> None:
     assert len(outputs) == 1
     assert outputs[0].structured is not None
     assert outputs[0].metadata["decision"] == "Accept"
+
+
+def test_reviewer_prose_mode_returns_text_not_json() -> None:
+    class ProseLLM:
+        def complete(self, messages, **kwargs):  # type: ignore[no-untyped-def]
+            return "Summary: solid.\nStrengths: clear.\nWeaknesses: small eval.\nDecision: Accept (7/10)"
+
+    out = ReviewerExpert(llm=ProseLLM()).run(
+        Task(id="r", description="review", payload={"paper": "# P\n\nbody", "format": "prose"}),
+        SessionContext(id="s"),
+    )
+    assert out.structured is None
+    assert out.metadata["format"] == "prose"
+    assert "error" not in out.metadata and "parse_error" not in out.metadata
+    assert "Decision: Accept" in out.content

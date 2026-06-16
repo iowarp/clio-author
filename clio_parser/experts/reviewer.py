@@ -56,6 +56,15 @@ _INSTRUCTIONS = (
     "The JSON is parsed automatically, so keep the format precise."
 )
 
+_PROSE_INSTRUCTIONS = (
+    "Write a concise peer review in plain prose (no JSON, no code fences):\n"
+    "- a short summary of the paper,\n"
+    "- Strengths,\n"
+    "- Weaknesses,\n"
+    "- Questions for the authors,\n"
+    "- and a final line: 'Decision: Accept' or 'Decision: Reject' with an overall rating out of 10."
+)
+
 
 def build_reviewer_system_prompt(persona: PersonaSpec) -> str:
     """Build the persona-conditioned reviewer system prompt.
@@ -175,17 +184,32 @@ class ReviewerExpert(BaseAgent):
             if not raw_paper:
                 return self._error(session, "no 'paper'/'markdown'/'blocks' provided")
 
+            # format: "structured" (default, JSON rubric) or "prose" (free-text review).
+            fmt = str(task.payload.get("format", "structured")).lower()
+            instructions = _PROSE_INSTRUCTIONS if fmt == "prose" else _INSTRUCTIONS
+
             paper_text = self._coerce_paper(raw_paper)
             messages = [
                 Message(role="system", content=self.system_prompt),
                 Message(
                     role="user",
                     content=(
-                        f"{_INSTRUCTIONS}\n\nHere is the paper to review:\n```\n{paper_text}\n```"
+                        f"{instructions}\n\nHere is the paper to review:\n```\n{paper_text}\n```"
                     ),
                 ),
             ]
             raw = self.llm.complete(messages)
+
+            if fmt == "prose":
+                # Human-facing prose review: the text IS the result; no parsing.
+                output = AgentOutput(
+                    agent=self.name,
+                    content=raw,
+                    structured=None,
+                    metadata={"persona": self.persona.label, "format": "prose"},
+                )
+                session.add(output)
+                return output
 
             parsed = _extract_json_object(raw)
             if parsed is None:

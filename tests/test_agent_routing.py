@@ -180,3 +180,28 @@ def test_convenience_plot() -> None:
     out = _agent().plot({"kind": "line", "intent": "trend"})
     assert out.agent == "figure"
     assert out.metadata.get("mode") == "plot"
+
+
+def test_prose_format_renders_meta_review_as_text() -> None:
+    from clio_parser.agent import ClioParserAgent
+    from clio_parser.harness.types import Task
+    from uuid import uuid4
+
+    agent = ClioParserAgent()  # offline echo; meta_review is deterministic
+    out = agent.invoke(
+        Task(
+            id=uuid4().hex,
+            description="meta_review",
+            payload={
+                "action": "meta_review",
+                "format": "prose",
+                "reviews": [
+                    {"Overall": 7, "Decision": "Accept", "Strengths": ["clear"]},
+                    {"Overall": 5, "Decision": "Reject", "Weaknesses": ["no baselines"]},
+                ],
+            },
+        )
+    )
+    assert out.structured is None
+    assert out.metadata.get("format") == "prose"
+    assert "Meta-review" in out.content
