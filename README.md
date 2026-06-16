@@ -21,12 +21,13 @@ or as a subprocess. It runs **standalone** and is tested on its own.
 3. [Install](#install)
 4. [Choosing a model](#choosing-a-model)
 5. [Quickstart](#quickstart)
-6. [Where output goes](#where-output-goes)
-7. [Testing](#testing)
-8. [Development](#development)
-9. [Architecture](#architecture)
-10. [Troubleshooting](#troubleshooting)
-11. [License](#license)
+6. [Invoking from another agent](#invoking-clio-parser-from-another-agent-as-a-subagent)
+7. [Where output goes](#where-output-goes)
+8. [Testing](#testing)
+9. [Development](#development)
+10. [Architecture](#architecture)
+11. [Troubleshooting](#troubleshooting)
+12. [License](#license)
 
 ---
 
@@ -176,48 +177,55 @@ class MyLLMClient:
 
 ## Quickstart
 
+> **Running the CLI — read this first.** `clio-parser` is a console script installed *inside the
+> project's `uv` environment*, so it is **not** on your global `PATH`. A bare `clio-parser …` will
+> print `clio-parser: command not found`. Run it one of two ways:
+>
+> ```bash
+> uv run clio-parser <args>            # recommended — no activation needed
+> # or:
+> source .venv/bin/activate            # activate the venv once...
+> clio-parser <args>                   # ...then call it directly
+> ```
+>
+> Actions that use a heavy extra must have it active **on that run** — pass the matching `--extra`:
+> `uv run --extra pdf clio-parser ingest …` (PDF extraction) and `uv run --extra rag clio-parser ask …`
+> (real embeddings). If you installed extras with `uv pip install` instead of `uv sync --extra`, use
+> `uv run --no-sync clio-parser …` so `uv run` doesn't remove them.
+
 ### Check available actions
 
 ```bash
-clio-parser capabilities
+uv run clio-parser capabilities
 ```
 
 ### Ingest a paper
 
-The `source` argument accepts an arXiv id, a full arXiv/HTTP URL, a local PDF path, a paper title,
-or a topic string:
+The `source` accepts an arXiv id, an arXiv/HTTP URL, a local PDF path, a paper title, or a topic
+string. Real extraction needs the `pdf` extra (`--extra pdf`):
 
 ```bash
-# arXiv id
-clio-parser ingest 2601.23265
-
-# Direct URL
-clio-parser ingest https://arxiv.org/pdf/1706.03762.pdf
-
-# Local file
-clio-parser ingest /path/to/paper.pdf
-
-# Paper title (resolved via the arXiv search API)
-clio-parser ingest "Attention Is All You Need"
-
-# Topic (resolves the top arXiv hit)
-clio-parser ingest "transformer self-attention mechanism"
+uv run --extra pdf clio-parser ingest 2601.23265                       # arXiv id
+uv run --extra pdf clio-parser ingest https://arxiv.org/pdf/2606.01444 # arXiv/HTTP URL
+uv run --extra pdf clio-parser ingest /path/to/paper.pdf               # local PDF
+uv run --extra pdf clio-parser ingest "Attention Is All You Need"      # paper title
+uv run --extra pdf clio-parser ingest "transformer self-attention"     # topic
 ```
 
-Output lands in `./clio-out/<slug>/`: a `paper.md` Markdown file, a `blocks.json` memory-blocks
-dump, and an `img/` directory with extracted figure PNGs. Results are printed as JSON to stdout.
+Output lands in `./clio-out/<slug>/`: `paper.md` (Markdown), `blocks.json` (memory blocks), and
+`img/` (extracted figure PNGs). The result is also printed as JSON to stdout.
 
 ### Review with a real model
 
 ```bash
-CLIO_LLM=claude clio-parser review --paper "$(cat clio-out/2601.23265/paper.md)"
+CLIO_LLM=claude uv run clio-parser review --paper "$(cat clio-out/2601.23265/paper.md)"
 ```
 
 ### Ask a question over ingested blocks
 
 ```bash
 CLIO_LLM=ollama CLIO_LLM_MODEL=llama3.1:8b \
-  clio-parser ask \
+  uv run --extra rag clio-parser ask \
     --question "What is the main contribution?" \
     --blocks-json "$(cat clio-out/2601.23265/blocks.json)"
 ```
@@ -226,8 +234,8 @@ CLIO_LLM=ollama CLIO_LLM_MODEL=llama3.1:8b \
 
 ```bash
 # meta_review, edit, plot, write_review, figure_refine — all reachable via 'run'
-clio-parser run meta_review --json '{"reviews": [{"Overall": 7, "Decision": "Accept"}, {"Overall": 5, "Decision": "Reject"}]}'
-clio-parser run plot --json '{"spec": {"kind": "plot", "intent": "bar chart of accuracy by model"}}'
+uv run clio-parser run meta_review --json '{"reviews": [{"Overall": 7, "Decision": "Accept"}, {"Overall": 5, "Decision": "Reject"}]}'
+CLIO_LLM=claude uv run clio-parser run plot --json '{"spec": {"kind": "plot", "intent": "bar chart of accuracy by model"}}'
 ```
 
 ### In-process Python
@@ -267,6 +275,37 @@ agent = ClioParserAgent(llm=ClaudeCliLLMClient())
 out = agent.review("# Title\n\nAbstract...")
 # out.content, out.structured, out.metadata
 ```
+
+---
+
+## Invoking clio-parser from another agent (as a subagent)
+
+clio-parser is built to be driven by a host agent (e.g. CLIO). Two integration patterns — both
+return the same JSON-serializable `{action, content, structured, metadata}` shape and **never
+raise** (a failed action reports `metadata["error"]`, or a top-level `error`, so the host branches
+without exception handling):
+
+**1. Subprocess** — language-agnostic; the host shells out to the CLI and parses stdout JSON
+(exit `0` ok / `1` error). This is how an external orchestrator like CLIO invokes it:
+
+```bash
+uv run clio-parser capabilities                                  # discover the 11 actions
+CLIO_LLM=claude uv run clio-parser review --paper "$(cat clio-out/<id>/paper.md)"
+CLIO_LLM=claude uv run clio-parser run ask --json '{"question":"...","blocks":{...}}'
+```
+
+**2. In-process** — a Python host imports the adapter and calls it directly:
+
+```python
+from clio_parser.integration.clio_adapter import ClioParserSubagent
+from clio_parser.llm.providers import resolve_llm
+
+sub = ClioParserSubagent(llm=resolve_llm("claude"))   # "codex" | "ollama" | None (offline echo)
+manifest = sub.capabilities()                          # {"name","version","actions":[...]}
+result = sub.run("review", {"paper": paper_md})        # -> {"action","content","structured","metadata"}
+```
+
+The adapter imports nothing from any host, so the coupling stays one-directional (host → clio-parser).
 
 ---
 
