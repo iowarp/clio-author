@@ -29,19 +29,29 @@ Payload keys below are exactly the keys each expert reads. Keys marked *(optiona
 
 ### 1. `ingest`
 
-Convert an arXiv id / URL / PDF path into clean Markdown + memory blocks.
+Convert an arXiv id / URL / local PDF / paper title / topic into clean Markdown + memory blocks.
 
-- **Reads:** `source` (arXiv id, URL, or PDF path).
+- **Reads:** `source` (arXiv id, arXiv/HTTP URL, local PDF path, paper title, or topic string);
+  `out_dir` *(optional)* — when set, writes `paper.md`, `blocks.json`, and `img/figureN.png` there.
+  From the CLI the default is `clio-out/<slug>/` in the current directory; from the library default
+  (`out_dir=None`) a temporary directory is used and figures land in `<tmp>/img/`.
 - **Returns:** `content` = processed Markdown; `structured` = a `MemoryBlocks` dump (`metadata`,
-  `sections`, `figures`); `metadata` = `{extractor, source_url, image_dir}`.
-- **Extra:** requires `pdf` for real extraction (Docling + PyMuPDF, lazy-imported). Without it the
-  run returns `metadata["error"]` describing the missing dependency.
+  `sections`, `figures`); `metadata` = `{extractor, source_url, image_dir, out_dir, wrote}`.
+  `wrote` lists the paths of files written to disk.
+- **Extra:** requires `pdf` for real extraction (Docling primary, PyMuPDF OCR fallback, lazy-imported).
+  Without it the run returns `metadata["error"]` describing the missing dependency.
+- **Title/topic resolution** uses the public arXiv Atom API (stdlib, no extra required); it issues
+  one HTTP request and returns the top hit. An unresolvable title/topic surfaces as
+  `metadata["error"]`.
 
 ```bash
-clio-parser ingest 2601.23265
+clio-parser ingest 2601.23265                         # arXiv id
+clio-parser ingest "Attention Is All You Need"        # paper title
+clio-parser ingest "transformer self-attention"       # topic
+clio-parser ingest /path/to/paper.pdf                 # local PDF
 ```
 ```python
-sub.run("ingest", {"source": "2601.23265"})
+sub.run("ingest", {"source": "2601.23265", "out_dir": "/tmp/my-paper"})
 agent.ingest("path/to/paper.pdf")
 ```
 
@@ -267,7 +277,8 @@ That echo path is fine for `ingest` (deterministic), `meta_review` (arithmetic),
 `ClaudeCliLLMClient` (the `claude` CLI — session-based, no API key), `CodexCliLLMClient`
 (`codex exec`), and `OllamaLLMClient` (a local Ollama server). The **CLI** selects one via the
 `CLIO_LLM` env var (`echo` (default) | `claude` | `codex` | `ollama`; model via `CLIO_LLM_MODEL`,
-Ollama URL via `CLIO_OLLAMA_URL`):
+Ollama URL via `CLIO_OLLAMA_URL`). Additionally, set `SEMANTIC_SCHOLAR_API_KEY` to authenticate
+with the S2 API and avoid HTTP 429 rate-limit errors on `cite`:
 
 ```bash
 CLIO_LLM=claude  clio-parser review --paper "# Paper ..."
