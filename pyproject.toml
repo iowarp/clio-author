@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clio-parser"
-version = "0.2.0"
+version = "0.2.1"
 description = "Standalone multi-agent harness for processing, reviewing, and writing scientific papers."
 requires-python = ">=3.12"
 license = "BSD-3-Clause"

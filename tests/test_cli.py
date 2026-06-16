@@ -133,3 +133,21 @@ def test_default_out_dir_slug() -> None:
 
     assert _default_out_dir("2601.23265") == "clio-out/2601.23265"
     assert _default_out_dir("Attention Is All You Need") == "clio-out/Attention-Is-All-You-Need"
+
+
+def test_review_prose_format_flag(capsys: pytest.CaptureFixture[str]) -> None:
+    # echo client (offline) + prose format: content is returned, no error, exit 0.
+    code, result = _run(capsys, ["review", "--paper", "# P\n\nbody", "--format", "prose"])
+    assert code == 0
+    assert result["structured"] is None
+    assert result["metadata"]["format"] == "prose"
+
+
+def test_ask_prose_format(capsys: pytest.CaptureFixture[str]) -> None:
+    code, result = _run(
+        capsys,
+        ["ask", "--question", "what?", "--blocks-json", '{"sections": []}', "--format", "prose"],
+    )
+    assert code == 0
+    assert result["structured"] is None
+    assert result["metadata"].get("format") == "prose"
