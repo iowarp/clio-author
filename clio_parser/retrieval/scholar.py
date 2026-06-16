@@ -422,4 +422,21 @@ __all__ = [
     "verified_coverage",
     "to_bibtex",
     "verify",
+    "resolve_scholar_client",
 ]
+
+
+def resolve_scholar_client(spec: str | None = None) -> ScholarClient | None:
+    """Resolve a scholar client from a spec string (e.g. the ``CLIO_SCHOLAR`` env var).
+
+    ``auto`` (default) / ``s2`` -> a :class:`SemanticScholarClient` (which reads
+    ``SEMANTIC_SCHOLAR_API_KEY`` from the environment); ``off`` / ``none`` ->
+    ``None`` (the citation expert then reports "no scholar client configured").
+    Construction performs no network I/O — the HTTP call is lazy at search time —
+    so wiring this by default is safe even without the ``scholar`` extra
+    installed (a real call without it surfaces as ``metadata["error"]``).
+    """
+    name = (spec or "auto").strip().lower()
+    if name in ("off", "none", ""):
+        return None
+    return SemanticScholarClient()

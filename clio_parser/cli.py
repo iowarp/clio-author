@@ -194,11 +194,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Lazy import so `--help`/parsing never pays the import cost.
     from clio_parser.integration.clio_adapter import ClioParserSubagent
     from clio_parser.llm.providers import resolve_llm
+    from clio_parser.retrieval.scholar import resolve_scholar_client
 
     try:
-        # CLIO_LLM selects the model (default 'echo' = offline); an invalid value
-        # degrades to an error dict below rather than a traceback.
-        subagent = ClioParserSubagent(llm=resolve_llm(os.environ.get("CLIO_LLM")))
+        # CLIO_LLM selects the model (default 'echo' = offline); CLIO_SCHOLAR
+        # selects the citation backend (default 'auto' = real Semantic Scholar,
+        # reading SEMANTIC_SCHOLAR_API_KEY). Invalid values degrade to an error
+        # dict below rather than a traceback.
+        subagent = ClioParserSubagent(
+            llm=resolve_llm(os.environ.get("CLIO_LLM")),
+            scholar_client=resolve_scholar_client(os.environ.get("CLIO_SCHOLAR")),
+        )
         if args.command == "capabilities":
             result: dict[str, Any] = subagent.capabilities()
         else:

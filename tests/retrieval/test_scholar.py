@@ -222,3 +222,15 @@ def test_to_bibtex_article_vs_inproceedings() -> None:
     assert proc is not None
     assert proc.bibtex.startswith("@inproceedings{")
     assert "booktitle = {ICLR}" in proc.bibtex
+
+
+def test_resolve_scholar_client() -> None:
+    from clio_parser.retrieval.scholar import (
+        SemanticScholarClient,
+        resolve_scholar_client,
+    )
+
+    assert isinstance(resolve_scholar_client(None), SemanticScholarClient)
+    assert isinstance(resolve_scholar_client("auto"), SemanticScholarClient)
+    assert resolve_scholar_client("off") is None
+    assert resolve_scholar_client("none") is None
