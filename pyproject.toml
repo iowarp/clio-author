@@ -16,12 +16,12 @@ clio-parser = "clio_parser.cli:main"
 [project.optional-dependencies]
 # Heavy PDF-extraction stack. Kept OUT of core deps: Docling pulls ~500MB of
 # ML models on first run. Install with `uv sync --extra pdf` only when needed.
-pdf = ["docling>=2.0.0", "pymupdf>=1.26.6", "pillow>=10", "httpx"]
+pdf = ["docling>=2.0.0", "pymupdf>=1.26.6", "pillow>=10", "httpx", "torch", "torchvision"]
 # Heavy retrieval backend (real embeddings + vector store). Kept OUT of core
 # deps: sentence-transformers downloads model weights on first use. The default
 # `HashingEmbedder` + in-memory `RagRetriever` need none of this. Install with
 # `uv sync --extra rag` only when using the LanceDB / SentenceTransformer path.
-rag = ["lancedb", "sentence-transformers", "numpy"]
+rag = ["lancedb", "sentence-transformers", "numpy", "torch"]
 # Citation grounding (Semantic Scholar retrieval + fuzzy title matching). Kept
 # OUT of core deps: the verification LOGIC is pure stdlib (difflib fallback) and
 # the S2 HTTP client is lazy/gated, so the default suite needs none of this.
@@ -35,6 +35,19 @@ viz = ["matplotlib"]
 
 [dependency-groups]
 dev = ["pytest", "ruff", "mypy"]
+
+# Pin torch/torchvision to the CPU wheels so the `pdf`/`rag` extras resolve to
+# matching builds and `uv sync --all-extras` "just works" (avoids the
+# `torchvision::nms` mismatch from mixing a CPU torch with a PyPI torchvision).
+# GPU users can override: drop this index or point it at a CUDA build.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+torchvision = [{ index = "pytorch-cpu" }]
 
 [tool.hatch.build.targets.wheel]
 packages = ["clio_parser"]
