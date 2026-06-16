@@ -25,8 +25,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from collections.abc import Sequence
 from typing import Any
+
+
+def _default_out_dir(source: str) -> str:
+    """Default visible output dir for ``ingest`` -> ``clio-out/<slug-of-source>``."""
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", source.strip()).strip("-")[:64] or "paper"
+    return f"clio-out/{slug}"
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -129,6 +136,8 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
 
     if command == "ingest":
         payload["source"] = args.source
+        # Persist to a visible folder by default so output isn't lost in /tmp.
+        payload.setdefault("out_dir", _default_out_dir(args.source))
     elif command == "ask":
         payload["question"] = args.question
         blocks = _parse_json(args.blocks_json, field="--blocks-json")
