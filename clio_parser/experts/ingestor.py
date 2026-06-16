@@ -14,6 +14,7 @@ than raising, so a harness run degrades gracefully.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -83,12 +84,17 @@ class IngestorExpert(BaseAgent):
         )
 
         config = self._config or PdfConfig()
+        # out_dir may be set per-call (task.payload) or on the expert (constructor);
+        # the payload wins. When set, figures, paper.md, and blocks.json land there.
+        raw_out = task.payload.get("out_dir") or self.out_dir
+        out_path = Path(raw_out) if raw_out is not None else None
+
         # Guard the whole extraction + block-building region: process_pdf only
         # raises ExtractionError, but build_section_blocks / MemoryBlocks could
         # raise on malformed Markdown. The expert must never propagate -- a
         # harness run degrades gracefully via an error-flagged output.
         try:
-            result = process_pdf(source, out_dir=self.out_dir, config=config)
+            result = process_pdf(source, out_dir=out_path, config=config)
 
             sections = build_section_blocks(result.markdown)
             # NOTE: figure_id is positionally coupled to "figureN.png" filenames;
@@ -103,6 +109,15 @@ class IngestorExpert(BaseAgent):
                 sections=sections,
                 figures=figures,
             )
+            # Persist Markdown + memory blocks so the result is visible on disk.
+            written: list[str] = []
+            if out_path is not None:
+                out_path.mkdir(parents=True, exist_ok=True)
+                md_file = out_path / "paper.md"
+                blocks_file = out_path / "blocks.json"
+                md_file.write_text(result.markdown, encoding="utf-8")
+                blocks_file.write_text(json.dumps(blocks.model_dump(), indent=2), encoding="utf-8")
+                written = [str(md_file), str(blocks_file)]
         except Exception as exc:  # noqa: BLE001 - never raise; flag error on output
             output = AgentOutput(
                 agent=self.name,
@@ -120,6 +135,8 @@ class IngestorExpert(BaseAgent):
                 "extractor": result.extractor,
                 "source_url": result.source_url,
                 "image_dir": image_dir,
+                "out_dir": str(out_path) if out_path is not None else None,
+                "wrote": written,
             },
         )
         session.add(output)

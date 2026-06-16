@@ -153,3 +153,22 @@ def test_ingestor_runs_through_engine_sequential(monkeypatch: pytest.MonkeyPatch
     assert len(outputs) == 1
     assert outputs[0].agent == "ingestor"
     assert outputs[0].content == CANNED_MD
+
+
+def test_ingestor_writes_paper_md_and_blocks_json(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(docling_extract, "process_pdf", lambda *a, **k: _canned_result())
+    out = tmp_path / "out"
+    expert = IngestorExpert()
+    output = expert.run(
+        Task(id="t", description="ingest", payload={"source": "2601.23265", "out_dir": str(out)}),
+        SessionContext(id="s"),
+    )
+    assert (out / "paper.md").read_text().startswith("# Sample Paper")
+    import json as _json
+
+    blocks = _json.loads((out / "blocks.json").read_text())
+    assert "sections" in blocks
+    assert str(out / "paper.md") in output.metadata["wrote"]
+    assert output.metadata["out_dir"] == str(out)

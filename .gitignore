@@ -28,3 +28,6 @@ dist/
 
 # real-test scratch output
 /scripts/_real_out/
+
+# ingest output
+/clio-out/

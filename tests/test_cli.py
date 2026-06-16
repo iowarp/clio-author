@@ -126,3 +126,10 @@ def test_cli_invalid_clio_llm_degrades_to_error(
     code, result = _run(capsys, ["capabilities"])
     assert code == 1
     assert "error" in result and "CLIO_LLM" in result["error"]
+
+
+def test_default_out_dir_slug() -> None:
+    from clio_parser.cli import _default_out_dir
+
+    assert _default_out_dir("2601.23265") == "clio-out/2601.23265"
+    assert _default_out_dir("Attention Is All You Need") == "clio-out/Attention-Is-All-You-Need"
