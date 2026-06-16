@@ -21,6 +21,14 @@ The CLI maps onto the adapter. `run(action, payload)` returns:
 
 The CLI exits `1` when the result has a top-level `error` or `metadata.error`, else `0`.
 
+> **Running the CLI examples below.** `clio-parser` is a console script inside the project's `uv`
+> environment, not on your global `PATH`. Prefix every example with **`uv run`** (e.g.
+> `uv run clio-parser ingest 2601.23265`), or activate the venv once (`source .venv/bin/activate`)
+> and call `clio-parser` directly. Actions needing a heavy extra take the matching flag on the run
+> (`uv run --extra pdf clio-parser ingest …`, `uv run --extra rag clio-parser ask …`); add
+> `--no-sync` if you installed extras via `uv pip install`. The bare `clio-parser …` form shown
+> below assumes an activated venv.
+
 ---
 
 ## Action catalog (11 actions)
