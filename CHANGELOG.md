@@ -12,6 +12,8 @@ All notable changes to clio-parser are documented here. The format is based on
   or `arxiv`, or disable lookup with `off`/`none`.
 - **Local CLI env files.** `clio-parser` now loads `.env.local` (or `CLIO_ENV_FILE`) without
   overriding existing environment variables, so API keys do not need to be pasted into commands.
+- **Security documentation and env template.** `.env.local.example` documents supported local
+  credentials; `docs/SECURITY.md` covers key rotation, local env files, and S2 rate limits.
 
 ### Changed
 - **Semantic Scholar throttling.** The S2 client now enforces a process-wide 1 request/second

@@ -20,6 +20,7 @@ dist/
 # Env / secrets
 .env
 .env.*
+!.env.local.example
 *.key
 
 # OS / editor

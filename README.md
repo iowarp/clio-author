@@ -147,15 +147,13 @@ For polite no-key usage, set `OPENALEX_MAILTO` and/or `CROSSREF_MAILTO` to your 
 Keep secrets in a local ignored env file instead of pasting them into commands:
 
 ```bash
-cat > .env.local <<'EOF'
-SEMANTIC_SCHOLAR_API_KEY=your-rotated-key
-GEMINI_API_KEY=your-rotated-key
-EOF
+cp .env.local.example .env.local
 chmod 600 .env.local
 ```
 
-`uv run clio-parser ...` loads `.env.local` automatically. Use `CLIO_ENV_FILE=/path/to/file` if
-you want a different file.
+Then edit `.env.local` with rotated keys. `uv run clio-parser ...` loads it automatically. Use
+`CLIO_ENV_FILE=/path/to/file` if you want a different file. Never paste API keys into chat, issues,
+PRs, or commands; rotate any key that was exposed. See [`docs/SECURITY.md`](docs/SECURITY.md).
 
 ---
 
@@ -253,6 +251,7 @@ uv run python scripts/real_test.py   # full real end-to-end run; set CLIO_TEST_L
 ## More
 
 - **Full action & payload reference, providers, output details** → [`docs/USAGE.md`](docs/USAGE.md)
+- **API keys and local env-file handling** → [`docs/SECURITY.md`](docs/SECURITY.md)
 - **What it can do + the 11 actions at a glance** → see §2 above; design in
   [`artifact/notes/DESIGN.md`](artifact/notes/DESIGN.md)
 - **Working in this repo (for agents/contributors)** → [`AGENTS.md`](AGENTS.md)
