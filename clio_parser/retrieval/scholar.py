@@ -30,8 +30,10 @@ import html
 import json
 import os
 import re
+import tempfile
 import threading
 import time
+from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -50,6 +52,12 @@ _OPENALEX_WORKS_URL = "https://api.openalex.org/works"
 _CROSSREF_WORKS_URL = "https://api.crossref.org/works"
 _ARXIV_QUERY_URL = "https://export.arxiv.org/api/query"
 _FALLBACK_TIMEOUT = 8.0
+_S2_RATE_STATE = Path(tempfile.gettempdir()) / "clio-parser-s2-rate-limit"
+
+try:  # pragma: no cover - fcntl is available on the supported Linux/macOS path.
+    import fcntl
+except ImportError:  # pragma: no cover
+    fcntl = None  # type: ignore[assignment]
 
 
 # --------------------------------------------------------------------------- #
@@ -127,12 +135,16 @@ class SemanticScholarClient:
         api_key: str | None = None,
         timeout: float = _S2_TIMEOUT,
         min_interval: float = 1.0,
+        rate_state_path: str | Path | None = None,
         _clock: Any = time.monotonic,
         _sleep: Any = time.sleep,
     ) -> None:
         self.api_key = api_key or os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
         self.timeout = timeout
         self.min_interval = min_interval
+        self.rate_state_path = (
+            Path(rate_state_path) if rate_state_path is not None else _S2_RATE_STATE
+        )
         self._clock = _clock
         self._sleep = _sleep
 
@@ -153,14 +165,19 @@ class SemanticScholarClient:
             "limit": _S2_LIMIT,
             "fields": _S2_FIELDS,
         }
-        try:
-            self._throttle()
-            response = httpx.get(
-                _S2_SEARCH_URL, headers=headers, params=params, timeout=self.timeout
-            )
-        except Exception:  # noqa: BLE001 - network failures degrade to no results
-            return []
-        if response.status_code != 200:
+        for attempt in range(2):
+            try:
+                self._throttle()
+                response = httpx.get(
+                    _S2_SEARCH_URL, headers=headers, params=params, timeout=self.timeout
+                )
+            except Exception:  # noqa: BLE001 - network failures degrade to no results
+                return []
+            if response.status_code == 200:
+                break
+            if response.status_code != 429 or attempt == 1:
+                return []
+        else:  # pragma: no cover - loop always returns or breaks
             return []
         try:
             data = response.json().get("data", [])
@@ -169,9 +186,16 @@ class SemanticScholarClient:
         return [_record_from_s2(item) for item in data if item.get("title")]
 
     def _throttle(self) -> None:
-        """Respect S2's 1 request/second process-wide limit."""
+        """Respect S2's 1 request/second limit across CLI processes."""
         if self.min_interval <= 0:
             return
+        if fcntl is not None:
+            self._throttle_cross_process()
+            return
+        self._throttle_in_process()
+
+    def _throttle_in_process(self) -> None:
+        """Fallback throttle for platforms without ``fcntl`` file locks."""
         with self._rate_lock:
             now = float(self._clock())
             last = self.__class__._last_request_at
@@ -181,6 +205,40 @@ class SemanticScholarClient:
                     self._sleep(wait)
                     now = float(self._clock())
             self.__class__._last_request_at = now
+
+    def _throttle_cross_process(self) -> None:
+        """File-lock-backed throttle for repeated ``uv run clio-parser`` calls.
+
+        Semantic Scholar keys are rate-limited across all endpoints, while CLI
+        invocations run in separate Python processes. A small temp-file state
+        record lets those processes share the last request timestamp without
+        adding a runtime dependency.
+        """
+        with self._rate_lock:
+            self.rate_state_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.rate_state_path.open("a+", encoding="utf-8") as handle:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                try:
+                    handle.seek(0)
+                    last = _parse_rate_timestamp(handle.read())
+                    process_last = self.__class__._last_request_at
+                    if process_last is not None and (last is None or process_last > last):
+                        last = process_last
+
+                    now = float(self._clock())
+                    if last is not None and last <= now:
+                        wait = self.min_interval - (now - last)
+                        if wait > 0:
+                            self._sleep(wait)
+                            now = float(self._clock())
+
+                    self.__class__._last_request_at = now
+                    handle.seek(0)
+                    handle.truncate()
+                    handle.write(f"{now:.9f}")
+                    handle.flush()
+                finally:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _record_from_s2(item: dict[str, Any]) -> S2Record:
@@ -205,6 +263,14 @@ def _record_from_s2(item: dict[str, Any]) -> S2Record:
         journal=journal,
         publication_date=(str(item["publicationDate"]) if item.get("publicationDate") else None),
     )
+
+
+def _parse_rate_timestamp(raw: str) -> float | None:
+    """Parse the persisted S2 throttle timestamp."""
+    try:
+        return float(raw.strip())
+    except ValueError:
+        return None
 
 
 class OpenAlexClient:

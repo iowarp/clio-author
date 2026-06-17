@@ -585,7 +585,8 @@ write-capable experts) and `scholar_client=...` (for `cite`).
 | `off` / `none` / `offline` | `None` | Citation expert reports "no scholar client configured" |
 
 `SEMANTIC_SCHOLAR_API_KEY` reduces HTTP 429 rate-limit errors with the Semantic Scholar client. The
-client enforces a process-wide 1-request/second minimum interval regardless.
+client enforces a cross-process 1-request/second minimum interval for CLI runs and retries once after
+HTTP 429.
 
 In-process, pass any `ScholarClient` protocol-compatible object directly:
 `ClioParserAgent(scholar_client=MyScholarClient())`.

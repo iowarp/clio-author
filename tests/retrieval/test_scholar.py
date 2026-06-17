@@ -9,6 +9,7 @@ are pinned to that path's ratios.
 from __future__ import annotations
 
 import importlib.util
+import sys
 from xml.etree import ElementTree
 
 import pytest
@@ -269,6 +270,117 @@ def test_semantic_scholar_client_throttles_process_wide() -> None:
     first._throttle()
     assert slept == [0.75]
 
+    SemanticScholarClient._last_request_at = None
+
+
+def test_semantic_scholar_client_throttles_across_process_state(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    now = [100.0]
+    slept: list[float] = []
+    state = tmp_path / "s2-rate"
+
+    def clock() -> float:
+        return now[0]
+
+    def sleep(seconds: float) -> None:
+        slept.append(seconds)
+        now[0] += seconds
+
+    SemanticScholarClient._last_request_at = None
+    first = SemanticScholarClient(
+        min_interval=1.0,
+        rate_state_path=state,
+        _clock=clock,
+        _sleep=sleep,
+    )
+    first._throttle()
+    assert slept == []
+    assert float(state.read_text()) == 100.0
+
+    # Simulate a fresh CLI process: no class memory, same shared rate file.
+    SemanticScholarClient._last_request_at = None
+    now[0] = 100.25
+    second = SemanticScholarClient(
+        min_interval=1.0,
+        rate_state_path=state,
+        _clock=clock,
+        _sleep=sleep,
+    )
+    second._throttle()
+
+    assert slept == [0.75]
+    assert float(state.read_text()) == 101.0
+    SemanticScholarClient._last_request_at = None
+
+
+def test_semantic_scholar_client_ignores_malformed_rate_state(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    state = tmp_path / "s2-rate"
+    state.write_text("not-a-timestamp")
+    SemanticScholarClient._last_request_at = None
+    client = SemanticScholarClient(
+        min_interval=1.0,
+        rate_state_path=state,
+        _clock=lambda: 42.0,
+        _sleep=lambda seconds: pytest.fail(f"unexpected sleep: {seconds}"),
+    )
+
+    client._throttle()
+
+    assert float(state.read_text()) == 42.0
+    SemanticScholarClient._last_request_at = None
+
+
+def test_semantic_scholar_client_retries_once_after_429(monkeypatch, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    now = [100.0]
+    slept: list[float] = []
+    calls: list[dict[str, object]] = []
+
+    class Response:
+        def __init__(self, status_code: int) -> None:
+            self.status_code = status_code
+
+        def json(self) -> dict[str, object]:
+            return {
+                "data": [
+                    {
+                        "paperId": "s2",
+                        "title": "Attention Is All You Need",
+                        "authors": [{"name": "Ashish Vaswani"}],
+                        "venue": "NeurIPS",
+                        "year": 2017,
+                        "abstract": "Transformers use attention.",
+                        "citationCount": 1,
+                        "publicationDate": "2017-06-12",
+                    }
+                ]
+            }
+
+    class FakeHttpx:
+        @staticmethod
+        def get(*args: object, **kwargs: object) -> Response:
+            calls.append({"args": args, "kwargs": kwargs})
+            return Response(429 if len(calls) == 1 else 200)
+
+    def clock() -> float:
+        return now[0]
+
+    def sleep(seconds: float) -> None:
+        slept.append(seconds)
+        now[0] += seconds
+
+    monkeypatch.setitem(sys.modules, "httpx", FakeHttpx)
+    SemanticScholarClient._last_request_at = None
+    client = SemanticScholarClient(
+        min_interval=1.0,
+        rate_state_path=tmp_path / "s2-rate",
+        _clock=clock,
+        _sleep=sleep,
+    )
+
+    records = client.search_title("Attention Is All You Need", 2017, None)
+
+    assert len(calls) == 2
+    assert slept == [1.0]
+    assert records[0].paper_id == "s2"
     SemanticScholarClient._last_request_at = None
 
 
