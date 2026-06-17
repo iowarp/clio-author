@@ -7,6 +7,15 @@ All notable changes to clio-parser are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`compose` action** (PaperOrchestra's whole-paper orchestration). Takes an `idea` (+ optional
+  `experimental_log`, `outline`, `candidates`, `blocks`, `review`, `out_dir`) and drafts a
+  multi-section manuscript by chaining the existing experts: outline (provided or LLM-generated) →
+  optional citation verification → per-section writing (each in a fresh session, optionally through
+  the writer↔reviewer refine loop) → deterministic Markdown assembly (with a `## References` block
+  when a bib is produced). Persists `paper.md` + `sections/NN-slug.md` when `out_dir` is set. Never
+  raises; a failed section degrades to a placeholder rather than aborting. Reachable as the 12th
+  action via `clio-parser compose` / `run compose` and the adapter. LaTeX export and the parallel
+  plotting branch remain follow-ups.
 - **Gemini vision path** (PaperBanana's true-image route), optional and off by default.
   `clio_parser/llm/vision.py`: `VisionClient` protocol + `GeminiVisionClient` (stdlib `urllib` REST,
   lazy; reads `GEMINI_API_KEY`/`GOOGLE_API_KEY`) with `describe_image` (vision → text) and
