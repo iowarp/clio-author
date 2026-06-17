@@ -18,6 +18,13 @@ The model is selected by the ``CLIO_LLM`` environment variable
 (``echo`` (default, offline) | ``claude`` | ``codex`` | ``ollama``); the model
 name comes from ``CLIO_LLM_MODEL`` and the Ollama URL from ``CLIO_OLLAMA_URL``.
 The default ``echo`` keeps the CLI fully offline unless a real model is requested.
+
+The figure agent's optional vision path is selected by ``CLIO_VISION``
+(``off`` (default, hermetic) | ``gemini``); the describe/generate model names come
+from ``CLIO_VISION_MODEL`` / ``CLIO_IMAGE_MODEL`` and the Gemini client reads
+``GEMINI_API_KEY`` (or ``GOOGLE_API_KEY``). With ``off`` no image API is ever
+called.
+
 Secrets can live in a local ignored env file: ``.env.local`` by default, or the
 path named by ``CLIO_ENV_FILE``. Existing environment variables take precedence.
 """
@@ -307,16 +314,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Lazy import so `--help`/parsing never pays the import cost.
     from clio_parser.integration.clio_adapter import ClioParserSubagent
     from clio_parser.llm.providers import resolve_llm
+    from clio_parser.llm.vision import resolve_vision_client
     from clio_parser.retrieval.scholar import resolve_scholar_client
 
     try:
         # CLIO_LLM selects the model (default 'echo' = offline); CLIO_SCHOLAR
         # selects the citation backend (default 'auto' = real Semantic Scholar,
-        # reading SEMANTIC_SCHOLAR_API_KEY). Invalid values degrade to an error
-        # dict below rather than a traceback.
+        # reading SEMANTIC_SCHOLAR_API_KEY); CLIO_VISION selects the figure-agent
+        # image route (default off = hermetic, 'gemini' reads GEMINI_API_KEY).
+        # Invalid values degrade to an error dict below rather than a traceback.
         subagent = ClioParserSubagent(
             llm=resolve_llm(os.environ.get("CLIO_LLM")),
             scholar_client=resolve_scholar_client(os.environ.get("CLIO_SCHOLAR")),
+            vision=resolve_vision_client(os.environ.get("CLIO_VISION")),
         )
         if args.command == "capabilities":
             result: dict[str, Any] = subagent.capabilities()

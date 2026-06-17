@@ -39,6 +39,7 @@ from clio_parser.harness.patterns import Sequential
 from clio_parser.harness.session import SessionContext
 from clio_parser.harness.types import AgentOutput, Task
 from clio_parser.llm.client import EchoLLMClient, LLMClient
+from clio_parser.llm.vision import VisionClient
 from clio_parser.retrieval.scholar import ScholarClient
 from clio_parser.tools.files import SafeFiles
 
@@ -57,6 +58,7 @@ class ClioParserAgent:
         *,
         files: SafeFiles | None = None,
         scholar_client: ScholarClient | None = None,
+        vision: VisionClient | None = None,
     ) -> None:
         """Construct the expert set.
 
@@ -67,10 +69,13 @@ class ClioParserAgent:
                 (ingestor / writer / editor / figure).
             scholar_client: Optional scholar client given to the citation expert
                 (the network seam). Citation runs degrade gracefully when absent.
+            vision: Optional :class:`VisionClient` (e.g. Gemini) given to the
+                figure agent. ``None`` (default) keeps the hermetic text/code path.
         """
         self.llm: LLMClient = llm if llm is not None else EchoLLMClient()
         self.files = files
         self.scholar_client = scholar_client
+        self.vision = vision
 
         self.echo_expert = EchoExpert(self.llm)
         self.ingestor = IngestorExpert(self.llm, out_dir=files.root if files else None)
@@ -80,7 +85,7 @@ class ClioParserAgent:
         self.citation = CitationExpert(self.llm, client=scholar_client)
         self.writer = WriterExpert(self.llm, files=files)
         self.editor = EditorExpert(self.llm, files=files)
-        self.figure = FigureAgentExpert(self.llm, files=files)
+        self.figure = FigureAgentExpert(self.llm, files=files, vision=vision)
 
         # M0 echo wiring is preserved for the unknown/None-action fallthrough.
         self.engine = Engine()
@@ -159,7 +164,7 @@ class ClioParserAgent:
             )
             return outputs[-1]
         if action == "figure_refine":
-            producer = FigureAgentExpert(self.llm, files=self.files)
+            producer = FigureAgentExpert(self.llm, files=self.files, vision=self.vision)
             critic = self.figure
             outputs = run_figure_refine(
                 task.model_copy(update={"payload": {**task.payload, "mode": "plot"}}),

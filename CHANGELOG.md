@@ -7,6 +7,14 @@ All notable changes to clio-parser are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Gemini vision path** (PaperBanana's true-image route), optional and off by default.
+  `clio_parser/llm/vision.py`: `VisionClient` protocol + `GeminiVisionClient` (stdlib `urllib` REST,
+  lazy; reads `GEMINI_API_KEY`/`GOOGLE_API_KEY`) with `describe_image` (vision → text) and
+  `generate_image` (text → image PNG), plus `resolve_vision_client`. `figure_agent` uses it when
+  enabled: `describe_figures` *looks at* real figure images (metadata reports `vision_described` vs
+  `text_described`); `plot` with `spec.kind="diagram"` generates a real image. Falls back to the
+  text/code path otherwise; never raises. Wired via `CLIO_VISION` (`gemini`|`off`, default `off`),
+  `CLIO_VISION_MODEL` (default `gemini-2.5-flash`), `CLIO_IMAGE_MODEL` (default `gemini-2.5-flash-image`).
 - **No-key citation backends.** `CLIO_SCHOLAR=auto` now cascades Semantic Scholar, OpenAlex,
   Crossref, and arXiv. Users can force one backend with `semantic`/`s2`, `openalex`, `crossref`,
   or `arxiv`, or disable lookup with `off`/`none`.
