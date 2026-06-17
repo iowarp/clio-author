@@ -85,6 +85,8 @@ verification, review win-rate).
   update it as milestones move.
 - Confirm before destructive or outward-facing actions (force-push, deleting files you didn't
   create, publishing). Branch before committing on `main`.
+- Never commit, patch, print, or paste API keys/tokens. Use `.env.local` or `CLIO_ENV_FILE`; rotate
+  any key that appears in chat, logs, issues, or commits.
 - Prefer reusing existing utilities over adding new ones; check `artifact/notes/SYNTHESIS.md`
   reuse map first.
 - Keep changes scoped; report test results honestly (show failures, don't paper over them).
@@ -108,4 +110,3 @@ tier.
 
 Escalation: bump a `sonnet` agent to `opus` for unusually complex one-off tasks; do not downgrade
 the `opus` think/judge roles.
-

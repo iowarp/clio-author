@@ -305,7 +305,8 @@ CLIO_LLM=ollama  CLIO_LLM_MODEL=qwen2.5:14b clio-parser ask --question "..." --b
 
 For secrets, the CLI automatically loads `.env.local` from the current working directory, without
 overriding real environment variables. Set `CLIO_ENV_FILE=/path/to/file` to use a different local
-env file. These files are ignored by the repo.
+env file. These files are ignored by the repo. Start from `.env.local.example` and see
+[`SECURITY.md`](SECURITY.md) for key rotation and handling rules.
 
 In-process, pass a provider directly: `ClioParserAgent(llm=ClaudeCliLLMClient())` or
 `ClioParserSubagent(llm=resolve_llm("claude"))`. To write your own provider, implement the contract:

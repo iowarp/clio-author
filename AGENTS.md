@@ -66,6 +66,8 @@ without the extras installed. The default install needs only `pydantic`.
   tests hermetic. A real provider (Ollama, an API, etc.) plugs in by implementing that one method.
 - **File safety:** all file writes go through `SafeFiles` (sandboxed root, `O_NOFOLLOW`, no clobber);
   never overwrite a user's source of truth. Citation/writer output is *suggestions only*.
+- **Secret safety:** never commit, patch, print, or paste API keys/tokens. Use `.env.local` or
+  `CLIO_ENV_FILE`; rotate any key that appears in chat, logs, issues, or commits.
 - **Hermetic-first:** add the deterministic/offline path + tests first; gate the heavy path behind an
   extra + `live`.
 
