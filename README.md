@@ -26,7 +26,7 @@ cd clio-Parser
 uv sync
 ```
 
-**Step 3. Confirm it works** (prints the list of 15 things it can do — no model or network needed):
+**Step 3. Confirm it works** (prints the list of 16 things it can do — no model or network needed):
 
 ```bash
 uv run clio-parser capabilities
@@ -103,6 +103,19 @@ CLIO_LLM=claude uv run clio-parser ask \
 # Verify citations against Semantic Scholar + fallback backends (suggestions only):
 uv run --extra scholar clio-parser cite \
   --candidates-json '[{"title": "Attention Is All You Need", "year": 2017}]'
+```
+
+### Literature graph visualization
+
+```bash
+# Build a Connected-Papers-style HTML graph: node color = year, size = citations.
+uv run --extra scholar clio-parser graph \
+  --seed "Attention Is All You Need" \
+  --max-nodes 40 \
+  --out-dir clio-out/graphs/attention
+
+# Open clio-out/graphs/attention/graph.html in a browser.
+# Click a node to see paper links and an ingest command for that paper.
 ```
 
 ### Review
@@ -216,6 +229,19 @@ Other useful variables:
 | `CLIO_VISION_MODEL` | Gemini describe model | `gemini-2.5-flash` |
 | `CLIO_IMAGE_MODEL` | Gemini image generation model | `gemini-2.5-flash-image` |
 
+### Literature graph backends (`CLIO_GRAPH`)
+
+| `CLIO_GRAPH` | What it uses |
+|---|---|
+| `auto` *(default)* | Semantic Scholar first, then OpenAlex fallback |
+| `semantic` / `s2` | Semantic Scholar only; uses `SEMANTIC_SCHOLAR_API_KEY` when present |
+| `openalex` | OpenAlex only; no key required |
+| `off` / `none` / `offline` | disable graph lookup |
+
+`clio-parser graph` writes `graph.json` and a self-contained `graph.html` when `--out-dir` is set.
+The HTML graph shows publication year by color, citation count by node size, prior/derivative roles,
+paper links, and a copyable `clio-parser ingest ...` command for each node.
+
 ### Citation backends (`CLIO_SCHOLAR`)
 
 | `CLIO_SCHOLAR` | What it uses |
@@ -271,7 +297,7 @@ from clio_parser.llm.providers import resolve_llm
 # Build the subagent. resolve_llm("claude") | "codex" | "ollama" | None (offline echo).
 sub = ClioParserSubagent(llm=resolve_llm("claude"))
 
-# 1) Discover what it can do (15 actions).
+# 1) Discover what it can do (16 actions).
 for a in sub.capabilities()["actions"]:
     print(a["action"], "—", a["description"])
 
@@ -315,7 +341,7 @@ CLIO_LLM=claude uv run clio-parser review --paper-file clio-out/2601.23265/paper
 
 ---
 
-## 5. The 15 actions at a glance
+## 5. The 16 actions at a glance
 
 | # | Action | What it does | Dedicated subcommand |
 |---|--------|-------------|----------------------|
@@ -328,12 +354,13 @@ CLIO_LLM=claude uv run clio-parser review --paper-file clio-out/2601.23265/paper
 | 7 | `edit` | Revise a draft to address reviewer feedback | `clio-parser run edit` |
 | 8 | `polish` | Improve prose clarity, flow, and academic voice | `clio-parser polish` |
 | 9 | `coherence` | Check cross-section consistency of a manuscript | `clio-parser coherence` |
-| 10 | `describe_figures` | Fill figure descriptions / captions in memory blocks | `clio-parser describe` |
-| 11 | `plot` | Generate matplotlib plot code (code text only) | `clio-parser run plot` |
-| 12 | `compose` | Whole-paper orchestration: idea → outline → cite → write → assemble | `clio-parser compose` |
-| 13 | `export` | Markdown manuscript → standalone LaTeX (`paper.tex` + `references.bib`) | `clio-parser export` |
-| 14 | `write_review` | Writer ↔ reviewer critic-refine loop | `clio-parser run write_review` |
-| 15 | `figure_refine` | Figure visualizer ↔ critic refine loop | `clio-parser run figure_refine` |
+| 10 | `literature_graph` | Visual paper graph: seed, prior works, derivative works, links, ingest commands | `clio-parser graph` |
+| 11 | `describe_figures` | Fill figure descriptions / captions in memory blocks | `clio-parser describe` |
+| 12 | `plot` | Generate matplotlib plot code (code text only) | `clio-parser run plot` |
+| 13 | `compose` | Whole-paper orchestration: idea → outline → cite → write → assemble | `clio-parser compose` |
+| 14 | `export` | Markdown manuscript → standalone LaTeX (`paper.tex` + `references.bib`) | `clio-parser export` |
+| 15 | `write_review` | Writer ↔ reviewer critic-refine loop | `clio-parser run write_review` |
+| 16 | `figure_refine` | Figure visualizer ↔ critic refine loop | `clio-parser run figure_refine` |
 
 Actions without a dedicated subcommand are reachable via `clio-parser run <action> --json '...'`.
 
@@ -346,7 +373,7 @@ The core install is tiny and offline. Each heavy capability is opt-in:
 ```bash
 uv sync --extra pdf        # real PDF/arXiv extraction (Docling + PyMuPDF) — needed for `ingest`
 uv sync --extra rag        # real semantic search for `ask` (sentence-transformers + LanceDB)
-uv sync --extra scholar    # live Semantic Scholar for `cite` (httpx + thefuzz)
+uv sync --extra scholar    # live Semantic Scholar for `cite` + `graph` (httpx + thefuzz)
 uv sync --extra viz        # actually render plot images (matplotlib)
 uv sync --all-extras       # everything at once
 ```

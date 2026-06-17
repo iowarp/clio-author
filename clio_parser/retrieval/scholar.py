@@ -39,7 +39,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from clio_parser.retrieval.rag import RetrievalDependencyError
 
@@ -91,6 +91,7 @@ class S2Record(BaseModel):
     citation_count: int | None = None
     journal: str | None = None
     publication_date: str | None = None
+    external_ids: dict[str, str] = Field(default_factory=dict)
 
 
 class VerifiedCitation(BaseModel):
@@ -262,6 +263,13 @@ def _record_from_s2(item: dict[str, Any]) -> S2Record:
         ),
         journal=journal,
         publication_date=(str(item["publicationDate"]) if item.get("publicationDate") else None),
+        external_ids={
+            str(key): str(value)
+            for key, value in (item.get("externalIds") or {}).items()
+            if value is not None
+        }
+        if isinstance(item.get("externalIds"), dict)
+        else {},
     )
 
 

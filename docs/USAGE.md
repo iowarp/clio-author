@@ -32,8 +32,8 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 > host agent to branch on. Pass `--format prose` (CLI flag on dedicated text subcommands) or
 > `{"format": "prose"}` in any payload to get a human-readable text answer instead: `structured`
 > becomes `null` and the prose lands in `content`. `review` has the model *write* the prose; the
-> data-shaped actions (`cite`, `meta_review`, `describe_figures`, `coherence`) render their result
-> as text.
+> data-shaped actions (`cite`, `meta_review`, `literature_graph`, `describe_figures`, `coherence`)
+> render their result as text.
 
 > **File inputs for large payloads.** Every action that accepts blocks, sections, candidates, or
 > source text has a companion `--*-file` flag (e.g. `--blocks-file`, `--paper-file`,
@@ -43,7 +43,7 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 
 ---
 
-## Action catalog (15 actions)
+## Action catalog (16 actions)
 
 Payload keys below are exactly the keys each expert reads. Keys marked *(optional)* have a fallback.
 
@@ -275,7 +275,41 @@ sub.run("coherence", {"sections": [{"title": "Introduction", "draft": "..."}, ..
 
 ---
 
-### 10. `describe_figures`
+### 10. `literature_graph`
+
+Build a browsable literature graph around one or more seed papers.
+
+- **Reads:** `seed` *(single string)* or `seeds` *(list of strings or `{title, paper_id, year, url}`
+  objects)*; `max_nodes` *(optional, default 40)*; `per_seed` *(optional, default 8)*;
+  `backend` *(optional: `auto`, `semantic`/`s2`, `openalex`, `off`)*; `out_dir` *(optional)*.
+- **Returns:** `content` = graph summary; `structured` = `{backend, seeds, nodes, edges,
+  prior_works, derivative_works, related_works}`. Nodes include paper title, authors, year,
+  citation count, source link, role, and `ingest_source`. Edges include citation/recommendation
+  semantics.
+- **Writes:** with `out_dir`, writes `graph.json` and a self-contained `graph.html`. The HTML uses
+  color for publication year, node size for citation count, thick outlines for seed papers, and a
+  details panel with the paper link plus a copyable `clio-parser ingest ...` command.
+- **Backends:** resolved from `CLIO_GRAPH` or the payload's `backend`; see
+  [Literature graph backends](#literature-graph-backends-clio_graph).
+- **Extra:** `scholar` is needed for Semantic Scholar. `openalex` works without a key/dependency.
+
+```bash
+clio-parser graph \
+  --seed "Attention Is All You Need" \
+  --max-nodes 40 \
+  --out-dir clio-out/graphs/attention
+```
+```python
+sub.run("literature_graph", {
+    "seed": "Attention Is All You Need",
+    "max_nodes": 40,
+    "out_dir": "clio-out/graphs/attention",
+})
+```
+
+---
+
+### 11. `describe_figures`
 
 Fill in descriptions/captions for figures in memory blocks.
 
@@ -301,7 +335,7 @@ agent.describe_figures(blocks_dump)
 
 ---
 
-### 11. `plot`
+### 12. `plot`
 
 Generate matplotlib plot **code** (text only; never executed on this path).
 
@@ -327,7 +361,7 @@ agent.plot({"kind": "plot", "intent": "bar chart of accuracy by model"})
 
 ---
 
-### 12. `compose`
+### 13. `compose`
 
 **Whole-paper orchestration.** Drafts a full multi-section manuscript from an idea and optional
 experimental log, chaining the existing experts in sequence.
@@ -391,7 +425,7 @@ print("section errors:", result["metadata"]["section_errors"])
 
 ---
 
-### 13. `export`
+### 14. `export`
 
 Export a composed Markdown manuscript to a standalone LaTeX document (`paper.tex` + optional
 `references.bib`).
@@ -441,7 +475,7 @@ print(result["metadata"]["wrote"])
 
 ---
 
-### 14. `write_review`
+### 15. `write_review`
 
 Run a writer ↔ reviewer **critic-refine** loop and return the final output.
 
@@ -463,7 +497,7 @@ sub.run("write_review", {"outline": {"title": "Methods"}, "source": "...", "max_
 
 ---
 
-### 15. `figure_refine`
+### 16. `figure_refine`
 
 Run a figure visualizer ↔ critic **critic-refine** loop and return the final output.
 
@@ -492,7 +526,7 @@ lazy-imported only when their action needs them:
 |-------|-----------|-----------------------------------|
 | `pdf` | `ingest`: Docling extraction + PyMuPDF OCR fallback | `ingest` returns `metadata["error"]` for the missing dependency |
 | `rag` | `ask`: `SentenceTransformerEmbedder` + `LanceDbRetriever` | deterministic `HashingEmbedder` + in-memory `RagRetriever` |
-| `scholar` | `cite`: Semantic Scholar `httpx` client + `thefuzz` fuzzy match | no-key OpenAlex/Crossref/arXiv clients and difflib fuzzy match still work |
+| `scholar` | `cite` + `literature_graph`: Semantic Scholar `httpx` client + `thefuzz` fuzzy match | citation no-key fallbacks and graph OpenAlex fallback still work |
 | `viz` | gated `render_plot_code` (subprocess render) | `plot` emits code text only; never renders |
 
 Install a subset as needed, e.g. `uv sync --extra pdf --extra scholar`.
@@ -567,6 +601,34 @@ agent.review("# Title\n...")
 
 Both `ClioParserAgent` and `ClioParserSubagent` also accept `files=SafeFiles(root)` (for the
 write-capable experts) and `scholar_client=...` (for `cite`).
+
+---
+
+## Literature graph backends (`CLIO_GRAPH`)
+
+`CLIO_GRAPH` selects the backend for `literature_graph` / `clio-parser graph`:
+
+| Value | Client | Notes |
+|-------|--------|-------|
+| `auto` / `cascade` *(default)* | `CascadeLiteratureGraphClient` | Semantic Scholar first, then OpenAlex fallback |
+| `semantic` / `s2` | `SemanticScholarGraphClient` | Uses title match, references, citations, and recommendations; reads `SEMANTIC_SCHOLAR_API_KEY` |
+| `openalex` / `oa` | `OpenAlexGraphClient` | No key required; related-work fallback |
+| `off` / `none` / `offline` | `None` | Graph expert reports "no literature graph client configured" |
+
+The Semantic Scholar graph path is rate-limit aware and spaces requests more conservatively than
+single citation checks because one graph run needs several API calls. The graph action writes
+portable artifacts:
+
+```bash
+uv run --extra scholar clio-parser graph \
+  --seed "Attention Is All You Need" \
+  --out-dir clio-out/graphs/attention
+```
+
+Open `clio-out/graphs/attention/graph.html` directly in a browser. No dev server is required.
+
+In-process, pass a `LiteratureGraphClient` protocol-compatible object directly:
+`ClioParserAgent(graph_client=MyGraphClient())`.
 
 ---
 

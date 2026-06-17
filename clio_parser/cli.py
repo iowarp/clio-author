@@ -282,6 +282,55 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_coherence)
     _add_json(p_coherence)
 
+    p_graph = sub.add_parser(
+        "graph",
+        help="Build a visual literature graph around seed papers.",
+    )
+    p_graph.add_argument(
+        "--seed",
+        default=None,
+        help="Seed paper title, Semantic Scholar id, DOI/arXiv URL, or paper URL.",
+    )
+    p_graph.add_argument(
+        "--seeds-json",
+        dest="seeds_json",
+        default=None,
+        help="JSON seed list (strings or {title, paper_id, year, url} objects).",
+    )
+    p_graph.add_argument(
+        "--seeds-file",
+        dest="seeds_file",
+        default=None,
+        help="Path to a JSON seed list.",
+    )
+    p_graph.add_argument(
+        "--backend",
+        choices=("auto", "semantic", "s2", "openalex", "off"),
+        default=None,
+        help="Graph backend. Defaults to CLIO_GRAPH or auto (Semantic Scholar first).",
+    )
+    p_graph.add_argument(
+        "--max-nodes",
+        dest="max_nodes",
+        type=int,
+        default=40,
+        help="Maximum papers to include.",
+    )
+    p_graph.add_argument(
+        "--per-seed",
+        dest="per_seed",
+        type=int,
+        default=8,
+        help="References/citations/recommendations to request per seed.",
+    )
+    p_graph.add_argument(
+        "--out-dir",
+        dest="out_dir",
+        default=None,
+        help="Directory to write graph.json + graph.html.",
+    )
+    _add_json(p_graph)
+
     p_run = sub.add_parser(
         "run",
         help="Dispatch any adapter action by name (generic escape hatch).",
@@ -492,6 +541,25 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         if args.text is not None:
             payload["text"] = args.text
         payload["format"] = args.fmt
+    elif command == "graph":
+        seeds = _json_input(
+            args.seeds_file, args.seeds_json, field="seeds (--seeds-json/--seeds-file)"
+        )
+        if seeds is not None:
+            payload["seeds"] = seeds
+        elif args.seed is not None:
+            payload["seed"] = args.seed
+        if args.backend is not None:
+            payload["backend"] = args.backend
+        payload["max_nodes"] = args.max_nodes
+        payload["per_seed"] = args.per_seed
+        if args.out_dir is not None:
+            payload["out_dir"] = args.out_dir
+        elif args.seed is not None:
+            from clio_parser.retrieval.literature_graph import graph_slug
+
+            payload["out_dir"] = f"clio-out/graphs/{graph_slug(args.seed)}"
+        return "literature_graph", payload
     elif command == "run":
         return args.action, payload
     elif command == "describe":
@@ -519,6 +587,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     from clio_parser.integration.clio_adapter import ClioParserSubagent
     from clio_parser.llm.providers import resolve_llm
     from clio_parser.llm.vision import resolve_vision_client
+    from clio_parser.retrieval.literature_graph import resolve_literature_graph_client
     from clio_parser.retrieval.scholar import resolve_scholar_client
 
     try:
@@ -530,6 +599,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         subagent = ClioParserSubagent(
             llm=resolve_llm(os.environ.get("CLIO_LLM")),
             scholar_client=resolve_scholar_client(os.environ.get("CLIO_SCHOLAR")),
+            graph_client=resolve_literature_graph_client(os.environ.get("CLIO_GRAPH")),
             vision=resolve_vision_client(os.environ.get("CLIO_VISION")),
         )
         if args.command == "capabilities":

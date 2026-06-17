@@ -16,6 +16,17 @@ from clio_parser.retrieval.rag import (
     inject_context,
     render_scored,
 )
+from clio_parser.retrieval.literature_graph import (
+    CascadeLiteratureGraphClient,
+    GraphEdge,
+    GraphSeed,
+    LiteratureGraph,
+    LiteratureGraphClient,
+    OpenAlexGraphClient,
+    PaperNode,
+    SemanticScholarGraphClient,
+    resolve_literature_graph_client,
+)
 
 __all__ = [
     "Embedder",
@@ -25,6 +36,15 @@ __all__ = [
     "RetrievalDependencyError",
     "ScoredBlock",
     "SentenceTransformerEmbedder",
+    "CascadeLiteratureGraphClient",
+    "GraphEdge",
+    "GraphSeed",
+    "LiteratureGraph",
+    "LiteratureGraphClient",
+    "OpenAlexGraphClient",
+    "PaperNode",
+    "SemanticScholarGraphClient",
     "inject_context",
     "render_scored",
+    "resolve_literature_graph_client",
 ]

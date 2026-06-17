@@ -10,6 +10,7 @@ from clio_parser.experts.figure_agent import (
     run_figure_refine,
 )
 from clio_parser.experts.ingestor import IngestorExpert
+from clio_parser.experts.literature_graph import LiteratureGraphExpert
 from clio_parser.experts.meta_reviewer import MetaReviewerExpert, run_panel
 from clio_parser.experts.paper_qa import PaperQAExpert
 from clio_parser.experts.polish import PolishExpert
@@ -24,6 +25,7 @@ __all__ = [
     "EditorExpert",
     "FigureAgentExpert",
     "IngestorExpert",
+    "LiteratureGraphExpert",
     "MetaReviewerExpert",
     "PaperQAExpert",
     "PolishExpert",

@@ -24,6 +24,7 @@ from clio_parser.agent import ClioParserAgent
 from clio_parser.harness.types import Task
 from clio_parser.llm.client import LLMClient
 from clio_parser.llm.vision import VisionClient
+from clio_parser.retrieval.literature_graph import LiteratureGraphClient
 from clio_parser.retrieval.scholar import ScholarClient
 from clio_parser.tools.files import SafeFiles
 
@@ -91,6 +92,14 @@ _ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["sections", "markdown", "text"],
     },
     {
+        "action": "literature_graph",
+        "description": (
+            "Build a visual literature graph around seed papers "
+            "(year color, citation-size nodes, ingest links)."
+        ),
+        "payload_keys": ["seed", "seeds", "max_nodes", "per_seed", "out_dir", "backend"],
+    },
+    {
         "action": "describe_figures",
         "description": "Fill in descriptions/captions for the figures in memory blocks.",
         "payload_keys": ["blocks", "figures", "context"],
@@ -141,17 +150,23 @@ class ClioParserSubagent:
         *,
         files: SafeFiles | None = None,
         scholar_client: ScholarClient | None = None,
+        graph_client: LiteratureGraphClient | None = None,
         vision: VisionClient | None = None,
     ) -> None:
         """Build the subagent over a :class:`ClioParserAgent`.
 
         Args mirror the agent: an optional shared ``llm`` (default offline echo),
         ``files`` for write-capable experts, a ``scholar_client`` for citation
-        grounding, and an optional ``vision`` client (e.g. Gemini) for the figure
-        agent's real image describe/generate route.
+        grounding, a ``graph_client`` for literature graph discovery, and an
+        optional ``vision`` client (e.g. Gemini) for the figure agent's real image
+        describe/generate route.
         """
         self._agent = ClioParserAgent(
-            llm, files=files, scholar_client=scholar_client, vision=vision
+            llm,
+            files=files,
+            scholar_client=scholar_client,
+            graph_client=graph_client,
+            vision=vision,
         )
 
     def capabilities(self) -> dict[str, Any]:

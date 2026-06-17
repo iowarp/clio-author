@@ -7,10 +7,16 @@ All notable changes to clio-parser are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Visual literature graphs.** New `literature_graph` action and `clio-parser graph` subcommand
+  build Connected-Papers-style paper maps from seed papers. Semantic Scholar is the preferred backend
+  (title match → references/citations/recommendations, using `SEMANTIC_SCHOLAR_API_KEY`), with
+  OpenAlex fallback via `CLIO_GRAPH=auto|semantic|openalex|off`. When `out_dir` is set, writes
+  `graph.json` plus a self-contained `graph.html` where node color encodes year, size encodes
+  citation count, and clicking a paper shows links plus an ingest command.
 - **`polish` and `coherence` experts** (wtf-p-style writing roles). `polish` improves prose for
   clarity, flow, and academic voice (optional `voice`) while preserving citations/claims;
   `coherence` checks a manuscript's sections for terminology drift, contradictions, undefined terms,
-  duplication, and broken flow, returning structured issues. Both are reachable as actions (now 15)
+  duplication, and broken flow, returning structured issues. Both are reachable as actions (now 16)
   via the CLI (`polish`/`coherence` subcommands), `run`, and the adapter.
 - **LaTeX export** (completes PaperOrchestra parity — a `.tex` manuscript). New `clio_parser/export/`:
   pure-stdlib `escape_latex`, `markdown_to_latex` (headings/bold/italic/code/lists/links/citations),

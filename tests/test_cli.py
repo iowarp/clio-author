@@ -110,6 +110,14 @@ def test_run_plot_reaches_figure_expert(capsys: pytest.CaptureFixture[str]) -> N
     assert code == (1 if "error" in result or "error" in result["metadata"] else 0)
 
 
+def test_graph_command_routes_without_network_when_off(capsys: pytest.CaptureFixture[str]) -> None:
+    code, result = _run(capsys, ["graph", "--seed", "Seed Paper", "--backend", "off"])
+
+    assert code == 1
+    assert result["action"] == "literature_graph"
+    assert "graph client" in result["metadata"]["error"]
+
+
 def test_write_accepts_outline_flag(capsys: pytest.CaptureFixture[str]) -> None:
     code, result = _run(capsys, ["write", "--outline", "1. Intro\n2. Method"])
     assert code == 0
@@ -123,7 +131,7 @@ def test_cli_clio_llm_env_accepted_for_capabilities(
     monkeypatch.setenv("CLIO_LLM", "claude")
     code, result = _run(capsys, ["capabilities"])
     assert code == 0
-    assert len(result["actions"]) == 15
+    assert len(result["actions"]) == 16
 
 
 def test_cli_invalid_clio_llm_degrades_to_error(
