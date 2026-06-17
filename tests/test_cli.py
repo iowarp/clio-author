@@ -123,7 +123,7 @@ def test_cli_clio_llm_env_accepted_for_capabilities(
     monkeypatch.setenv("CLIO_LLM", "claude")
     code, result = _run(capsys, ["capabilities"])
     assert code == 0
-    assert len(result["actions"]) == 13
+    assert len(result["actions"]) == 15
 
 
 def test_cli_invalid_clio_llm_degrades_to_error(
