@@ -25,6 +25,7 @@ _ROUTED_ACTIONS = {
     "plot",
     "write_review",
     "figure_refine",
+    "export",
 }
 
 

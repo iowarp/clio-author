@@ -100,6 +100,11 @@ _ACTIONS: list[dict[str, Any]] = [
         ],
     },
     {
+        "action": "export",
+        "description": "Export a composed manuscript to LaTeX (paper.tex + references.bib).",
+        "payload_keys": ["title", "sections", "markdown", "outline", "bibtex", "out_dir"],
+    },
+    {
         "action": "write_review",
         "description": "Run a writer/reviewer critic-refine loop and return the final output.",
         "payload_keys": ["outline", "section_plan", "blocks", "source", "max_rounds"],

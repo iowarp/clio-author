@@ -30,6 +30,7 @@ from clio_parser.experts.reviewer import ReviewerExpert, _extract_json_object
 from clio_parser.experts.write_loop import run_write_review_loop
 from clio_parser.experts.write_models import PaperOutline, SectionOutline
 from clio_parser.experts.writer import WriterExpert
+from clio_parser.export.latex import to_latex_document
 from clio_parser.harness.session import SessionContext
 from clio_parser.harness.types import AgentOutput, Message, Task
 from clio_parser.ingest.blocks import MemoryBlocks
@@ -184,8 +185,12 @@ def _run_compose(
 
     # --- Persist (if reachable) --------------------------------------------- #
     wrote: list[str] = []
+    latex_written = False
     if files is not None:
         wrote = _persist(files, manuscript, sections)
+        if bool(payload.get("latex", False)):
+            wrote.extend(_persist_latex(files, outline, sections, suggested_bibtex))
+            latex_written = True
 
     metadata.update(
         {
@@ -193,6 +198,7 @@ def _run_compose(
             "reviewed": review,
             "wrote": wrote,
             "section_errors": section_errors,
+            "latex": latex_written,
         }
     )
     out = AgentOutput(
@@ -358,6 +364,39 @@ def _persist(
             wrote.append(str(files.write_new(rel, body)))
         except FileToolError:
             continue
+    return wrote
+
+
+def _persist_latex(
+    files: SafeFiles,
+    outline: PaperOutline,
+    sections: list[dict[str, Any]],
+    suggested_bibtex: str,
+) -> list[str]:
+    """Build a LaTeX document and write ``paper.tex`` (+ ``references.bib``).
+
+    Best-effort/never-raise, mirroring :func:`_persist`: a refused or failed
+    write is skipped rather than aborting the compose.
+    """
+    wrote: list[str] = []
+    bib = suggested_bibtex or None
+    try:
+        latex = to_latex_document(
+            outline.title,
+            [(s["title"], s["draft"]) for s in sections],
+            bibtex=bib,
+        )
+    except Exception:  # noqa: BLE001 - LaTeX export is best-effort
+        return wrote
+    try:
+        wrote.append(str(files.write_new("paper.tex", latex)))
+    except FileToolError:
+        pass
+    if bib:
+        try:
+            wrote.append(str(files.write_new("references.bib", bib.rstrip("\n") + "\n")))
+        except FileToolError:
+            pass
     return wrote
 
 

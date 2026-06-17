@@ -333,6 +333,64 @@ def test_out_dir_writes_paper_and_sections(tmp_path) -> None:  # type: ignore[no
     assert all(str(p) in out.metadata["wrote"] for p in section_files)
 
 
+def test_latex_true_writes_paper_tex(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    files = SafeFiles(tmp_path)
+    writer, reviewer, citation, llm = _experts()
+    out = run_compose(
+        _task(idea="x", outline=_OUTLINE_3, latex=True),
+        writer=writer,
+        reviewer=reviewer,
+        citation=citation,
+        llm=llm,
+        files=files,
+    )
+    tex = tmp_path / "paper.tex"
+    assert tex.exists()
+    assert str(tex) in out.metadata["wrote"]
+    assert out.metadata["latex"] is True
+    assert "\\documentclass{article}" in tex.read_text(encoding="utf-8")
+    # No bibliography emitted without citations.
+    assert not (tmp_path / "references.bib").exists()
+
+
+def test_latex_true_with_citations_writes_bib(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    files = SafeFiles(tmp_path)
+    writer, reviewer, citation, llm = _experts(scholar_client=_scholar())
+    out = run_compose(
+        _task(
+            idea="x",
+            outline={"title": "T", "sections": [{"title": "A", "goal": "g"}]},
+            candidates=[{"title": _S2_TITLE, "year": 2015}],
+            latex=True,
+        ),
+        writer=writer,
+        reviewer=reviewer,
+        citation=citation,
+        llm=llm,
+        files=files,
+    )
+    bib = tmp_path / "references.bib"
+    assert (tmp_path / "paper.tex").exists()
+    assert bib.exists()
+    assert str(bib) in out.metadata["wrote"]
+    assert "\\bibliography{references}" in (tmp_path / "paper.tex").read_text(encoding="utf-8")
+
+
+def test_latex_false_writes_no_tex(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    files = SafeFiles(tmp_path)
+    writer, reviewer, citation, llm = _experts()
+    out = run_compose(
+        _task(idea="x", outline=_OUTLINE_3),
+        writer=writer,
+        reviewer=reviewer,
+        citation=citation,
+        llm=llm,
+        files=files,
+    )
+    assert not (tmp_path / "paper.tex").exists()
+    assert out.metadata["latex"] is False
+
+
 # --------------------------------------------------------------------------- #
 # Adapter + CLI                                                               #
 # --------------------------------------------------------------------------- #

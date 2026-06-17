@@ -192,8 +192,49 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Directory to persist paper.md + per-section files (optional).",
     )
+    p_compose.add_argument(
+        "--latex",
+        action="store_true",
+        help="Also export paper.tex (+ references.bib) when --out-dir is reachable.",
+    )
     _add_format(p_compose)
     _add_json(p_compose)
+
+    p_export = sub.add_parser(
+        "export", help="Export a composed manuscript to LaTeX (paper.tex + references.bib)."
+    )
+    p_export.add_argument("--title", default=None, help="The manuscript title (optional).")
+    p_export.add_argument(
+        "--sections-json",
+        dest="sections_json",
+        default=None,
+        help="A JSON list of compose sections ([{title, draft}], inline).",
+    )
+    p_export.add_argument(
+        "--sections-file",
+        dest="sections_file",
+        default=None,
+        help="Path to a JSON file of compose sections ([{title, draft}]).",
+    )
+    p_export.add_argument(
+        "--markdown-file",
+        dest="markdown_file",
+        default=None,
+        help="Path to a full Markdown manuscript to split and export (e.g. paper.md).",
+    )
+    p_export.add_argument(
+        "--bibtex-file",
+        dest="bibtex_file",
+        default=None,
+        help="Path to a BibTeX file to emit as references.bib.",
+    )
+    p_export.add_argument(
+        "--out-dir",
+        dest="out_dir",
+        default=None,
+        help="Directory to persist paper.tex (+ references.bib) (optional).",
+    )
+    _add_json(p_export)
 
     p_run = sub.add_parser(
         "run",
@@ -364,7 +405,24 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         payload["max_rounds"] = args.max_rounds
         if args.out_dir is not None:
             payload["out_dir"] = args.out_dir
+        payload["latex"] = args.latex
         payload["format"] = args.fmt
+    elif command == "export":
+        if args.title is not None:
+            payload["title"] = args.title
+        sections = _json_input(
+            args.sections_file,
+            args.sections_json,
+            field="sections (--sections-json/--sections-file)",
+        )
+        if sections is not None:
+            payload["sections"] = sections
+        if args.markdown_file is not None:
+            payload["markdown"] = _read_file(args.markdown_file, field="--markdown-file")
+        if args.bibtex_file is not None:
+            payload["bibtex"] = _read_file(args.bibtex_file, field="--bibtex-file")
+        if args.out_dir is not None:
+            payload["out_dir"] = args.out_dir
     elif command == "run":
         return args.action, payload
     elif command == "describe":

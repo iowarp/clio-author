@@ -7,6 +7,12 @@ All notable changes to clio-parser are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **LaTeX export** (completes PaperOrchestra parity — a `.tex` manuscript). New `clio_parser/export/`:
+  pure-stdlib `escape_latex`, `markdown_to_latex` (headings/bold/italic/code/lists/links/citations),
+  and `to_latex_document` (standalone `\documentclass` … `\end{document}` with `\section` per section
+  and `\bibliography{references}` when a bib is present). New **`export`** action (13th) takes
+  compose-style `sections`/`markdown` + optional `bibtex` and writes `paper.tex` (+ `references.bib`).
+  `compose --latex` also emits `paper.tex` alongside the Markdown. No new dependencies.
 - **`compose` action** (PaperOrchestra's whole-paper orchestration). Takes an `idea` (+ optional
   `experimental_log`, `outline`, `candidates`, `blocks`, `review`, `out_dir`) and drafts a
   multi-section manuscript by chaining the existing experts: outline (provided or LLM-generated) →
