@@ -180,7 +180,7 @@ def test_dedupe_resolves_key_collisions() -> None:
 
 def test_verified_coverage_rounding() -> None:
     cands = [Candidate(title=f"t{i}") for i in range(10)]
-    # int(10 * 0.9) == 9 required.
+    # ceil(10 * 0.9) == 9 required.
     min_required, ratio, meets = verified_coverage(
         cands, [_verified(f"p{i}", f"k{i}") for i in range(9)]
     )
@@ -190,6 +190,18 @@ def test_verified_coverage_rounding() -> None:
     # 8/10 fails.
     _, _, meets8 = verified_coverage(cands, [_verified(f"p{i}", f"k{i}") for i in range(8)])
     assert meets8 is False
+
+
+def test_verified_coverage_single_candidate_requires_one_verified() -> None:
+    cands = [Candidate(title="t")]
+    min_required, ratio, meets = verified_coverage(cands, [])
+    assert min_required == 1
+    assert ratio == 0.0
+    assert meets is False
+
+    _, ratio1, meets1 = verified_coverage(cands, [_verified("p1", "k1")])
+    assert ratio1 == 1.0
+    assert meets1 is True
 
 
 def test_verified_coverage_empty_candidates() -> None:

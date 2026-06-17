@@ -30,7 +30,7 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 > below assumes an activated venv.
 
 > **Output format (`structured` vs `prose`).** Every action defaults to `structured` — JSON for a
-> host agent to branch on. Pass `--format prose` (CLI flag on `review`/`ask`/`cite`) or
+> host agent to branch on. Pass `--format prose` (CLI flag on dedicated text subcommands) or
 > `{"format": "prose"}` in any payload to get a human-readable text answer instead: `structured`
 > becomes `null` and the prose lands in `content`. `review` has the model *write* the prose;
 > the data-shaped actions (`cite`, `meta_review`, `describe_figures`) render their result as text.
@@ -297,7 +297,7 @@ with the S2 API and avoid HTTP 429 rate-limit errors on `cite`:
 ```bash
 CLIO_LLM=claude  clio-parser review --paper "# Paper ..."
 CLIO_LLM=codex   clio-parser run write --json '{"outline": {"title": "Introduction"}, "source": "..."}'
-CLIO_LLM=ollama  CLIO_LLM_MODEL=qwen2.5:14b clio-parser ask --question "..." --blocks-json '{ ... }'
+CLIO_LLM=ollama  CLIO_LLM_MODEL=qwen2.5:14b clio-parser ask --question "..." --blocks-file clio-out/2601.23265/blocks.json
 ```
 
 In-process, pass a provider directly: `ClioParserAgent(llm=ClaudeCliLLMClient())` or

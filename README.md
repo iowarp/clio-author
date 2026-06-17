@@ -68,7 +68,7 @@ example uses the Claude CLI):
 
 ```bash
 CLIO_LLM=claude uv run clio-parser review \
-  --paper "$(cat clio-out/2601.23265/paper.md)" --format prose
+  --paper-file clio-out/2601.23265/paper.md --format prose
 ```
 
 That is the whole loop: **ingest → read → review.** Everything below is variations on this.
@@ -88,17 +88,17 @@ uv run --extra pdf clio-parser ingest 2601.23265
 # Ask a question, grounded in that paper's blocks:
 CLIO_LLM=claude uv run clio-parser ask \
   --question "What problem does this paper solve?" \
-  --blocks-json "$(cat clio-out/2601.23265/blocks.json)"
+  --blocks-file clio-out/2601.23265/blocks.json
 
 # Verify citations against Semantic Scholar (suggestions only — never edits your refs):
 uv run --extra scholar clio-parser cite --candidates-json '[{"title": "Attention Is All You Need", "year": 2017}]'
 
 # Peer-review a paper (structured JSON, or prose):
-CLIO_LLM=claude uv run clio-parser review --paper "$(cat clio-out/2601.23265/paper.md)" --format prose
+CLIO_LLM=claude uv run clio-parser review --paper-file clio-out/2601.23265/paper.md --format prose
 
 # Draft a section from an outline + source material:
 CLIO_LLM=claude uv run clio-parser write \
-  --outline "Introduction" --source "$(cat clio-out/2601.23265/paper.md)" --format prose
+  --outline "Introduction" --source-file clio-out/2601.23265/paper.md --format prose
 
 # Generate matplotlib code for a figure:
 CLIO_LLM=claude uv run clio-parser run plot \
@@ -126,8 +126,8 @@ placeholder instead of real text. Pick a real one with the `CLIO_LLM` environmen
 | `ollama` | a local model server | install [Ollama](https://ollama.com), then `ollama pull llama3.1:8b` |
 
 ```bash
-CLIO_LLM=claude uv run clio-parser review --paper "$(cat clio-out/2601.23265/paper.md)" --format prose
-CLIO_LLM=ollama CLIO_LLM_MODEL=llama3.1:8b uv run clio-parser ask --question "…" --blocks-json "$(cat clio-out/2601.23265/blocks.json)"
+CLIO_LLM=claude uv run clio-parser review --paper-file clio-out/2601.23265/paper.md --format prose
+CLIO_LLM=ollama CLIO_LLM_MODEL=llama3.1:8b uv run clio-parser ask --question "..." --blocks-file clio-out/2601.23265/blocks.json
 ```
 
 Other useful variables: `CLIO_LLM_MODEL` (model name), `CLIO_OLLAMA_URL` (default
@@ -179,7 +179,7 @@ so the coupling is one-directional.
 Call the CLI and read JSON from stdout (exit code `0` = ok, `1` = error):
 
 ```bash
-CLIO_LLM=claude uv run clio-parser review --paper "$(cat clio-out/2601.23265/paper.md)"
+CLIO_LLM=claude uv run clio-parser review --paper-file clio-out/2601.23265/paper.md
 # -> {"action": "review", "content": "...", "structured": {...}, "metadata": {...}}
 ```
 
