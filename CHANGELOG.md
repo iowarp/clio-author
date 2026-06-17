@@ -4,6 +4,19 @@ All notable changes to clio-parser are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.3]
+
+### Added
+- **File inputs for the CLI** — `--blocks-file`, `--paper-file`, `--source-file`,
+  `--candidates-file`. Real papers couldn't be passed inline (a 200 KB+ `--blocks-json` hit the
+  shell's "Argument list too long" limit); the `*-file` variants read the file inside the CLI.
+- **`--format structured|prose` on every text action** (`write` and `describe` were missing it).
+
+### Fixed
+- `clio-parser write … --format prose` previously errored with "unrecognized arguments".
+- `clio-parser ask --blocks-file clio-out/<id>/blocks.json` (and `review`/`write` via `*-file`) now
+  handle real-paper-sized inputs.
+
 ## [0.2.2]
 
 ### Added

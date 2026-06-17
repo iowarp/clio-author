@@ -151,3 +151,34 @@ def test_ask_prose_format(capsys: pytest.CaptureFixture[str]) -> None:
     assert code == 0
     assert result["structured"] is None
     assert result["metadata"].get("format") == "prose"
+
+
+def test_ask_reads_blocks_from_file(capsys: pytest.CaptureFixture[str], tmp_path) -> None:
+    blocks = tmp_path / "blocks.json"
+    blocks.write_text(
+        '{"metadata": {}, "sections": [{"section_path": "S", "title": "S", "text": "X is a method."}]}'
+    )
+    code, result = _run(capsys, ["ask", "--question", "what is X?", "--blocks-file", str(blocks)])
+    assert code == 0
+    assert result["action"] == "ask"
+
+
+def test_write_accepts_format_flag(capsys: pytest.CaptureFixture[str]) -> None:
+    # `--format` must be accepted on write (regression: it was only on ask/review/cite).
+    code, result = _run(
+        capsys, ["write", "--outline", "Intro", "--source", "facts", "--format", "prose"]
+    )
+    assert result["action"] == "write"
+
+
+def test_review_reads_paper_from_file(capsys: pytest.CaptureFixture[str], tmp_path) -> None:
+    paper = tmp_path / "paper.md"
+    paper.write_text("# Title\n\nAbstract and method.")
+    code, result = _run(capsys, ["review", "--paper-file", str(paper)])
+    assert result["action"] == "review"
+
+
+def test_bad_blocks_file_degrades_to_error(capsys: pytest.CaptureFixture[str]) -> None:
+    code, result = _run(capsys, ["ask", "--question", "q", "--blocks-file", "/no/such/file.json"])
+    assert code == 1
+    assert "error" in result
