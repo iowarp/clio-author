@@ -44,8 +44,9 @@ All notable changes to clio-parser are documented here. The format is based on
   credentials; `docs/SECURITY.md` covers key rotation, local env files, and S2 rate limits.
 
 ### Changed
-- **Semantic Scholar throttling.** The S2 client now enforces a process-wide 1 request/second
-  interval before HTTP calls to respect the API key rate limit.
+- **Semantic Scholar throttling.** The S2 client now enforces a cross-process 1 request/second
+  interval before HTTP calls and retries once after HTTP 429 to respect the API key rate limit
+  across repeated CLI invocations.
 
 ## [0.2.3]
 

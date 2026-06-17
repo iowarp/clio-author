@@ -40,8 +40,8 @@ compromised:
 ## Semantic Scholar Rate Limit
 
 Semantic Scholar API keys may be limited to 1 request per second across endpoints. The S2 client
-enforces a process-wide 1 request/second delay before S2 HTTP calls. No-key citation fallbacks are
-available through:
+enforces a cross-process 1 request/second delay before S2 HTTP calls for repeated CLI invocations and
+retries once after HTTP 429. No-key citation fallbacks are available through:
 
 ```bash
 CLIO_SCHOLAR=auto      # Semantic Scholar + OpenAlex + Crossref + arXiv
