@@ -129,7 +129,7 @@ sub.run("meta_review", {"reviews": [review_a_dump, review_b_dump]})
 
 ### 5. `cite`
 
-Verify citation candidates against Semantic Scholar and emit **suggestions only**.
+Verify citation candidates against scholarly metadata backends and emit **suggestions only**.
 
 - **Reads:** `candidates` *(optional — falls back to `references`)*, a list of `{title, year?,
   reason?}`; `out_dir` *(optional)* — when set, writes `suggested.bib` and
@@ -139,17 +139,18 @@ Verify citation candidates against Semantic Scholar and emit **suggestions only*
   num_verified, meets_90pct, wrote}`.
 - **Safety:** never overwrites; refuses any target named `references.bib`, any existing file, or a
   symlink (atomic `O_CREAT|O_EXCL|O_NOFOLLOW` write).
-- **Extra:** the verification logic is pure stdlib (difflib fallback), but a real run needs a scholar
-  client. Construct the agent with `scholar_client=...`; without one, `cite` returns
-  `metadata["error"] = "no scholar client configured"`. The `scholar` extra provides the real S2
-  client + `thefuzz`.
+- **Backends:** the CLI resolves `CLIO_SCHOLAR`: `auto`/`cascade` (default) tries Semantic Scholar,
+  OpenAlex, Crossref, then arXiv; `semantic`/`s2`, `openalex`, `crossref`, and `arxiv` force one
+  backend; `off`/`none`/`offline` disables lookup. OpenAlex/Crossref/arXiv use stdlib HTTP and need no key.
+- **Extra:** the verification logic is pure stdlib (difflib fallback). The `scholar` extra only adds
+  Semantic Scholar's `httpx` path and `thefuzz`; no-key fallbacks work from the core install.
 
 ```bash
 clio-parser cite --candidates-json '[{"title": "Attention Is All You Need", "year": 2017}]'
 ```
 ```python
 from clio_parser import ClioParserAgent
-from clio_parser.retrieval.scholar import FakeScholarClient   # hermetic; real: SemanticScholarClient
+from clio_parser.retrieval.scholar import FakeScholarClient   # hermetic; real: OpenAlexClient etc.
 
 agent = ClioParserAgent(scholar_client=FakeScholarClient(...))
 agent.cite([{"title": "Attention Is All You Need", "year": 2017}], out_dir="/tmp/suggestions")
@@ -273,7 +274,7 @@ lazy-imported only when their action needs them, so they are absent from the def
 |-------|-----------|-----------------------------------|
 | `pdf` | `ingest`: Docling extraction + PyMuPDF OCR fallback | `ingest` returns `metadata["error"]` for the missing dependency |
 | `rag` | `ask`: `SentenceTransformerEmbedder` + `LanceDbRetriever` | deterministic `HashingEmbedder` + in-memory `RagRetriever` |
-| `scholar` | `cite`: `SemanticScholarClient` + `thefuzz` fuzzy match | pure stdlib verification (difflib); a scholar client must be injected |
+| `scholar` | `cite`: Semantic Scholar `httpx` client + `thefuzz` fuzzy match | no-key OpenAlex/Crossref/arXiv clients and difflib fuzzy match still work |
 | `viz` | gated `render_plot_code` (subprocess render) | `plot` emits code text only; never renders |
 
 Install a subset as needed, e.g. `uv sync --extra pdf --extra scholar`.
@@ -291,14 +292,20 @@ That echo path is fine for `ingest` (deterministic), `meta_review` (arithmetic),
 `ClaudeCliLLMClient` (the `claude` CLI — session-based, no API key), `CodexCliLLMClient`
 (`codex exec`), and `OllamaLLMClient` (a local Ollama server). The **CLI** selects one via the
 `CLIO_LLM` env var (`echo` (default) | `claude` | `codex` | `ollama`; model via `CLIO_LLM_MODEL`,
-Ollama URL via `CLIO_OLLAMA_URL`). Additionally, set `SEMANTIC_SCHOLAR_API_KEY` to authenticate
-with the S2 API and avoid HTTP 429 rate-limit errors on `cite`:
+Ollama URL via `CLIO_OLLAMA_URL`). Citation lookup is selected with `CLIO_SCHOLAR` (`auto`
+default | `semantic` | `openalex` | `crossref` | `arxiv` | `off`). Set
+`SEMANTIC_SCHOLAR_API_KEY` to authenticate with the S2 API and reduce HTTP 429 rate-limit errors;
+set `OPENALEX_MAILTO` / `CROSSREF_MAILTO` for polite no-key fallback usage:
 
 ```bash
 CLIO_LLM=claude  clio-parser review --paper "# Paper ..."
 CLIO_LLM=codex   clio-parser run write --json '{"outline": {"title": "Introduction"}, "source": "..."}'
 CLIO_LLM=ollama  CLIO_LLM_MODEL=qwen2.5:14b clio-parser ask --question "..." --blocks-file clio-out/2601.23265/blocks.json
 ```
+
+For secrets, the CLI automatically loads `.env.local` from the current working directory, without
+overriding real environment variables. Set `CLIO_ENV_FILE=/path/to/file` to use a different local
+env file. These files are ignored by the repo.
 
 In-process, pass a provider directly: `ClioParserAgent(llm=ClaudeCliLLMClient())` or
 `ClioParserSubagent(llm=resolve_llm("claude"))`. To write your own provider, implement the contract:

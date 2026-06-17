@@ -131,8 +131,31 @@ CLIO_LLM=ollama CLIO_LLM_MODEL=llama3.1:8b uv run clio-parser ask --question "..
 ```
 
 Other useful variables: `CLIO_LLM_MODEL` (model name), `CLIO_OLLAMA_URL` (default
-`http://localhost:11434`), and `SEMANTIC_SCHOLAR_API_KEY` — set this to make `cite` reliable, since
-the public Semantic Scholar endpoint rate-limits anonymous requests.
+`http://localhost:11434`), and `CLIO_SCHOLAR` for citation lookup:
+
+| `CLIO_SCHOLAR` | What it uses |
+|---|---|
+| `auto` *(default)* | Semantic Scholar, then OpenAlex, Crossref, arXiv |
+| `semantic` / `s2` | Semantic Scholar only; set `SEMANTIC_SCHOLAR_API_KEY` to avoid rate limits |
+| `openalex` | OpenAlex only; no key required |
+| `crossref` | Crossref only; no key required |
+| `arxiv` | arXiv only; no key required, preprint-focused |
+| `off` / `none` / `offline` | disable citation lookup |
+
+For polite no-key usage, set `OPENALEX_MAILTO` and/or `CROSSREF_MAILTO` to your email address.
+
+Keep secrets in a local ignored env file instead of pasting them into commands:
+
+```bash
+cat > .env.local <<'EOF'
+SEMANTIC_SCHOLAR_API_KEY=your-rotated-key
+GEMINI_API_KEY=your-rotated-key
+EOF
+chmod 600 .env.local
+```
+
+`uv run clio-parser ...` loads `.env.local` automatically. Use `CLIO_ENV_FILE=/path/to/file` if
+you want a different file.
 
 ---
 
@@ -220,8 +243,8 @@ uv run python scripts/real_test.py   # full real end-to-end run; set CLIO_TEST_L
 - **First `ingest` is slow** — Docling downloads ~500 MB of models once; subsequent runs are fast.
 - **`review`/`ask`/`write` output looks like a placeholder** — you're on the default echo model; set
   `CLIO_LLM=claude` (or `codex`/`ollama`).
-- **`cite` returns nothing** — the public Semantic Scholar endpoint rate-limited you; set
-  `SEMANTIC_SCHOLAR_API_KEY`.
+- **`cite` returns nothing** — try `CLIO_SCHOLAR=openalex` or `CLIO_SCHOLAR=arxiv`; for Semantic
+  Scholar specifically, set `SEMANTIC_SCHOLAR_API_KEY` to reduce rate limits.
 - **`torchvision::nms` error after installing `rag`/`pdf`** — reinstall the matching CPU wheel:
   `uv pip install --reinstall torchvision --index-url https://download.pytorch.org/whl/cpu`.
 

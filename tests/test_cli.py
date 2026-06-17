@@ -9,10 +9,17 @@ to confirm it is valid JSON.
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 
-from clio_parser.cli import main
+from clio_parser.cli import _load_cli_env, main
+
+
+@pytest.fixture(autouse=True)
+def _disable_local_env_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep developer .env.local files from affecting hermetic CLI tests."""
+    monkeypatch.setenv("CLIO_ENV_FILE", "/__clio_parser_test_no_env__")
 
 
 def _run(capsys: pytest.CaptureFixture[str], argv: list[str]) -> tuple[int, dict]:
@@ -122,10 +129,57 @@ def test_cli_clio_llm_env_accepted_for_capabilities(
 def test_cli_invalid_clio_llm_degrades_to_error(
     capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("CLIO_LLM", "bogus-model")
+    monkeypatch.setenv("CLIO_LLM", "unsupported-provider")
     code, result = _run(capsys, ["capabilities"])
     assert code == 1
     assert "error" in result and "CLIO_LLM" in result["error"]
+
+
+def test_cli_loads_env_local(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("CLIO_ENV_FILE", raising=False)
+    (tmp_path / ".env.local").write_text("CLIO_LLM=unsupported-provider\n", encoding="utf-8")
+
+    old = os.environ.pop("CLIO_LLM", None)
+    try:
+        _load_cli_env()
+        assert os.environ["CLIO_LLM"] == "unsupported-provider"
+    finally:
+        os.environ.pop("CLIO_LLM", None)
+        if old is not None:
+            os.environ["CLIO_LLM"] = old
+
+
+def test_cli_env_file_does_not_override_real_env(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("CLIO_ENV_FILE", raising=False)
+    (tmp_path / ".env.local").write_text("CLIO_LLM=unsupported-provider\n", encoding="utf-8")
+
+    old = os.environ.get("CLIO_LLM")
+    os.environ["CLIO_LLM"] = "echo"
+    try:
+        _load_cli_env()
+        assert os.environ["CLIO_LLM"] == "echo"
+    finally:
+        if old is None:
+            os.environ.pop("CLIO_LLM", None)
+        else:
+            os.environ["CLIO_LLM"] = old
+
+
+def test_cli_loads_explicit_env_file(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    env_file = tmp_path / "clio.env"
+    env_file.write_text("export CLIO_LLM='unsupported-provider'\n", encoding="utf-8")
+    monkeypatch.setenv("CLIO_ENV_FILE", str(env_file))
+
+    old = os.environ.pop("CLIO_LLM", None)
+    try:
+        _load_cli_env()
+        assert os.environ["CLIO_LLM"] == "unsupported-provider"
+    finally:
+        os.environ.pop("CLIO_LLM", None)
+        if old is not None:
+            os.environ["CLIO_LLM"] = old
 
 
 def test_default_out_dir_slug() -> None:
