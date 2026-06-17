@@ -35,6 +35,7 @@ from clio_parser.experts.paper_qa import PaperQAExpert
 from clio_parser.experts.reviewer import ReviewerExpert
 from clio_parser.experts.write_loop import run_write_review_loop
 from clio_parser.experts.writer import WriterExpert
+from clio_parser.export.latex import run_export
 from clio_parser.harness.engine import Engine
 from clio_parser.harness.patterns import Sequential
 from clio_parser.harness.session import SessionContext
@@ -165,6 +166,8 @@ class ClioParserAgent:
                 files=self.files,
                 session=session,
             )
+        if action == "export":
+            return run_export(task, files=self.files, session=session)
         if action == "write_review":
             outputs = run_write_review_loop(
                 task,
