@@ -4,6 +4,19 @@ All notable changes to clio-parser are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **No-key citation backends.** `CLIO_SCHOLAR=auto` now cascades Semantic Scholar, OpenAlex,
+  Crossref, and arXiv. Users can force one backend with `semantic`/`s2`, `openalex`, `crossref`,
+  or `arxiv`, or disable lookup with `off`/`none`.
+- **Local CLI env files.** `clio-parser` now loads `.env.local` (or `CLIO_ENV_FILE`) without
+  overriding existing environment variables, so API keys do not need to be pasted into commands.
+
+### Changed
+- **Semantic Scholar throttling.** The S2 client now enforces a process-wide 1 request/second
+  interval before HTTP calls to respect the API key rate limit.
+
 ## [0.2.3]
 
 ### Added

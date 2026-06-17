@@ -18,6 +18,8 @@ The model is selected by the ``CLIO_LLM`` environment variable
 (``echo`` (default, offline) | ``claude`` | ``codex`` | ``ollama``); the model
 name comes from ``CLIO_LLM_MODEL`` and the Ollama URL from ``CLIO_OLLAMA_URL``.
 The default ``echo`` keeps the CLI fully offline unless a real model is requested.
+Secrets can live in a local ignored env file: ``.env.local`` by default, or the
+path named by ``CLIO_ENV_FILE``. Existing environment variables take precedence.
 """
 
 from __future__ import annotations
@@ -182,6 +184,51 @@ def _json_input(file_path: str | None, raw: str | None, *, field: str) -> Any:
     return _parse_json(raw, field=field)
 
 
+def _load_env_file(path: Path) -> None:
+    """Load simple KEY=VALUE lines from ``path`` without overriding real env vars."""
+    if not path.exists():
+        return
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ValueError(f"could not read env file {path!s}: {exc}") from exc
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].strip()
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+            continue
+        os.environ.setdefault(key, _strip_env_quotes(value.strip()))
+
+
+def _strip_env_quotes(value: str) -> str:
+    """Strip one matching shell-style quote pair from an env-file value."""
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        return value[1:-1]
+    return value
+
+
+def _load_cli_env() -> None:
+    """Load env configuration for CLI runs.
+
+    ``CLIO_ENV_FILE=/path/to/file`` is explicit. Otherwise, load ``.env.local``
+    from the current working directory when present, then ``.env`` for users who
+    prefer that conventional name. Both are ignored by this repo's ``.gitignore``.
+    """
+    explicit = os.environ.get("CLIO_ENV_FILE")
+    if explicit:
+        _load_env_file(Path(explicit))
+        return
+    _load_env_file(Path(".env.local"))
+    _load_env_file(Path(".env"))
+
+
 def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
     """Map parsed ``args`` to an ``(action, payload)`` pair.
 
@@ -255,6 +302,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     parser = _build_parser()
     args = parser.parse_args(argv)
+    _load_cli_env()
 
     # Lazy import so `--help`/parsing never pays the import cost.
     from clio_parser.integration.clio_adapter import ClioParserSubagent

@@ -9,14 +9,21 @@ are pinned to that path's ratios.
 from __future__ import annotations
 
 import importlib.util
+from xml.etree import ElementTree
 
 import pytest
 
+from clio_parser.retrieval import scholar as scholar_mod
 from clio_parser.retrieval.scholar import (
+    ArxivScholarClient,
+    CascadeScholarClient,
     Candidate,
+    CrossrefClient,
     FakeScholarClient,
+    OpenAlexClient,
     Reference,
     S2Record,
+    SemanticScholarClient,
     VerifiedCitation,
     best_match,
     dedupe,
@@ -236,13 +243,129 @@ def test_to_bibtex_article_vs_inproceedings() -> None:
     assert "booktitle = {ICLR}" in proc.bibtex
 
 
-def test_resolve_scholar_client() -> None:
-    from clio_parser.retrieval.scholar import (
-        SemanticScholarClient,
-        resolve_scholar_client,
-    )
+def test_semantic_scholar_client_throttles_process_wide() -> None:
+    now = [100.0]
+    slept: list[float] = []
 
-    assert isinstance(resolve_scholar_client(None), SemanticScholarClient)
-    assert isinstance(resolve_scholar_client("auto"), SemanticScholarClient)
+    def clock() -> float:
+        return now[0]
+
+    def sleep(seconds: float) -> None:
+        slept.append(seconds)
+        now[0] += seconds
+
+    SemanticScholarClient._last_request_at = None
+    first = SemanticScholarClient(min_interval=1.0, _clock=clock, _sleep=sleep)
+    second = SemanticScholarClient(min_interval=1.0, _clock=clock, _sleep=sleep)
+
+    first._throttle()
+    assert slept == []
+
+    now[0] += 0.25
+    second._throttle()
+    assert slept == [0.75]
+
+    now[0] += 1.0
+    first._throttle()
+    assert slept == [0.75]
+
+    SemanticScholarClient._last_request_at = None
+
+
+def test_record_from_openalex_reconstructs_abstract() -> None:
+    record = scholar_mod._record_from_openalex(
+        {
+            "id": "https://openalex.org/W1",
+            "display_name": "Attention Is All You Need",
+            "authorships": [{"author": {"display_name": "Ashish Vaswani"}}],
+            "primary_location": {"source": {"display_name": "NeurIPS", "type": "conference"}},
+            "publication_year": 2017,
+            "publication_date": "2017-12-01",
+            "cited_by_count": 100,
+            "abstract_inverted_index": {"Transformers": [0], "use": [1], "attention": [2]},
+        }
+    )
+    assert record.paper_id == "openalex:https://openalex.org/W1"
+    assert record.title == "Attention Is All You Need"
+    assert record.authors == ["Ashish Vaswani"]
+    assert record.venue == "NeurIPS"
+    assert record.year == 2017
+    assert record.abstract == "Transformers use attention"
+    assert record.citation_count == 100
+
+
+def test_record_from_crossref_cleans_metadata() -> None:
+    record = scholar_mod._record_from_crossref(
+        {
+            "DOI": "10.123/example",
+            "title": ["A Paper"],
+            "author": [{"given": "Ada", "family": "Lovelace"}],
+            "container-title": ["Journal of Tests"],
+            "type": "journal-article",
+            "issued": {"date-parts": [[2020, 5]]},
+            "abstract": "<jats:p>Hello &amp; goodbye.</jats:p>",
+            "is-referenced-by-count": 7,
+        }
+    )
+    assert record.paper_id == "crossref:10.123/example"
+    assert record.title == "A Paper"
+    assert record.authors == ["Ada Lovelace"]
+    assert record.journal == "Journal of Tests"
+    assert record.publication_date == "2020-05-01"
+    assert record.abstract == "Hello & goodbye."
+    assert record.citation_count == 7
+
+
+def test_record_from_arxiv_atom_entry() -> None:
+    xml = """
+    <entry xmlns="http://www.w3.org/2005/Atom">
+      <id>http://arxiv.org/abs/1706.03762v7</id>
+      <title> Attention Is All You Need </title>
+      <summary> A transformer paper. </summary>
+      <published>2017-06-12T17:57:34Z</published>
+      <author><name>Ashish Vaswani</name></author>
+    </entry>
+    """
+    entry = ElementTree.fromstring(xml)
+    ns = {"atom": "http://www.w3.org/2005/Atom"}
+    record = scholar_mod._record_from_arxiv(entry, ns)
+    assert record.paper_id == "arxiv:1706.03762v7"
+    assert record.title == "Attention Is All You Need"
+    assert record.abstract == "A transformer paper."
+    assert record.authors == ["Ashish Vaswani"]
+    assert record.year == 2017
+    assert record.publication_date == "2017-06-12"
+
+
+class _RaisingSearchClient:
+    def search_title(self, title: str, year_hint: int | None, cutoff_date: str | None):
+        raise RuntimeError("boom")
+
+
+def test_cascade_tries_next_backend_after_empty_or_error() -> None:
+    early = S2Record(paper_id="early", title="Early", abstract="a")
+    wanted = S2Record(paper_id="p", title="Wanted", abstract="a")
+    cascade = CascadeScholarClient(
+        [
+            FakeScholarClient({"wanted": [early]}),
+            _RaisingSearchClient(),
+            FakeScholarClient({"wanted": [wanted]}),
+        ]
+    )
+    assert cascade.search_title("wanted", None, None) == [early, wanted]
+
+
+def test_resolve_scholar_client() -> None:
+    from clio_parser.retrieval.scholar import resolve_scholar_client
+
+    assert isinstance(resolve_scholar_client(None), CascadeScholarClient)
+    assert isinstance(resolve_scholar_client("auto"), CascadeScholarClient)
+    assert isinstance(resolve_scholar_client("semantic"), SemanticScholarClient)
+    assert isinstance(resolve_scholar_client("openalex"), OpenAlexClient)
+    assert isinstance(resolve_scholar_client("crossref"), CrossrefClient)
+    assert isinstance(resolve_scholar_client("arxiv"), ArxivScholarClient)
     assert resolve_scholar_client("off") is None
     assert resolve_scholar_client("none") is None
+    assert resolve_scholar_client("offline") is None
+    with pytest.raises(ValueError, match="CLIO_SCHOLAR"):
+        resolve_scholar_client("unsupported-backend")

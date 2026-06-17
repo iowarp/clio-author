@@ -26,8 +26,16 @@ from __future__ import annotations
 
 import datetime
 import difflib
+import html
+import json
 import os
+import re
+import threading
+import time
 from typing import Any, Protocol, runtime_checkable
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+from xml.etree import ElementTree
 
 from pydantic import BaseModel
 
@@ -38,6 +46,10 @@ _S2_SEARCH_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
 _S2_FIELDS = "title,authors,venue,year,abstract,citationCount,journal,publicationDate"
 _S2_LIMIT = 3
 _S2_TIMEOUT = 5.0
+_OPENALEX_WORKS_URL = "https://api.openalex.org/works"
+_CROSSREF_WORKS_URL = "https://api.crossref.org/works"
+_ARXIV_QUERY_URL = "https://export.arxiv.org/api/query"
+_FALLBACK_TIMEOUT = 8.0
 
 
 # --------------------------------------------------------------------------- #
@@ -106,9 +118,23 @@ class SemanticScholarClient:
     :class:`RetrievalDependencyError` only when ``httpx`` is not installed.
     """
 
-    def __init__(self, *, api_key: str | None = None, timeout: float = _S2_TIMEOUT) -> None:
+    _rate_lock = threading.Lock()
+    _last_request_at: float | None = None
+
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        timeout: float = _S2_TIMEOUT,
+        min_interval: float = 1.0,
+        _clock: Any = time.monotonic,
+        _sleep: Any = time.sleep,
+    ) -> None:
         self.api_key = api_key or os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
         self.timeout = timeout
+        self.min_interval = min_interval
+        self._clock = _clock
+        self._sleep = _sleep
 
     def search_title(
         self, title: str, year_hint: int | None, cutoff_date: str | None
@@ -128,6 +154,7 @@ class SemanticScholarClient:
             "fields": _S2_FIELDS,
         }
         try:
+            self._throttle()
             response = httpx.get(
                 _S2_SEARCH_URL, headers=headers, params=params, timeout=self.timeout
             )
@@ -140,6 +167,20 @@ class SemanticScholarClient:
         except Exception:  # noqa: BLE001 - malformed body degrades to no results
             return []
         return [_record_from_s2(item) for item in data if item.get("title")]
+
+    def _throttle(self) -> None:
+        """Respect S2's 1 request/second process-wide limit."""
+        if self.min_interval <= 0:
+            return
+        with self._rate_lock:
+            now = float(self._clock())
+            last = self.__class__._last_request_at
+            if last is not None:
+                wait = self.min_interval - (now - last)
+                if wait > 0:
+                    self._sleep(wait)
+                    now = float(self._clock())
+            self.__class__._last_request_at = now
 
 
 def _record_from_s2(item: dict[str, Any]) -> S2Record:
@@ -164,6 +205,317 @@ def _record_from_s2(item: dict[str, Any]) -> S2Record:
         journal=journal,
         publication_date=(str(item["publicationDate"]) if item.get("publicationDate") else None),
     )
+
+
+class OpenAlexClient:
+    """No-key title-search client backed by the OpenAlex Works API.
+
+    Uses only the standard library. An optional ``OPENALEX_MAILTO`` environment
+    variable is sent as the API etiquette contact parameter when present.
+    """
+
+    def __init__(self, *, mailto: str | None = None, timeout: float = _FALLBACK_TIMEOUT) -> None:
+        self.mailto = mailto or os.environ.get("OPENALEX_MAILTO")
+        self.timeout = timeout
+
+    def search_title(
+        self, title: str, year_hint: int | None, cutoff_date: str | None
+    ) -> list[S2Record]:
+        """Query OpenAlex works by title/search text (``[]`` on miss/failure)."""
+        params: dict[str, str | int] = {"search": title, "per-page": _S2_LIMIT}
+        if year_hint is not None:
+            params["filter"] = f"publication_year:{year_hint}"
+        if self.mailto:
+            params["mailto"] = self.mailto
+        try:
+            data = _get_json(_OPENALEX_WORKS_URL, params, timeout=self.timeout)
+            results = data.get("results", [])
+        except Exception:  # noqa: BLE001 - network failures degrade to no results
+            return []
+        return [_record_from_openalex(item) for item in results if item.get("display_name")]
+
+
+def _record_from_openalex(item: dict[str, Any]) -> S2Record:
+    """Map a raw OpenAlex work object to an :class:`S2Record`."""
+    authorships = item.get("authorships") or []
+    authors: list[str] = []
+    for authorship in authorships:
+        author = authorship.get("author") if isinstance(authorship, dict) else None
+        if isinstance(author, dict) and author.get("display_name"):
+            authors.append(str(author["display_name"]))
+    primary_location = item.get("primary_location") or {}
+    source = primary_location.get("source") if isinstance(primary_location, dict) else None
+    venue = (
+        str(source["display_name"])
+        if isinstance(source, dict) and source.get("display_name")
+        else None
+    )
+    return S2Record(
+        paper_id=f"openalex:{item.get('id') or ''}",
+        title=str(item.get("display_name") or ""),
+        authors=authors,
+        venue=venue,
+        year=(
+            int(item["publication_year"]) if isinstance(item.get("publication_year"), int) else None
+        ),
+        abstract=_openalex_abstract(item.get("abstract_inverted_index")),
+        citation_count=(
+            int(item["cited_by_count"]) if isinstance(item.get("cited_by_count"), int) else None
+        ),
+        journal=venue if _openalex_is_journal(source) else None,
+        publication_date=(str(item["publication_date"]) if item.get("publication_date") else None),
+    )
+
+
+def _openalex_is_journal(source: Any) -> bool:
+    """Best-effort journal/source-type check for OpenAlex source metadata."""
+    if not isinstance(source, dict):
+        return False
+    source_type = str(source.get("type") or "").lower()
+    return source_type == "journal"
+
+
+def _openalex_abstract(index: Any) -> str | None:
+    """Reconstruct OpenAlex's inverted-index abstract representation."""
+    if not isinstance(index, dict) or not index:
+        return None
+    positions: list[tuple[int, str]] = []
+    for word, raw_locs in index.items():
+        if not isinstance(raw_locs, list):
+            continue
+        for loc in raw_locs:
+            if isinstance(loc, int):
+                positions.append((loc, str(word)))
+    if not positions:
+        return None
+    return " ".join(word for _, word in sorted(positions))
+
+
+class CrossrefClient:
+    """No-key title-search client backed by the Crossref Works REST API."""
+
+    def __init__(self, *, mailto: str | None = None, timeout: float = _FALLBACK_TIMEOUT) -> None:
+        self.mailto = mailto or os.environ.get("CROSSREF_MAILTO")
+        self.timeout = timeout
+
+    def search_title(
+        self, title: str, year_hint: int | None, cutoff_date: str | None
+    ) -> list[S2Record]:
+        """Query Crossref works by bibliographic text (``[]`` on miss/failure)."""
+        params: dict[str, str | int] = {
+            "query.bibliographic": title,
+            "rows": _S2_LIMIT,
+        }
+        if self.mailto:
+            params["mailto"] = self.mailto
+        try:
+            data = _get_json(_CROSSREF_WORKS_URL, params, timeout=self.timeout)
+            items = data.get("message", {}).get("items", [])
+        except Exception:  # noqa: BLE001 - network failures degrade to no results
+            return []
+        return [_record_from_crossref(item) for item in items if item.get("title")]
+
+
+def _record_from_crossref(item: dict[str, Any]) -> S2Record:
+    """Map a raw Crossref work object to an :class:`S2Record`."""
+    authors = []
+    for author in item.get("author") or []:
+        if not isinstance(author, dict):
+            continue
+        given = str(author.get("given") or "").strip()
+        family = str(author.get("family") or "").strip()
+        name = " ".join(part for part in (given, family) if part)
+        if name:
+            authors.append(name)
+    title = _first_string(item.get("title"))
+    container = _first_string(item.get("container-title"))
+    year = _crossref_year(item)
+    return S2Record(
+        paper_id=f"crossref:{item.get('DOI') or item.get('URL') or title}",
+        title=title,
+        authors=authors,
+        venue=container,
+        year=year,
+        abstract=_clean_crossref_abstract(item.get("abstract")),
+        citation_count=(
+            int(item["is-referenced-by-count"])
+            if isinstance(item.get("is-referenced-by-count"), int)
+            else None
+        ),
+        journal=container if str(item.get("type") or "").lower() == "journal-article" else None,
+        publication_date=_crossref_date(item),
+    )
+
+
+class ArxivScholarClient:
+    """No-key title-search client backed by the public arXiv Atom API."""
+
+    def __init__(self, *, timeout: float = _FALLBACK_TIMEOUT) -> None:
+        self.timeout = timeout
+
+    def search_title(
+        self, title: str, year_hint: int | None, cutoff_date: str | None
+    ) -> list[S2Record]:
+        """Query arXiv by title (``[]`` on miss/failure)."""
+        params: dict[str, str | int] = {
+            "search_query": f'ti:"{title}"',
+            "start": 0,
+            "max_results": _S2_LIMIT,
+        }
+        try:
+            raw = _get_text(_ARXIV_QUERY_URL, params, timeout=self.timeout)
+            root = ElementTree.fromstring(raw)
+        except Exception:  # noqa: BLE001 - network/XML failures degrade to no results
+            return []
+        ns = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
+        records: list[S2Record] = []
+        for entry in root.findall("atom:entry", ns):
+            record = _record_from_arxiv(entry, ns)
+            if record.title:
+                records.append(record)
+        return records
+
+
+def _record_from_arxiv(entry: ElementTree.Element, ns: dict[str, str]) -> S2Record:
+    """Map an arXiv Atom entry to an :class:`S2Record`."""
+    title = _normalise_space(entry.findtext("atom:title", default="", namespaces=ns))
+    abstract = _normalise_space(entry.findtext("atom:summary", default="", namespaces=ns))
+    published = entry.findtext("atom:published", default="", namespaces=ns)
+    year = int(published[:4]) if len(published) >= 4 and published[:4].isdigit() else None
+    authors = [
+        _normalise_space(author.findtext("atom:name", default="", namespaces=ns))
+        for author in entry.findall("atom:author", ns)
+    ]
+    authors = [author for author in authors if author]
+    arxiv_id = ""
+    raw_id = entry.findtext("atom:id", default="", namespaces=ns)
+    if raw_id:
+        arxiv_id = raw_id.rstrip("/").split("/")[-1]
+    return S2Record(
+        paper_id=f"arxiv:{arxiv_id}",
+        title=title,
+        authors=authors,
+        venue="arXiv",
+        year=year,
+        abstract=abstract or None,
+        citation_count=None,
+        journal=None,
+        publication_date=published[:10] if len(published) >= 10 else None,
+    )
+
+
+class CascadeScholarClient:
+    """Search several scholar clients and return their combined candidates."""
+
+    def __init__(self, clients: list[ScholarClient]) -> None:
+        self.clients = clients
+
+    def search_title(
+        self, title: str, year_hint: int | None, cutoff_date: str | None
+    ) -> list[S2Record]:
+        """Search each configured backend, ignoring backend failures."""
+        merged: list[S2Record] = []
+        for client in self.clients:
+            try:
+                records = client.search_title(title, year_hint, cutoff_date)
+            except Exception:  # noqa: BLE001 - fallback backends should not abort the cascade
+                continue
+            if records:
+                merged.extend(records)
+        return merged
+
+
+def _get_json(url: str, params: dict[str, str | int], *, timeout: float) -> dict[str, Any]:
+    """Fetch a JSON object with stdlib urllib."""
+    text = _get_text(url, params, timeout=timeout, accept="application/json")
+    data = json.loads(text)
+    return data if isinstance(data, dict) else {}
+
+
+def _get_text(
+    url: str, params: dict[str, str | int], *, timeout: float, accept: str | None = None
+) -> str:
+    """Fetch text from ``url`` with encoded query params."""
+    full_url = f"{url}?{urlencode(params)}"
+    headers = {"User-Agent": "clio-parser/0.2 (+https://github.com/SIslamMun/clio-Parser)"}
+    if accept:
+        headers["Accept"] = accept
+    req = Request(full_url, headers=headers)  # noqa: S310 - public scholarly metadata APIs
+    with urlopen(req, timeout=timeout) as response:  # noqa: S310 - public scholarly metadata APIs
+        return response.read().decode("utf-8", errors="replace")
+
+
+def _first_string(raw: Any) -> str:
+    """Return the first string from a scalar/list-ish API field."""
+    if isinstance(raw, list):
+        for item in raw:
+            if item:
+                return str(item)
+        return ""
+    return str(raw or "")
+
+
+def _crossref_year(item: dict[str, Any]) -> int | None:
+    """Extract the first available year from Crossref date-parts."""
+    for key in ("published-print", "published-online", "published", "issued", "created"):
+        date = item.get(key)
+        year = _year_from_date_parts(date)
+        if year is not None:
+            return year
+    return None
+
+
+def _crossref_date(item: dict[str, Any]) -> str | None:
+    """Extract a YYYY-MM-DD-ish date from Crossref date-parts."""
+    for key in ("published-print", "published-online", "published", "issued", "created"):
+        date = item.get(key)
+        rendered = _date_from_date_parts(date)
+        if rendered is not None:
+            return rendered
+    return None
+
+
+def _year_from_date_parts(raw: Any) -> int | None:
+    """Extract a year from Crossref ``date-parts``."""
+    parts = _date_parts(raw)
+    if parts and isinstance(parts[0], int):
+        return parts[0]
+    return None
+
+
+def _date_from_date_parts(raw: Any) -> str | None:
+    """Render Crossref ``date-parts`` as YYYY-MM-DD with missing values filled."""
+    parts = _date_parts(raw)
+    if not parts or not isinstance(parts[0], int):
+        return None
+    year = parts[0]
+    month = parts[1] if len(parts) > 1 and isinstance(parts[1], int) else 1
+    day = parts[2] if len(parts) > 2 and isinstance(parts[2], int) else 1
+    return f"{year:04d}-{month:02d}-{day:02d}"
+
+
+def _date_parts(raw: Any) -> list[Any] | None:
+    """Return the first Crossref date-parts list."""
+    if not isinstance(raw, dict):
+        return None
+    parts = raw.get("date-parts")
+    if not isinstance(parts, list) or not parts:
+        return None
+    first = parts[0]
+    return first if isinstance(first, list) else None
+
+
+def _clean_crossref_abstract(raw: Any) -> str | None:
+    """Convert Crossref's often-HTML abstract field to plain text."""
+    if not raw:
+        return None
+    text = re.sub(r"<[^>]+>", " ", str(raw))
+    return _normalise_space(html.unescape(text)) or None
+
+
+def _normalise_space(text: str) -> str:
+    """Collapse whitespace in API text fields."""
+    return " ".join(text.split())
 
 
 class FakeScholarClient:
@@ -412,6 +764,10 @@ __all__ = [
     "VerifiedCitation",
     "ScholarClient",
     "SemanticScholarClient",
+    "OpenAlexClient",
+    "CrossrefClient",
+    "ArxivScholarClient",
+    "CascadeScholarClient",
     "FakeScholarClient",
     "RetrievalDependencyError",
     "fuzzy_ratio",
@@ -429,14 +785,28 @@ __all__ = [
 def resolve_scholar_client(spec: str | None = None) -> ScholarClient | None:
     """Resolve a scholar client from a spec string (e.g. the ``CLIO_SCHOLAR`` env var).
 
-    ``auto`` (default) / ``s2`` -> a :class:`SemanticScholarClient` (which reads
-    ``SEMANTIC_SCHOLAR_API_KEY`` from the environment); ``off`` / ``none`` ->
-    ``None`` (the citation expert then reports "no scholar client configured").
-    Construction performs no network I/O — the HTTP call is lazy at search time —
-    so wiring this by default is safe even without the ``scholar`` extra
-    installed (a real call without it surfaces as ``metadata["error"]``).
+    ``auto`` (default) / ``cascade`` tries Semantic Scholar first, then OpenAlex,
+    Crossref, and arXiv. ``semantic`` / ``s2`` selects Semantic Scholar only;
+    ``openalex``, ``crossref``, and ``arxiv`` select the no-key fallback clients.
+    ``off`` / ``none`` returns ``None`` (the citation expert then reports "no
+    scholar client configured"). Construction performs no network I/O.
     """
     name = (spec or "auto").strip().lower()
-    if name in ("off", "none", ""):
+    if name in ("off", "none", "offline", "disabled", ""):
         return None
-    return SemanticScholarClient()
+    if name in ("auto", "cascade", "all"):
+        return CascadeScholarClient(
+            [SemanticScholarClient(), OpenAlexClient(), CrossrefClient(), ArxivScholarClient()]
+        )
+    if name in ("semantic", "semanticscholar", "semantic-scholar", "s2"):
+        return SemanticScholarClient()
+    if name in ("openalex", "oa"):
+        return OpenAlexClient()
+    if name in ("crossref", "cr"):
+        return CrossrefClient()
+    if name in ("arxiv", "arxiv.org"):
+        return ArxivScholarClient()
+    raise ValueError(
+        "unknown CLIO_SCHOLAR="
+        f"{spec!r} (use one of: auto, semantic, openalex, crossref, arxiv, off)"
+    )
