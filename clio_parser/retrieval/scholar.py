@@ -346,7 +346,7 @@ def verified_coverage(
 ) -> tuple[int, float, bool]:
     """Return ``(min_required, ratio, meets)`` coverage against a 90% target.
 
-    ``min_required`` is ``int(len(candidates) * 0.9)``; ``ratio`` is
+    ``min_required`` is ``ceil(len(candidates) * 0.9)``; ``ratio`` is
     ``len(verified) / len(candidates)``; ``meets`` is ``len(verified) >=
     min_required``. With no candidates the result is ``(0, 0.0, True)`` (vacuously
     met).
@@ -354,7 +354,7 @@ def verified_coverage(
     total = len(candidates)
     if total == 0:
         return 0, 0.0, True
-    min_required = int(total * 0.9)
+    min_required = (total * 9 + 9) // 10
     ratio = len(verified) / total
     return min_required, ratio, len(verified) >= min_required
 
