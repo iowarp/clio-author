@@ -23,6 +23,7 @@ from uuid import uuid4
 from clio_parser.agent import ClioParserAgent
 from clio_parser.harness.types import Task
 from clio_parser.llm.client import LLMClient
+from clio_parser.llm.vision import VisionClient
 from clio_parser.retrieval.scholar import ScholarClient
 from clio_parser.tools.files import SafeFiles
 
@@ -106,14 +107,18 @@ class ClioParserSubagent:
         *,
         files: SafeFiles | None = None,
         scholar_client: ScholarClient | None = None,
+        vision: VisionClient | None = None,
     ) -> None:
         """Build the subagent over a :class:`ClioParserAgent`.
 
         Args mirror the agent: an optional shared ``llm`` (default offline echo),
-        ``files`` for write-capable experts, and a ``scholar_client`` for
-        citation grounding.
+        ``files`` for write-capable experts, a ``scholar_client`` for citation
+        grounding, and an optional ``vision`` client (e.g. Gemini) for the figure
+        agent's real image describe/generate route.
         """
-        self._agent = ClioParserAgent(llm, files=files, scholar_client=scholar_client)
+        self._agent = ClioParserAgent(
+            llm, files=files, scholar_client=scholar_client, vision=vision
+        )
 
     def capabilities(self) -> dict[str, Any]:
         """Return a JSON-serializable discovery manifest of the supported actions."""

@@ -246,3 +246,150 @@ def test_emits_one_output_via_engine_sequential() -> None:
     assert len(outputs) == 1
     assert len(session.history) == 1
     assert outputs[0].agent == "figure"
+
+
+# --- vision path (fake client, no network) -----------------------------------
+class FakeVision:
+    """A fake VisionClient: records calls, returns canned text / writes a PNG."""
+
+    def __init__(self, *, describe: str = "A real micrograph of cells.") -> None:
+        self.describe = describe
+        self.describe_calls: list[tuple[str, str]] = []
+        self.generate_calls: list[tuple[str, Path]] = []
+
+    def describe_image(self, image_path: str, prompt: str) -> str:
+        self.describe_calls.append((image_path, prompt))
+        return self.describe
+
+    def generate_image(self, prompt: str, out_path: Path) -> Path:
+        self.generate_calls.append((prompt, out_path))
+        out_path = Path(out_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(b"\x89PNG\r\n\x1a\nfake")
+        return out_path
+
+
+def test_describe_uses_vision_when_image_exists(tmp_path: Path) -> None:
+    img = tmp_path / "fig1.png"
+    img.write_bytes(b"\x89PNG\r\n")
+    vision = FakeVision(describe="Vision saw a scatter plot.")
+    # The LLM would say something different -> assert the vision text wins.
+    llm = RecordingLLM(response="text-only fallback description")
+    expert = FigureAgentExpert(llm=llm, vision=vision)
+    blocks = MemoryBlocks(figures=[FigureInfo(figure_id=1, caption="cap", image_path="fig1.png")])
+    session = SessionContext(id="s")
+    task = Task(
+        id="t",
+        description="describe",
+        payload={"mode": "describe", "blocks": blocks.model_dump(), "out_dir": str(tmp_path)},
+    )
+
+    output = expert.run(task, session)
+
+    assert vision.describe_calls and vision.describe_calls[0][0] == str(img)
+    assert output.metadata["vision_described"] == [1]
+    assert output.metadata["text_described"] == []
+    updated = MemoryBlocks.model_validate(output.structured["blocks"])
+    assert updated.figures[0].description == "Vision saw a scatter plot."
+
+
+def test_describe_falls_back_when_no_image(tmp_path: Path) -> None:
+    vision = FakeVision()
+    llm = RecordingLLM(response="text-only fallback description")
+    expert = FigureAgentExpert(llm=llm, vision=vision)
+    # image_path points at a file that does not exist -> fall back to text.
+    blocks = MemoryBlocks(
+        figures=[FigureInfo(figure_id=1, caption="cap", image_path="missing.png")]
+    )
+    session = SessionContext(id="s")
+    task = Task(
+        id="t",
+        description="describe",
+        payload={"mode": "describe", "blocks": blocks.model_dump(), "out_dir": str(tmp_path)},
+    )
+
+    output = expert.run(task, session)
+
+    assert vision.describe_calls == []  # never called
+    assert output.metadata["vision_described"] == []
+    assert output.metadata["text_described"] == [1]
+    updated = MemoryBlocks.model_validate(output.structured["blocks"])
+    assert updated.figures[0].description == "text-only fallback description"
+
+
+def test_describe_without_vision_uses_text_path(tmp_path: Path) -> None:
+    img = tmp_path / "fig1.png"
+    img.write_bytes(b"\x89PNG\r\n")
+    llm = RecordingLLM(response="text-only fallback description")
+    expert = FigureAgentExpert(llm=llm)  # no vision client
+    blocks = MemoryBlocks(figures=[FigureInfo(figure_id=1, caption="cap", image_path="fig1.png")])
+    session = SessionContext(id="s")
+    task = Task(
+        id="t",
+        description="describe",
+        payload={"mode": "describe", "blocks": blocks.model_dump(), "out_dir": str(tmp_path)},
+    )
+
+    output = expert.run(task, session)
+    assert output.metadata["vision_described"] == []
+    assert output.metadata["text_described"] == [1]
+
+
+def test_diagram_generates_image_via_vision(tmp_path: Path) -> None:
+    files = SafeFiles(tmp_path)
+    vision = FakeVision()
+    expert = FigureAgentExpert(llm=RecordingLLM(response=_PLOT_CODE), files=files, vision=vision)
+    session = SessionContext(id="s")
+    task = Task(
+        id="t",
+        description="plot",
+        payload={
+            "mode": "plot",
+            "spec": {"kind": "diagram", "intent": "system architecture"},
+            "out_path": "arch.png",
+        },
+    )
+
+    output = expert.run(task, session)
+
+    assert vision.generate_calls and vision.generate_calls[0][0]
+    written = tmp_path / "arch.png"
+    assert written.is_file()
+    assert output.metadata["phase"] == "diagram"
+    assert output.metadata["vision"] is True
+    assert output.structured["artifact"]["kind"] == "diagram"
+    assert output.structured["artifact"]["image_path"] == str(written)
+
+
+def test_diagram_without_vision_keeps_code_path() -> None:
+    expert = FigureAgentExpert(llm=RecordingLLM(response=_PLOT_CODE))
+    session = SessionContext(id="s")
+    task = Task(
+        id="t",
+        description="plot",
+        payload={"mode": "plot", "spec": {"kind": "diagram", "intent": "x"}},
+    )
+
+    output = expert.run(task, session)
+    # No vision -> the existing matplotlib-code path runs.
+    assert output.metadata["phase"] == "draft"
+    assert output.structured["artifact"]["kind"] == "plot"
+    assert "import matplotlib" in output.content
+
+
+def test_plot_kind_unaffected_by_vision(tmp_path: Path) -> None:
+    files = SafeFiles(tmp_path)
+    vision = FakeVision()
+    expert = FigureAgentExpert(llm=RecordingLLM(response=_PLOT_CODE), files=files, vision=vision)
+    session = SessionContext(id="s")
+    task = Task(
+        id="t",
+        description="plot",
+        payload={"mode": "plot", "spec": {"kind": "plot", "intent": "line"}, "out_path": "f.py"},
+    )
+
+    output = expert.run(task, session)
+    # kind="plot" keeps the matplotlib-code path; vision is never called.
+    assert vision.generate_calls == []
+    assert output.metadata["phase"] == "draft"
+    assert output.structured["artifact"]["kind"] == "plot"

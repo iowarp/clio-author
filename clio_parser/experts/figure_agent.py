@@ -47,6 +47,7 @@ from clio_parser.harness.session import SessionContext
 from clio_parser.harness.types import AgentOutput, Message, Task
 from clio_parser.ingest.blocks import FigureInfo, MemoryBlocks
 from clio_parser.llm.client import EchoLLMClient, LLMClient
+from clio_parser.llm.vision import VisionClient
 from clio_parser.tools.files import FileToolError, SafeFiles
 
 FIGURE_SYSTEM_PROMPT = (
@@ -70,7 +71,13 @@ class PlotCodeRenderError(RuntimeError):
 class FigureAgentExpert(BaseAgent):
     """Expert that describes figures and generates matplotlib plot code."""
 
-    def __init__(self, llm: LLMClient | None = None, *, files: SafeFiles | None = None) -> None:
+    def __init__(
+        self,
+        llm: LLMClient | None = None,
+        *,
+        files: SafeFiles | None = None,
+        vision: VisionClient | None = None,
+    ) -> None:
         """Build a figure agent.
 
         Args:
@@ -78,8 +85,13 @@ class FigureAgentExpert(BaseAgent):
             files: Optional :class:`SafeFiles`; when given together with
                 ``payload["out_path"]`` the generated plot code is written under
                 its root.
+            vision: Optional :class:`VisionClient` (e.g. Gemini). When set, the
+                describe mode looks at the real figure image and the diagram plot
+                kind generates a real image; ``None`` (default) keeps the
+                hermetic text/code path.
         """
         self.files = files
+        self._vision = vision
         super().__init__(
             role="figure",
             system_prompt=FIGURE_SYSTEM_PROMPT,
@@ -147,8 +159,11 @@ class FigureAgentExpert(BaseAgent):
             return self._error(session, "no 'blocks'/'figures' provided")
 
         context = str(task.payload.get("context", ""))
+        images_dir = self._images_dir(task.payload)
         described: list[FigureDescription] = []
         num_described = 0
+        vision_ids: list[int] = []
+        text_ids: list[int] = []
         for figure in figures:
             if figure.description:
                 # Already described -- keep it untouched, but still report it.
@@ -160,10 +175,10 @@ class FigureAgentExpert(BaseAgent):
                     )
                 )
                 continue
-            messages = self._describe_messages(figure, context)
-            description = self.llm.complete(messages).strip()
+            description, used_vision = self._describe_one(figure, context, images_dir)
             figure.description = description
             num_described += 1
+            (vision_ids if used_vision else text_ids).append(figure.figure_id)
             described.append(
                 FigureDescription(
                     figure_id=figure.figure_id,
@@ -183,10 +198,76 @@ class FigureAgentExpert(BaseAgent):
             agent=self.name,
             content=summary,
             structured=structured,
-            metadata={"mode": "describe", "num_described": num_described},
+            metadata={
+                "mode": "describe",
+                "num_described": num_described,
+                "vision_described": vision_ids,
+                "text_described": text_ids,
+            },
         )
         session.add(output)
         return output
+
+    def _images_dir(self, payload: dict[str, Any]) -> Path | None:
+        """Resolve a base directory for figure images from ``payload``/``files``.
+
+        Prefers an explicit ``payload["images_dir"]`` / ``payload["out_dir"]``,
+        else the :class:`SafeFiles` root, else ``None`` (absolute/existing image
+        paths still resolve on their own).
+        """
+        for key in ("images_dir", "out_dir"):
+            raw = payload.get(key)
+            if raw:
+                return Path(str(raw))
+        if self.files is not None:
+            return self.files.root
+        return None
+
+    @staticmethod
+    def _resolve_image(image_path: str, images_dir: Path | None) -> Path | None:
+        """Resolve ``image_path`` to a readable file, or ``None`` if not found."""
+        if not image_path:
+            return None
+        candidate = Path(image_path)
+        if candidate.is_file():
+            return candidate
+        if images_dir is not None:
+            joined = images_dir / image_path
+            if joined.is_file():
+                return joined
+        return None
+
+    def _describe_one(
+        self, figure: FigureInfo, context: str, images_dir: Path | None
+    ) -> tuple[str, bool]:
+        """Describe one figure; return ``(description, used_vision)``. Never raises.
+
+        When a vision client is set and the figure's image is readable, look at
+        the real image; otherwise (or on any vision failure) fall back to the
+        caption/context LLM text path.
+        """
+        if self._vision is not None:
+            image = self._resolve_image(figure.image_path, images_dir)
+            if image is not None:
+                prompt = self._vision_describe_prompt(figure, context)
+                try:
+                    description = self._vision.describe_image(str(image), prompt).strip()
+                except Exception:  # noqa: BLE001 - VisionError/any failure -> text path
+                    description = ""
+                if description:
+                    return description, True
+        messages = self._describe_messages(figure, context)
+        return self.llm.complete(messages).strip(), False
+
+    def _vision_describe_prompt(self, figure: FigureInfo, context: str) -> str:
+        """Build the text prompt accompanying the image for a vision describe."""
+        parts = [f"Describe Figure {figure.figure_id} for a scientific reader."]
+        if figure.caption:
+            parts.append(f"Caption:\n{figure.caption}")
+        if context:
+            parts.append(f"Surrounding context:\n{context}")
+        parts.append("Write a concise, factual description of what the image actually shows.")
+        return "\n\n".join(parts)
 
     def _describe_messages(self, figure: FigureInfo, context: str) -> list[Message]:
         parts = [f"Describe Figure {figure.figure_id} for a scientific reader."]
@@ -228,6 +309,13 @@ class FigureAgentExpert(BaseAgent):
         out_path = payload.get("out_path")
         out_name = str(out_path) if out_path else "figure.png"
 
+        # Diagram + a vision client -> PaperBanana's true image route: generate a
+        # real PNG instead of matplotlib code. Plots keep the code path unchanged.
+        if spec.kind == "diagram" and self._vision is not None:
+            diagram = self._generate_diagram(spec, out_path, session)
+            if diagram is not None:
+                return diagram
+
         if feedback:
             current = str(session.data.get("draft", ""))
             messages = self._revise_messages(spec, out_name, current, str(feedback))
@@ -257,6 +345,69 @@ class FigureAgentExpert(BaseAgent):
         )
         session.add(output)
         return output
+
+    def _diagram_out_path(self, out_path: Any) -> Path | None:
+        """Resolve where to write a generated diagram image, or ``None``.
+
+        Uses ``payload["out_path"]`` (under the :class:`SafeFiles` root when one
+        is set and the path is relative), else a default ``diagram.png`` under the
+        files root. Returns ``None`` when there is no usable location.
+        """
+        if out_path:
+            candidate = Path(str(out_path))
+            if candidate.is_absolute():
+                return candidate
+            if self.files is not None:
+                return self.files.root / candidate
+            return candidate
+        if self.files is not None:
+            return self.files.root / "diagram.png"
+        return None
+
+    def _generate_diagram(
+        self, spec: PlotSpec, out_path: Any, session: SessionContext
+    ) -> AgentOutput | None:
+        """Generate a real diagram image via the vision client. Never raises.
+
+        Returns a ``kind="diagram"`` :class:`AgentOutput` on success, or ``None``
+        to fall back to the matplotlib-code path (no location, or any failure).
+        """
+        assert self._vision is not None  # guarded by the caller
+        path = self._diagram_out_path(out_path)
+        if path is None:
+            return None
+        prompt = self._diagram_prompt(spec)
+        try:
+            written = self._vision.generate_image(prompt, path)
+        except Exception:  # noqa: BLE001 - VisionError/any failure -> code path
+            return None
+
+        artifact = FigureArtifact(
+            kind="diagram",
+            image_path=str(written),
+            description=spec.intent or None,
+        )
+        output = AgentOutput(
+            agent=self.name,
+            content=f"Generated diagram at {written}",
+            structured={
+                "artifact": artifact.model_dump(),
+                "out_path": str(written),
+            },
+            metadata={"mode": "plot", "phase": "diagram", "vision": True, "wrote": [str(written)]},
+        )
+        session.add(output)
+        return output
+
+    @staticmethod
+    def _diagram_prompt(spec: PlotSpec) -> str:
+        """Build the text prompt for generating a schematic diagram image."""
+        parts = [f"Generate a clear scientific schematic diagram. Intent:\n{spec.intent}"]
+        if spec.data_hint:
+            parts.append(f"Details:\n{spec.data_hint}")
+        if spec.aspect_ratio:
+            parts.append(f"Aspect ratio: {spec.aspect_ratio}")
+        return "\n\n".join(parts)
 
     def _draft_messages(self, spec: PlotSpec, out_name: str) -> list[Message]:
         parts = [f"Generate matplotlib code for a {spec.kind}."]
