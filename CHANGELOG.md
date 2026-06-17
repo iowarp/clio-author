@@ -7,6 +7,11 @@ All notable changes to clio-parser are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`polish` and `coherence` experts** (wtf-p-style writing roles). `polish` improves prose for
+  clarity, flow, and academic voice (optional `voice`) while preserving citations/claims;
+  `coherence` checks a manuscript's sections for terminology drift, contradictions, undefined terms,
+  duplication, and broken flow, returning structured issues. Both are reachable as actions (now 15)
+  via the CLI (`polish`/`coherence` subcommands), `run`, and the adapter.
 - **LaTeX export** (completes PaperOrchestra parity — a `.tex` manuscript). New `clio_parser/export/`:
   pure-stdlib `escape_latex`, `markdown_to_latex` (headings/bold/italic/code/lists/links/citations),
   and `to_latex_document` (standalone `\documentclass` … `\end{document}` with `\section` per section

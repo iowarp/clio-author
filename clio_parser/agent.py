@@ -25,6 +25,7 @@ from typing import Any
 from uuid import uuid4
 
 from clio_parser.experts.citation import CitationExpert
+from clio_parser.experts.coherence import CoherenceExpert
 from clio_parser.experts.compose import run_compose
 from clio_parser.experts.echo import EchoExpert
 from clio_parser.experts.editor import EditorExpert
@@ -32,6 +33,7 @@ from clio_parser.experts.figure_agent import FigureAgentExpert, run_figure_refin
 from clio_parser.experts.ingestor import IngestorExpert
 from clio_parser.experts.meta_reviewer import MetaReviewerExpert
 from clio_parser.experts.paper_qa import PaperQAExpert
+from clio_parser.experts.polish import PolishExpert
 from clio_parser.experts.reviewer import ReviewerExpert
 from clio_parser.experts.write_loop import run_write_review_loop
 from clio_parser.experts.writer import WriterExpert
@@ -87,6 +89,8 @@ class ClioParserAgent:
         self.citation = CitationExpert(self.llm, client=scholar_client)
         self.writer = WriterExpert(self.llm, files=files)
         self.editor = EditorExpert(self.llm, files=files)
+        self.polish = PolishExpert(self.llm, files=files)
+        self.coherence = CoherenceExpert(self.llm)
         self.figure = FigureAgentExpert(self.llm, files=files, vision=vision)
 
         # M0 echo wiring is preserved for the unknown/None-action fallthrough.
@@ -146,6 +150,10 @@ class ClioParserAgent:
             return self.writer.run(task, session)
         if action == "edit":
             return self.editor.run(task, session)
+        if action == "polish":
+            return self.polish.run(task, session)
+        if action == "coherence":
+            return self.coherence.run(task, session)
         if action == "describe_figures":
             return self.figure.run(
                 task.model_copy(update={"payload": {**task.payload, "mode": "describe"}}),
@@ -288,7 +296,8 @@ def _prose_view(action: Any, out: AgentOutput) -> str:
         ds = s.get("descriptions") or []
         rendered = "\n".join(f"Figure {d.get('figure_id')}: {d.get('description')}" for d in ds)
         return rendered or out.content
-    # ask / write / edit / plot: content is already the human answer/draft/code.
+    # ask / write / edit / plot / polish / coherence: content is already the
+    # human answer / draft / code / polished prose / issue summary.
     return out.content or json.dumps(s, indent=2)
 
 

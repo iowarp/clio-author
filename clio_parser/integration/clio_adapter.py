@@ -76,6 +76,21 @@ _ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["draft", "review", "critic_notes", "target"],
     },
     {
+        "action": "polish",
+        "description": (
+            "Polish prose for clarity, flow, and academic voice (preserves citations/claims)."
+        ),
+        "payload_keys": ["text", "draft", "voice", "target"],
+    },
+    {
+        "action": "coherence",
+        "description": (
+            "Check cross-section consistency (terminology, contradictions, flow) "
+            "across a manuscript."
+        ),
+        "payload_keys": ["sections", "markdown", "text"],
+    },
+    {
         "action": "describe_figures",
         "description": "Fill in descriptions/captions for the figures in memory blocks.",
         "payload_keys": ["blocks", "figures", "context"],

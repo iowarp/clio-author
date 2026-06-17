@@ -236,6 +236,52 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_json(p_export)
 
+    p_polish = sub.add_parser("polish", help="Polish prose for clarity, flow, and academic voice.")
+    p_polish.add_argument("--text", default=None, help="The prose to polish (inline).")
+    p_polish.add_argument(
+        "--text-file",
+        dest="text_file",
+        default=None,
+        help="Path to a text file holding the prose to polish.",
+    )
+    p_polish.add_argument(
+        "--voice", default=None, help="Optional target voice (e.g. concise, formal)."
+    )
+    p_polish.add_argument(
+        "--target",
+        default=None,
+        help="Optional file (under the harness root) to apply the polished text to.",
+    )
+    _add_format(p_polish)
+    _add_json(p_polish)
+
+    p_coherence = sub.add_parser(
+        "coherence", help="Check cross-section consistency across a manuscript."
+    )
+    p_coherence.add_argument(
+        "--sections-json",
+        dest="sections_json",
+        default=None,
+        help="A JSON list of sections ([{title, draft}], inline).",
+    )
+    p_coherence.add_argument(
+        "--sections-file",
+        dest="sections_file",
+        default=None,
+        help="Path to a JSON file of sections ([{title, draft}]).",
+    )
+    p_coherence.add_argument(
+        "--markdown-file",
+        dest="markdown_file",
+        default=None,
+        help="Path to a full Markdown manuscript to split into sections (e.g. paper.md).",
+    )
+    p_coherence.add_argument(
+        "--text", default=None, help="A single passage to check (inline fallback)."
+    )
+    _add_format(p_coherence)
+    _add_json(p_coherence)
+
     p_run = sub.add_parser(
         "run",
         help="Dispatch any adapter action by name (generic escape hatch).",
@@ -423,6 +469,29 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
             payload["bibtex"] = _read_file(args.bibtex_file, field="--bibtex-file")
         if args.out_dir is not None:
             payload["out_dir"] = args.out_dir
+    elif command == "polish":
+        if args.text_file is not None:
+            payload["text"] = _read_file(args.text_file, field="--text-file")
+        elif args.text is not None:
+            payload["text"] = args.text
+        if args.voice is not None:
+            payload["voice"] = args.voice
+        if args.target is not None:
+            payload["target"] = args.target
+        payload["format"] = args.fmt
+    elif command == "coherence":
+        sections = _json_input(
+            args.sections_file,
+            args.sections_json,
+            field="sections (--sections-json/--sections-file)",
+        )
+        if sections is not None:
+            payload["sections"] = sections
+        if args.markdown_file is not None:
+            payload["markdown"] = _read_file(args.markdown_file, field="--markdown-file")
+        if args.text is not None:
+            payload["text"] = args.text
+        payload["format"] = args.fmt
     elif command == "run":
         return args.action, payload
     elif command == "describe":
