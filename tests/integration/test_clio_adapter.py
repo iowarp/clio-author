@@ -19,6 +19,7 @@ _ROUTED_ACTIONS = {
     "meta_review",
     "cite",
     "write",
+    "compose",
     "edit",
     "describe_figures",
     "plot",

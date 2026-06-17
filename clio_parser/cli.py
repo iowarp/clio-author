@@ -140,6 +140,61 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_write)
     _add_json(p_write)
 
+    p_compose = sub.add_parser(
+        "compose", help="Draft a whole multi-section manuscript from an idea + log."
+    )
+    p_compose.add_argument("--idea", default=None, help="The research idea / thesis (inline).")
+    p_compose.add_argument(
+        "--idea-file", dest="idea_file", default=None, help="Path to a file holding the idea text."
+    )
+    p_compose.add_argument(
+        "--log", default=None, help="The experimental log / results notes (inline)."
+    )
+    p_compose.add_argument(
+        "--log-file",
+        dest="log_file",
+        default=None,
+        help="Path to a file holding the experimental log.",
+    )
+    p_compose.add_argument(
+        "--outline-json",
+        dest="outline_json",
+        default=None,
+        help="A JSON PaperOutline (inline) to use instead of generating one.",
+    )
+    p_compose.add_argument(
+        "--outline-file",
+        dest="outline_file",
+        default=None,
+        help="Path to a JSON PaperOutline file.",
+    )
+    p_compose.add_argument(
+        "--candidates-file",
+        dest="candidates_file",
+        default=None,
+        help="Path to a JSON file of citation candidates to verify and cite.",
+    )
+    p_compose.add_argument(
+        "--review",
+        action="store_true",
+        help="Run a per-section writer/reviewer refine loop.",
+    )
+    p_compose.add_argument(
+        "--max-rounds",
+        dest="max_rounds",
+        type=int,
+        default=3,
+        help="Max writer/reviewer rounds per section when --review is set.",
+    )
+    p_compose.add_argument(
+        "--out-dir",
+        dest="out_dir",
+        default=None,
+        help="Directory to persist paper.md + per-section files (optional).",
+    )
+    _add_format(p_compose)
+    _add_json(p_compose)
+
     p_run = sub.add_parser(
         "run",
         help="Dispatch any adapter action by name (generic escape hatch).",
@@ -287,6 +342,28 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
             # A typed outline flag carries a section title; richer outlines come
             # through --json. A bare string is wrapped so the writer can coerce it.
             payload["outline"] = {"title": args.outline}
+        payload["format"] = args.fmt
+    elif command == "compose":
+        if args.idea_file is not None:
+            payload["idea"] = _read_file(args.idea_file, field="--idea-file")
+        elif args.idea is not None:
+            payload["idea"] = args.idea
+        if args.log_file is not None:
+            payload["experimental_log"] = _read_file(args.log_file, field="--log-file")
+        elif args.log is not None:
+            payload["experimental_log"] = args.log
+        outline = _json_input(
+            args.outline_file, args.outline_json, field="outline (--outline-json/--outline-file)"
+        )
+        if outline is not None:
+            payload["outline"] = outline
+        candidates = _json_input(args.candidates_file, None, field="candidates (--candidates-file)")
+        if candidates is not None:
+            payload["candidates"] = candidates
+        payload["review"] = args.review
+        payload["max_rounds"] = args.max_rounds
+        if args.out_dir is not None:
+            payload["out_dir"] = args.out_dir
         payload["format"] = args.fmt
     elif command == "run":
         return args.action, payload

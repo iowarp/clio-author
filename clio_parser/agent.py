@@ -25,6 +25,7 @@ from typing import Any
 from uuid import uuid4
 
 from clio_parser.experts.citation import CitationExpert
+from clio_parser.experts.compose import run_compose
 from clio_parser.experts.echo import EchoExpert
 from clio_parser.experts.editor import EditorExpert
 from clio_parser.experts.figure_agent import FigureAgentExpert, run_figure_refine
@@ -154,6 +155,16 @@ class ClioParserAgent:
                 task.model_copy(update={"payload": {**task.payload, "mode": "plot"}}),
                 session,
             )
+        if action == "compose":
+            return run_compose(
+                task,
+                writer=self.writer,
+                reviewer=self.reviewer,
+                citation=self.citation,
+                llm=self.llm,
+                files=self.files,
+                session=session,
+            )
         if action == "write_review":
             outputs = run_write_review_loop(
                 task,
@@ -213,6 +224,15 @@ class ClioParserAgent:
         if source is not None:
             payload["source"] = source
         return self._invoke("write", payload)
+
+    def compose(self, *, idea: Any = None, outline: Any = None, **kw: Any) -> AgentOutput:
+        """Draft a whole multi-section manuscript from ``idea`` (+ optional ``outline``)."""
+        payload: dict[str, Any] = dict(kw)
+        if idea is not None:
+            payload["idea"] = idea
+        if outline is not None:
+            payload["outline"] = outline
+        return self._invoke("compose", payload)
 
     def edit(self, draft: Any, review: Any) -> AgentOutput:
         """Revise ``draft`` to address ``review`` feedback."""
