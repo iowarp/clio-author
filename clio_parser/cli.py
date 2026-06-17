@@ -27,6 +27,7 @@ import json
 import os
 import re
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 
@@ -77,13 +78,26 @@ def _build_parser() -> argparse.ArgumentParser:
         "--blocks-json",
         dest="blocks_json",
         default=None,
-        help="A JSON MemoryBlocks dump to ground the answer in.",
+        help="A JSON MemoryBlocks dump (inline) to ground the answer in.",
+    )
+    p_ask.add_argument(
+        "--blocks-file",
+        dest="blocks_file",
+        default=None,
+        help="Path to a JSON MemoryBlocks file (use this for real papers, e.g. "
+        "clio-out/<id>/blocks.json — avoids command-line length limits).",
     )
     _add_format(p_ask)
     _add_json(p_ask)
 
     p_review = sub.add_parser("review", help="Produce a peer review of a paper.")
-    p_review.add_argument("--paper", default=None, help="The paper Markdown text to review.")
+    p_review.add_argument("--paper", default=None, help="The paper Markdown text (inline).")
+    p_review.add_argument(
+        "--paper-file",
+        dest="paper_file",
+        default=None,
+        help="Path to a paper Markdown file (e.g. clio-out/<id>/paper.md).",
+    )
     _add_format(p_review)
     _add_json(p_review)
 
@@ -92,14 +106,29 @@ def _build_parser() -> argparse.ArgumentParser:
         "--candidates-json",
         dest="candidates_json",
         default=None,
-        help="A JSON list of citation candidates.",
+        help="A JSON list of citation candidates (inline).",
+    )
+    p_cite.add_argument(
+        "--candidates-file",
+        dest="candidates_file",
+        default=None,
+        help="Path to a JSON file of citation candidates.",
     )
     _add_format(p_cite)
     _add_json(p_cite)
 
     p_write = sub.add_parser("write", help="Draft a paper section from an outline.")
-    p_write.add_argument("--source", default=None, help="Source material for the section.")
-    p_write.add_argument("--outline", default=None, help="Outline text for the section.")
+    p_write.add_argument("--source", default=None, help="Source material for the section (inline).")
+    p_write.add_argument(
+        "--source-file",
+        dest="source_file",
+        default=None,
+        help="Path to a source-material file (e.g. clio-out/<id>/paper.md).",
+    )
+    p_write.add_argument(
+        "--outline", default=None, help="Outline text (section title) for the section."
+    )
+    _add_format(p_write)
     _add_json(p_write)
 
     p_run = sub.add_parser(
@@ -114,8 +143,15 @@ def _build_parser() -> argparse.ArgumentParser:
         "--blocks-json",
         dest="blocks_json",
         default=None,
-        help="A JSON MemoryBlocks dump whose figures to describe.",
+        help="A JSON MemoryBlocks dump (inline) whose figures to describe.",
     )
+    p_describe.add_argument(
+        "--blocks-file",
+        dest="blocks_file",
+        default=None,
+        help="Path to a JSON MemoryBlocks file whose figures to describe.",
+    )
+    _add_format(p_describe)
     _add_json(p_describe)
 
     return parser
@@ -129,6 +165,21 @@ def _parse_json(value: str | None, *, field: str) -> Any:
         return json.loads(value)
     except (json.JSONDecodeError, ValueError) as exc:
         raise ValueError(f"invalid JSON for {field}: {exc}") from exc
+
+
+def _read_file(path: str, *, field: str) -> str:
+    """Read a UTF-8 text file for ``field``; raise ValueError on failure."""
+    try:
+        return Path(path).read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ValueError(f"could not read {field} {path!r}: {exc}") from exc
+
+
+def _json_input(file_path: str | None, raw: str | None, *, field: str) -> Any:
+    """Parse JSON from a file (preferred) or an inline string; ``None`` if neither given."""
+    if file_path is not None:
+        raw = _read_file(file_path, field=field)
+    return _parse_json(raw, field=field)
 
 
 def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
@@ -152,32 +203,46 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         payload.setdefault("out_dir", _default_out_dir(args.source))
     elif command == "ask":
         payload["question"] = args.question
-        blocks = _parse_json(args.blocks_json, field="--blocks-json")
+        blocks = _json_input(
+            args.blocks_file, args.blocks_json, field="blocks (--blocks-json/--blocks-file)"
+        )
         if blocks is not None:
             payload["blocks"] = blocks
         payload["format"] = args.fmt
     elif command == "review":
-        if args.paper is not None:
+        if args.paper_file is not None:
+            payload["paper"] = _read_file(args.paper_file, field="--paper-file")
+        elif args.paper is not None:
             payload["paper"] = args.paper
         payload["format"] = args.fmt
     elif command == "cite":
-        candidates = _parse_json(args.candidates_json, field="--candidates-json")
+        candidates = _json_input(
+            args.candidates_file,
+            args.candidates_json,
+            field="candidates (--candidates-json/--candidates-file)",
+        )
         if candidates is not None:
             payload["candidates"] = candidates
         payload["format"] = args.fmt
     elif command == "write":
-        if args.source is not None:
+        if args.source_file is not None:
+            payload["source"] = _read_file(args.source_file, field="--source-file")
+        elif args.source is not None:
             payload["source"] = args.source
         if args.outline is not None:
             # A typed outline flag carries a section title; richer outlines come
             # through --json. A bare string is wrapped so the writer can coerce it.
             payload["outline"] = {"title": args.outline}
+        payload["format"] = args.fmt
     elif command == "run":
         return args.action, payload
     elif command == "describe":
-        blocks = _parse_json(args.blocks_json, field="--blocks-json")
+        blocks = _json_input(
+            args.blocks_file, args.blocks_json, field="blocks (--blocks-json/--blocks-file)"
+        )
         if blocks is not None:
             payload["blocks"] = blocks
+        payload["format"] = args.fmt
         return "describe_figures", payload
 
     return command, payload
