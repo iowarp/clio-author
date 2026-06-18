@@ -7,6 +7,11 @@ All notable changes to clio-parser are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Section-batched knowledge-graph extraction.** `build_kg_from_llm` now splits a paper's sections
+  into batches (`batch_size`, default 6), extracts each with one LLM call, and merges the sub-graphs
+  (dedupe nodes by type+label, remap/collapse edges). Long papers that previously overflowed a single
+  prompt now extract a full graph (e.g. a 125-section paper → ~347 nodes / 529 edges). Partial batch
+  parse failures are tolerated.
 - **Content knowledge graph.** New `kg` action and `clio-parser kg` subcommand extract a semantic
   graph of a paper's *content* (claims/methods/datasets/results/metrics/concepts/tasks and the
   relations between them) from its memory blocks — distinct from any citation graph. Returns

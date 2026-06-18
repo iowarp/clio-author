@@ -144,3 +144,60 @@ def test_kg_cli_blocks_json_exit_zero(capsys) -> None:
     assert result["action"] == "kg"
     # echo path flags parse_error (not an error), so the CLI still exits 0.
     assert code == 0
+
+
+def test_build_kg_batches_and_merges_across_sections() -> None:
+    """Many sections are split into batches; duplicate entities merge by type+label."""
+    from clio_parser.ingest.blocks import MemoryBlocks, SectionBlock
+    from clio_parser.retrieval.kg import build_kg_from_llm
+
+    # A canned client returns the SAME node every call -> across batches it must
+    # dedupe to ONE node, proving the merge (not N copies).
+    canned = (
+        '```json\n{"nodes": [{"id": "m1", "label": "Transformer", "type": "method"}], '
+        '"edges": []}\n```'
+    )
+
+    class CannedLLM:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, messages, **kw):  # type: ignore[no-untyped-def]
+            self.calls += 1
+            return canned
+
+    blocks = MemoryBlocks(
+        metadata={},
+        sections=[
+            SectionBlock(section_path=f"S{i}", title=f"S{i}", text=f"body {i}") for i in range(13)
+        ],
+    )
+    llm = CannedLLM()
+    graph, err = build_kg_from_llm(blocks, llm, batch_size=6)
+    assert err is None
+    assert llm.calls == 3  # 13 sections / 6 per batch -> 3 LLM calls (batched)
+    assert len(graph.nodes) == 1  # deduped by (type, label) across batches
+
+
+def test_build_kg_partial_parse_failure_is_tolerated() -> None:
+    """If some batches parse and some don't, return what parsed (error=None)."""
+    from clio_parser.ingest.blocks import MemoryBlocks, SectionBlock
+    from clio_parser.retrieval.kg import build_kg_from_llm
+
+    good = '```json\n{"nodes": [{"id": "m1", "label": "X", "type": "method"}], "edges": []}\n```'
+
+    class FlakyLLM:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, messages, **kw):  # type: ignore[no-untyped-def]
+            self.calls += 1
+            return good if self.calls == 1 else "no json here"
+
+    blocks = MemoryBlocks(
+        metadata={},
+        sections=[SectionBlock(section_path=f"S{i}", title=f"S{i}", text="b") for i in range(12)],
+    )
+    graph, err = build_kg_from_llm(blocks, FlakyLLM(), batch_size=6)
+    assert err is None  # partial success
+    assert len(graph.nodes) == 1
