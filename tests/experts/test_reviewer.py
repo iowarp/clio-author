@@ -17,6 +17,7 @@ from clio_parser.harness.patterns import Sequential
 from clio_parser.harness.session import SessionContext
 from clio_parser.harness.types import Message, Task
 from clio_parser.ingest.blocks import MemoryBlocks, SectionBlock
+from clio_parser.retrieval.scholar import FakeScholarClient, S2Record
 
 # Out-of-range scores deliberately included to test clamping.
 _REVIEW_JSON = {
@@ -175,3 +176,104 @@ def test_reviewer_prose_mode_returns_text_not_json() -> None:
     assert out.metadata["format"] == "prose"
     assert "error" not in out.metadata and "parse_error" not in out.metadata
     assert "Decision: Accept" in out.content
+
+
+# --- retrieval-grounded review ------------------------------------------- #
+_RELATED_TITLE = "Attention Is All You Need"
+
+
+def _related_record() -> S2Record:
+    return S2Record(
+        paper_id="rw1",
+        title=_RELATED_TITLE,
+        authors=["Ashish Vaswani", "Noam Shazeer", "Niki Parmar", "Jakob Uszkoreit"],
+        year=2017,
+        abstract="We propose the Transformer, a sequence model based solely on attention.",
+        journal="NeurIPS",
+    )
+
+
+class CountingFakeScholar(FakeScholarClient):
+    """FakeScholarClient that records how many times it was searched."""
+
+    def __init__(self, records_by_title: dict[str, list[S2Record]]) -> None:
+        super().__init__(records_by_title)
+        self.calls = 0
+
+    def search_title(self, title, year_hint, cutoff_date):  # type: ignore[no-untyped-def]
+        self.calls += 1
+        return super().search_title(title, year_hint, cutoff_date)
+
+
+def test_reviewer_grounded_injects_related_work_into_prompt() -> None:
+    scholar = CountingFakeScholar({_RELATED_TITLE: [_related_record()]})
+    client = CannedJSONLLMClient(_REVIEW_JSON)
+    expert = ReviewerExpert(llm=client, scholar_client=scholar)
+    session = SessionContext(id="s")
+    task = Task(
+        id="t",
+        description="review",
+        payload={"paper": "# Body", "title": _RELATED_TITLE, "ground": True},
+    )
+
+    output = expert.run(task, session)
+
+    assert scholar.calls == 1
+    # The related work appears in the user prompt the model saw.
+    user_prompt = client.messages[1].content
+    assert _RELATED_TITLE in user_prompt
+    assert "Related prior work" in user_prompt
+    assert "do not invent references" in user_prompt
+    # Metadata + structured echo the grounding for the caller.
+    assert output.metadata["grounded"] is True
+    assert output.metadata["related_work"] == [{"title": _RELATED_TITLE, "year": 2017}]
+    assert output.structured is not None
+    assert output.structured["related_work"] == [{"title": _RELATED_TITLE, "year": 2017}]
+    assert "error" not in output.metadata and "grounding_error" not in output.metadata
+
+
+def test_reviewer_ground_true_without_scholar_client_is_normal_review() -> None:
+    client = CannedJSONLLMClient(_REVIEW_JSON)
+    expert = ReviewerExpert(llm=client)  # no scholar client
+    session = SessionContext(id="s")
+    task = Task(id="t", description="review", payload={"paper": "# Paper\nbody", "ground": True})
+
+    output = expert.run(task, session)
+
+    assert output.metadata["grounded"] is False
+    assert "related_work" not in output.metadata
+    assert output.structured is not None
+    assert "related_work" not in output.structured
+    assert "Related prior work" not in client.messages[1].content
+    assert "error" not in output.metadata
+
+
+def test_reviewer_ground_false_never_calls_scholar() -> None:
+    scholar = CountingFakeScholar({_RELATED_TITLE: [_related_record()]})
+    expert = ReviewerExpert(llm=CannedJSONLLMClient(_REVIEW_JSON), scholar_client=scholar)
+    session = SessionContext(id="s")
+    task = Task(id="t", description="review", payload={"paper": "# Paper\nbody"})
+
+    output = expert.run(task, session)
+
+    assert scholar.calls == 0
+    assert output.metadata["grounded"] is False
+    assert output.structured is not None
+
+
+class RaisingScholar:
+    def search_title(self, title, year_hint, cutoff_date):  # type: ignore[no-untyped-def]
+        raise RuntimeError("boom")
+
+
+def test_reviewer_grounding_error_is_caught_and_review_still_produced() -> None:
+    expert = ReviewerExpert(llm=CannedJSONLLMClient(_REVIEW_JSON), scholar_client=RaisingScholar())
+    session = SessionContext(id="s")
+    task = Task(id="t", description="review", payload={"paper": "# Paper\nbody", "ground": True})
+
+    output = expert.run(task, session)
+
+    assert output.metadata["grounding_error"] == "boom"
+    assert output.metadata["grounded"] is False
+    assert output.structured is not None  # review still produced
+    assert output.metadata["decision"] == "Accept"

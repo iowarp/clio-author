@@ -107,6 +107,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to a paper Markdown file (e.g. clio-out/<id>/paper.md).",
     )
+    p_review.add_argument(
+        "--ground",
+        action="store_true",
+        help="Retrieve related prior work (via CLIO_SCHOLAR) and ground the review in it.",
+    )
     _add_format(p_review)
     _add_json(p_review)
 
@@ -429,6 +434,8 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
             payload["paper"] = _read_file(args.paper_file, field="--paper-file")
         elif args.paper is not None:
             payload["paper"] = args.paper
+        if args.ground:
+            payload["ground"] = True
         payload["format"] = args.fmt
     elif command == "cite":
         candidates = _json_input(

@@ -22,6 +22,7 @@ an exception. It defaults to :class:`EchoLLMClient` so the harness runs offline
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from clio_parser.experts.review_models import PaperReview, PersonaSpec
@@ -30,6 +31,17 @@ from clio_parser.harness.session import SessionContext
 from clio_parser.harness.types import AgentOutput, Message, Task
 from clio_parser.ingest.blocks import MemoryBlocks
 from clio_parser.llm.client import EchoLLMClient, LLMClient
+from clio_parser.retrieval.scholar import S2Record, ScholarClient
+
+# How many related-work records to retrieve and inject when grounding is on.
+_GROUNDING_TOP_K = 5
+# Max characters of each related-work abstract injected into the prompt.
+_GROUNDING_ABSTRACT_CHARS = 200
+
+_GROUNDING_INSTRUCTION = (
+    "Where a weakness or question relates to the prior work below, reference it by "
+    "title/year; do not invent references."
+)
 
 # Rubric text adapted from AgentReview (PaperOrchestra, Apache-2.0); re-typed.
 _RUBRIC = (
@@ -125,6 +137,7 @@ class ReviewerExpert(BaseAgent):
         llm: LLMClient | None = None,
         *,
         persona: PersonaSpec | None = None,
+        scholar_client: ScholarClient | None = None,
     ) -> None:
         """Build a reviewer expert.
 
@@ -132,8 +145,12 @@ class ReviewerExpert(BaseAgent):
             llm: Completion client; defaults to :class:`EchoLLMClient` (offline).
             persona: Reviewer persona; defaults to the knowledgeable / responsible
                 / benign "best case" reviewer.
+            scholar_client: Optional scholar client (the network seam) used only
+                when a review requests grounding (``payload["ground"]`` truthy).
+                ``None`` (default) leaves the review behaviour exactly as before.
         """
         self.persona = persona or PersonaSpec()
+        self._scholar = scholar_client
         super().__init__(
             role="reviewer",
             system_prompt=build_reviewer_system_prompt(self.persona),
@@ -173,7 +190,18 @@ class ReviewerExpert(BaseAgent):
         returns an output with the raw text as ``content``, ``structured=None`` and
         ``metadata={"parse_error": ...}``. Never raises: missing input or any
         failure produces an error-flagged output (appended once).
+
+        Retrieval-grounded review: when ``payload["ground"]`` is truthy *and* a
+        scholar client was supplied, related prior work is retrieved for the paper
+        and injected into the user prompt, with an instruction to ground weaknesses
+        and questions in it. The retrieved references are echoed back in
+        ``metadata["related_work"]`` and ``structured["related_work"]`` so the
+        caller sees what grounded the review. With no scholar client or grounding
+        off (the default), behaviour is unchanged and the scholar client is never
+        called. A scholar-search failure is caught and recorded in
+        ``metadata["grounding_error"]``; the review still proceeds ungrounded.
         """
+        metadata: dict[str, Any] = {"persona": self.persona.label}
         try:
             raw_paper = (
                 task.payload.get("paper")
@@ -189,14 +217,35 @@ class ReviewerExpert(BaseAgent):
             instructions = _PROSE_INSTRUCTIONS if fmt == "prose" else _INSTRUCTIONS
 
             paper_text = self._coerce_paper(raw_paper)
+
+            # Retrieval grounding (opt-in; default off keeps the legacy behaviour).
+            ground = bool(task.payload.get("ground", False)) and self._scholar is not None
+            related: list[S2Record] = []
+            if ground:
+                query = _grounding_query(task.payload.get("title"), paper_text)
+                try:
+                    found = self._scholar.search_title(query, None, None)  # type: ignore[union-attr]
+                except Exception as exc:  # noqa: BLE001 - grounding is best-effort
+                    metadata["grounding_error"] = str(exc)
+                    ground = False
+                else:
+                    related = list(found[:_GROUNDING_TOP_K])
+
+            metadata["grounded"] = ground
+            related_summary = [{"title": r.title, "year": r.year} for r in related]
+            if ground:
+                metadata["related_work"] = related_summary
+
+            user_content = f"{instructions}\n\nHere is the paper to review:\n```\n{paper_text}\n```"
+            if ground and related:
+                user_content += (
+                    f"\n\n{_GROUNDING_INSTRUCTION}\n\n## Related prior work\n"
+                    + _format_related_work(related)
+                )
+
             messages = [
                 Message(role="system", content=self.system_prompt),
-                Message(
-                    role="user",
-                    content=(
-                        f"{instructions}\n\nHere is the paper to review:\n```\n{paper_text}\n```"
-                    ),
-                ),
+                Message(role="user", content=user_content),
             ]
             raw = self.llm.complete(messages)
 
@@ -206,7 +255,7 @@ class ReviewerExpert(BaseAgent):
                     agent=self.name,
                     content=raw,
                     structured=None,
-                    metadata={"persona": self.persona.label, "format": "prose"},
+                    metadata={**metadata, "format": "prose"},
                 )
                 session.add(output)
                 return output
@@ -218,7 +267,7 @@ class ReviewerExpert(BaseAgent):
                     content=raw,
                     structured=None,
                     metadata={
-                        "persona": self.persona.label,
+                        **metadata,
                         "parse_error": "no parseable JSON object in LLM response",
                     },
                 )
@@ -229,18 +278,59 @@ class ReviewerExpert(BaseAgent):
         except Exception as exc:  # noqa: BLE001 - never raise; flag error on output
             return self._error(session, str(exc))
 
+        structured = review.model_dump()
+        if ground:
+            structured["related_work"] = related_summary
         output = AgentOutput(
             agent=self.name,
             content=f"Decision: {review.decision} (overall {review.overall}/10). {review.summary}".strip(),
-            structured=review.model_dump(),
+            structured=structured,
             metadata={
-                "persona": self.persona.label,
+                **metadata,
                 "decision": review.decision,
                 "overall": review.overall,
             },
         )
         session.add(output)
         return output
+
+
+def _grounding_query(title: Any, paper_text: str) -> str:
+    """Derive a related-work search query for the paper.
+
+    Prefers an explicit ``title``; otherwise the first Markdown ``#``/``##``
+    heading in the paper text; failing that, the first ~12 words of the text.
+    """
+    if isinstance(title, str) and title.strip():
+        return title.strip()
+    for line in paper_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            heading = stripped.lstrip("#").strip()
+            if heading:
+                return heading
+    return " ".join(paper_text.split()[:12])
+
+
+def _format_related_work(records: list[S2Record]) -> str:
+    """Render related-work ``records`` as a compact bullet block for the prompt."""
+    lines: list[str] = []
+    for record in records:
+        year = record.year if record.year is not None else "n.d."
+        authors = ", ".join(record.authors[:3]) or "unknown authors"
+        abstract = _normalise_space(record.abstract or "")
+        if len(abstract) > _GROUNDING_ABSTRACT_CHARS:
+            abstract = abstract[:_GROUNDING_ABSTRACT_CHARS].rstrip() + "..."
+        line = f"- {record.title} ({year}) - {authors}"
+        if abstract:
+            line += f"\n  {abstract}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _normalise_space(text: str) -> str:
+    """Collapse runs of whitespace to single spaces and strip the ends."""
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def _extract_json_object(text: str) -> dict[str, Any] | None:

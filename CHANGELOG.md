@@ -4,9 +4,17 @@ All notable changes to clio-parser are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.3.0]
 
 ### Added
+- **Retrieval-grounded review.** `review --ground` (when a `CLIO_SCHOLAR` backend is configured) makes
+  the reviewer first retrieve related prior work for the paper and inject it into the review prompt,
+  so weaknesses/questions can be grounded in real references ("overlaps prior work [Title, Year]").
+  Returns the retrieved set in `metadata["related_work"]`/`structured`; off by default and fully
+  backward compatible (no scholar client → unchanged single-pass review). Adopts DeepReview's idea.
+- **Parallel knowledge-graph extraction.** KG section batches now run concurrently
+  (`max_workers`, default 4) with a deterministic order-preserving merge — large papers extract far
+  faster while staying reproducible.
 - **Section-batched knowledge-graph extraction.** `build_kg_from_llm` now splits a paper's sections
   into batches (`batch_size`, default 6), extracts each with one LLM call, and merges the sub-graphs
   (dedupe nodes by type+label, remap/collapse edges). Long papers that previously overflowed a single

@@ -85,7 +85,7 @@ class ClioParserAgent:
         self.echo_expert = EchoExpert(self.llm)
         self.ingestor = IngestorExpert(self.llm, out_dir=files.root if files else None)
         self.paper_qa = PaperQAExpert(self.llm)
-        self.reviewer = ReviewerExpert(self.llm)
+        self.reviewer = ReviewerExpert(self.llm, scholar_client=scholar_client)
         self.meta_reviewer = MetaReviewerExpert(self.llm)
         self.citation = CitationExpert(self.llm, client=scholar_client)
         self.writer = WriterExpert(self.llm, files=files)
