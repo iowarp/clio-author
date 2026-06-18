@@ -27,11 +27,11 @@ jobs:
 
       - name: Ruff (lint + format check)
         run: |
-          uv run ruff check clio_parser tests scripts
-          uv run ruff format --check clio_parser tests scripts
+          uv run ruff check clio_author tests scripts
+          uv run ruff format --check clio_author tests scripts
 
       - name: Mypy
-        run: uv run mypy clio_parser
+        run: uv run mypy clio_author
 
       - name: Pytest (hermetic; live/baseline are deselected by default)
         run: uv run pytest -q
