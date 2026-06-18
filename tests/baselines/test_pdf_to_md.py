@@ -22,7 +22,7 @@ from typing import Any
 
 import pytest
 
-from clio_parser.ingest import process_markdown
+from clio_author.ingest import process_markdown
 
 # Raw-Markdown fixtures exercising the shared passes (sections, citations,
 # figures, bibliography, cleanup). Equation-specific input is intentionally
@@ -99,7 +99,7 @@ def test_full_pipeline_metrics(
     """
     pdf_path: Path = request.getfixturevalue(pdf_fixture)
 
-    from clio_parser.ingest.docling_extract import PdfConfig, process_pdf
+    from clio_author.ingest.docling_extract import PdfConfig, process_pdf
 
     result = process_pdf(pdf_path, out_dir=tmp_path, config=PdfConfig())
     md = result.markdown

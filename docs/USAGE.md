@@ -1,13 +1,13 @@
-# clio-parser usage
+# clio-author usage
 
-clio-parser is a standalone multi-agent harness a host invokes either **in-process** (import) or as
-a **subprocess** (the `clio-parser` CLI). This document is the full action reference plus the
+clio-author is a standalone multi-agent harness a host invokes either **in-process** (import) or as
+a **subprocess** (the `clio-author` CLI). This document is the full action reference plus the
 configuration seams (optional extras, the `LLMClient`, scholar backends, and Gemini vision).
 
-- **Adapter surface** — `ClioParserSubagent` (in `clio_parser.integration.clio_adapter`): two
+- **Adapter surface** — `ClioAuthorSubagent` (in `clio_author.integration.clio_adapter`): two
   methods, `capabilities()` and `run(action, payload)`. Both return JSON-serializable dicts and
   never raise; any failure is captured into an `error` field.
-- **Typed surface** — `ClioParserAgent` (in `clio_parser.agent`): the same routing with typed
+- **Typed surface** — `ClioAuthorAgent` (in `clio_author.agent`): the same routing with typed
   convenience methods, returning an `AgentOutput` (`agent`, `content`, `structured`, `metadata`).
 
 Every action degrades gracefully: missing inputs or failures produce an output whose
@@ -21,11 +21,11 @@ The CLI maps onto the adapter. `run(action, payload)` returns:
 
 The CLI exits `1` when the result has a top-level `error` or `metadata.error`, else `0`.
 
-> **Running the CLI examples below.** `clio-parser` is a console script inside the project's `uv`
+> **Running the CLI examples below.** `clio-author` is a console script inside the project's `uv`
 > environment, not on your global `PATH`. Prefix every example with **`uv run`** (e.g.
-> `uv run clio-parser ingest 2601.23265`), or activate the venv once (`source .venv/bin/activate`)
-> and call `clio-parser` directly. Actions needing a heavy extra take the matching flag on the run
-> (`uv run --extra pdf clio-parser ingest …`). The bare `clio-parser …` form shown below assumes an
+> `uv run clio-author ingest 2601.23265`), or activate the venv once (`source .venv/bin/activate`)
+> and call `clio-author` directly. Actions needing a heavy extra take the matching flag on the run
+> (`uv run --extra pdf clio-author ingest …`). The bare `clio-author …` form shown below assumes an
 > activated venv.
 
 > **Output format (`structured` vs `prose`).** Every action defaults to `structured` — JSON for a
@@ -67,10 +67,10 @@ Convert an arXiv id / URL / local PDF / paper title / topic into clean Markdown 
   `metadata["error"]`.
 
 ```bash
-clio-parser ingest 2601.23265                         # arXiv id
-clio-parser ingest "Attention Is All You Need"        # paper title
-clio-parser ingest "transformer self-attention"       # topic
-clio-parser ingest /path/to/paper.pdf                 # local PDF
+clio-author ingest 2601.23265                         # arXiv id
+clio-author ingest "Attention Is All You Need"        # paper title
+clio-author ingest "transformer self-attention"       # topic
+clio-author ingest /path/to/paper.pdf                 # local PDF
 ```
 ```python
 sub.run("ingest", {"source": "2601.23265", "out_dir": "clio-out/2601.23265"})
@@ -92,7 +92,7 @@ Answer a question grounded only in the provided memory blocks (selective context
 - **File inputs:** `--blocks-file clio-out/2601.23265/blocks.json` (preferred for real papers).
 
 ```bash
-clio-parser ask --question "What is the main result?" \
+clio-author ask --question "What is the main result?" \
   --blocks-file clio-out/2601.23265/blocks.json --format prose
 ```
 ```python
@@ -116,7 +116,7 @@ Produce a structured, persona-conditioned peer review.
 - **File inputs:** `--paper-file clio-out/2601.23265/paper.md`.
 
 ```bash
-clio-parser review --paper-file clio-out/2601.23265/paper.md --format prose
+clio-author review --paper-file clio-out/2601.23265/paper.md --format prose
 ```
 ```python
 sub.run("review", {"paper": "# Title\n\nAbstract..."})
@@ -134,10 +134,10 @@ Aggregate several reviews into a single area-chair meta-review (deterministic, o
 - **Returns:** `content` = meta-decision summary; `structured` = a `MetaReview` dump (per-axis
   rounded means, merged text fields, OR-ed ethical concerns, decision, `reviewer_count`); `metadata`
   = `{decision, overall, reviewer_count}`.
-- **Extra:** none. Aggregation is offline arithmetic. Reachable via `clio-parser run meta_review`.
+- **Extra:** none. Aggregation is offline arithmetic. Reachable via `clio-author run meta_review`.
 
 ```bash
-clio-parser run meta_review \
+clio-author run meta_review \
   --json '{"reviews": [{"Overall": 7, "Decision": "Accept"}, {"Overall": 5, "Decision": "Reject"}]}'
 ```
 ```python
@@ -165,13 +165,13 @@ Verify citation candidates against scholarly metadata backends and emit **sugges
 - **File inputs:** `--candidates-file refs.json`.
 
 ```bash
-clio-parser cite \
+clio-author cite \
   --candidates-json '[{"title": "Attention Is All You Need", "year": 2017}]'
 ```
 ```python
-from clio_parser.retrieval.scholar import FakeScholarClient
+from clio_author.retrieval.scholar import FakeScholarClient
 
-agent = ClioParserAgent(scholar_client=FakeScholarClient(...))
+agent = ClioAuthorAgent(scholar_client=FakeScholarClient(...))
 agent.cite([{"title": "Attention Is All You Need", "year": 2017}], out_dir="/tmp/suggestions")
 ```
 
@@ -192,7 +192,7 @@ Draft a single paper section grounded in scoped source material.
 - **File inputs:** `--source-file clio-out/2601.23265/paper.md`.
 
 ```bash
-clio-parser write --outline "Methods" \
+clio-author write --outline "Methods" \
   --source-file clio-out/2601.23265/paper.md --format prose
 ```
 ```python
@@ -238,7 +238,7 @@ citations**.
 - **File inputs:** `--text-file clio-out/mypaper/sections/01-introduction.md`.
 
 ```bash
-clio-parser polish --text-file clio-out/mypaper/sections/01-introduction.md \
+clio-author polish --text-file clio-out/mypaper/sections/01-introduction.md \
   --voice concise --format prose
 ```
 ```python
@@ -266,7 +266,7 @@ terms, duplication, and broken narrative flow.
 - **File inputs:** `--markdown-file clio-out/mypaper/paper.md` or `--sections-file sections.json`.
 
 ```bash
-clio-parser coherence --markdown-file clio-out/mypaper/paper.md --format prose
+clio-author coherence --markdown-file clio-out/mypaper/paper.md --format prose
 ```
 ```python
 sub.run("coherence", {"markdown": manuscript_text})
@@ -292,7 +292,7 @@ paper's *content* graph, distinct from any citation / literature graph.
   `<out_dir>/kg.mmd` (Mermaid).
 
 ```bash
-clio-parser kg --blocks-file clio-out/2601.23265/blocks.json --format prose
+clio-author kg --blocks-file clio-out/2601.23265/blocks.json --format prose
 ```
 ```python
 sub.run("kg", {"blocks": blocks_dump, "out_dir": "clio-out/2601.23265"})
@@ -317,7 +317,7 @@ Fill in descriptions/captions for figures in memory blocks.
 - **File inputs:** `--blocks-file clio-out/2601.23265/blocks.json`.
 
 ```bash
-clio-parser describe --blocks-file clio-out/2601.23265/blocks.json --format prose
+clio-author describe --blocks-file clio-out/2601.23265/blocks.json --format prose
 ```
 ```python
 sub.run("describe_figures", {"figures": [{"figure_id": 1, "caption": "..."}]})
@@ -342,7 +342,7 @@ Generate matplotlib plot **code** (text only; never executed on this path).
   runs the code in a subprocess (`Agg` backend, timeout). Nothing in the default action renders.
 
 ```bash
-clio-parser run plot \
+clio-author run plot \
   --json '{"spec": {"kind": "plot", "intent": "bar chart of accuracy by model"}}'
 ```
 ```python
@@ -381,10 +381,10 @@ LaTeX. Each section is written in a fresh `SessionContext` so state does not lea
 
 ```bash
 # Minimal: idea only (offline echo produces placeholder sections)
-clio-parser compose --idea "A new attention mechanism for long-range dependencies."
+clio-author compose --idea "A new attention mechanism for long-range dependencies."
 
 # Full: real model + review loop + LaTeX output
-CLIO_LLM=claude uv run clio-parser compose \
+CLIO_LLM=claude uv run clio-author compose \
   --idea "A new attention mechanism for long-range dependencies." \
   --log "WikiText-103 experiments: BLEU +2.1 over baseline." \
   --candidates-file refs.json \
@@ -443,13 +443,13 @@ bold / italic / inline code, bullet and numbered lists, Markdown links (rendered
 
 ```bash
 # From a composed paper.md:
-clio-parser export \
+clio-author export \
   --markdown-file clio-out/mypaper/paper.md \
   --bibtex-file clio-out/mypaper/references.bib \
   --out-dir clio-out/mypaper
 
 # From compose's structured sections list:
-clio-parser export \
+clio-author export \
   --sections-file /tmp/sections.json \
   --title "My Paper Title" \
   --out-dir clio-out/mypaper
@@ -476,10 +476,10 @@ Run a writer ↔ reviewer **critic-refine** loop and return the final output.
   error-flagged output.
 - **Returns:** the final writer/critic `AgentOutput` of the loop (writer-shaped on the last draft).
 - **Extra:** none; a real `LLMClient` drives both producer and critic. Reachable via
-  `clio-parser run write_review`.
+  `clio-author run write_review`.
 
 ```bash
-clio-parser run write_review \
+clio-author run write_review \
   --json '{"outline": {"title": "Methods"}, "source": "...", "max_rounds": 2}'
 ```
 ```python
@@ -496,10 +496,10 @@ Run a figure visualizer ↔ critic **critic-refine** loop and return the final o
   default 3)*.
 - **Returns:** the final figure `AgentOutput` of the loop (plot-shaped, code in `content`).
 - **Extra:** none for the loop itself (code only); `viz` only for the separate gated render.
-  Reachable via `clio-parser run figure_refine`.
+  Reachable via `clio-author run figure_refine`.
 
 ```bash
-clio-parser run figure_refine \
+clio-author run figure_refine \
   --json '{"spec": {"kind": "plot", "intent": "line chart of loss"}, "max_rounds": 2}'
 ```
 ```python
@@ -532,16 +532,16 @@ That echo path is fine for `ingest` (deterministic), `meta_review` (arithmetic),
 / `write` / `edit` / `polish` / `coherence` / `compose` need a **real** provider to produce useful
 output.
 
-**Ready-made providers** ship in `clio_parser.llm.providers` (stdlib-only, lazy):
+**Ready-made providers** ship in `clio_author.llm.providers` (stdlib-only, lazy):
 `ClaudeCliLLMClient` (the `claude` CLI — session-based, no API key), `CodexCliLLMClient`
 (`codex exec`), and `OllamaLLMClient` (a local Ollama server). The **CLI** selects one via the
 `CLIO_LLM` env var (`echo` (default) | `claude` | `codex` | `ollama`; model via `CLIO_LLM_MODEL`,
 Ollama URL via `CLIO_OLLAMA_URL`).
 
 ```bash
-CLIO_LLM=claude  clio-parser review --paper-file clio-out/2601.23265/paper.md
-CLIO_LLM=codex   clio-parser write --outline "Introduction" --source-file clio-out/2601.23265/paper.md
-CLIO_LLM=ollama  CLIO_LLM_MODEL=qwen2.5:14b clio-parser ask \
+CLIO_LLM=claude  clio-author review --paper-file clio-out/2601.23265/paper.md
+CLIO_LLM=codex   clio-author write --outline "Introduction" --source-file clio-out/2601.23265/paper.md
+CLIO_LLM=ollama  CLIO_LLM_MODEL=qwen2.5:14b clio-author ask \
   --question "..." --blocks-file clio-out/2601.23265/blocks.json
 ```
 
@@ -549,18 +549,18 @@ For secrets, the CLI automatically loads `.env.local` from the current working d
 overriding real environment variables. Set `CLIO_ENV_FILE=/path/to/file` to use a different local
 env file. See [`SECURITY.md`](SECURITY.md) for key rotation and handling rules.
 
-In-process, pass a provider directly: `ClioParserAgent(llm=ClaudeCliLLMClient())` or
-`ClioParserSubagent(llm=resolve_llm("claude"))`. To write your own provider, implement:
+In-process, pass a provider directly: `ClioAuthorAgent(llm=ClaudeCliLLMClient())` or
+`ClioAuthorSubagent(llm=resolve_llm("claude"))`. To write your own provider, implement:
 
 ```python
 def complete(self, messages: list[Message], **kwargs: object) -> str: ...
 ```
 
-`Message` (from `clio_parser.harness.types`) has `role` (`"system" | "user" | "assistant" |
+`Message` (from `clio_author.harness.types`) has `role` (`"system" | "user" | "assistant" |
 "expert"`), `content: str`, and optional `name` / `metadata`. A minimal real client:
 
 ```python
-from clio_parser.harness.types import Message
+from clio_author.harness.types import Message
 
 class MyLLMClient:
     def __init__(self, model: str) -> None:
@@ -584,13 +584,13 @@ class MyLLMClient:
 Inject it at construction; all experts share the one client:
 
 ```python
-from clio_parser import ClioParserAgent
+from clio_author import ClioAuthorAgent
 
-agent = ClioParserAgent(llm=MyLLMClient(model="..."))
+agent = ClioAuthorAgent(llm=MyLLMClient(model="..."))
 agent.review("# Title\n...")
 ```
 
-Both `ClioParserAgent` and `ClioParserSubagent` also accept `files=SafeFiles(root)` (for the
+Both `ClioAuthorAgent` and `ClioAuthorSubagent` also accept `files=SafeFiles(root)` (for the
 write-capable experts) and `scholar_client=...` (for `cite`).
 
 ---
@@ -614,7 +614,7 @@ client enforces a cross-process 1-request/second minimum interval for CLI runs a
 HTTP 429.
 
 In-process, pass any `ScholarClient` protocol-compatible object directly:
-`ClioParserAgent(scholar_client=MyScholarClient())`.
+`ClioAuthorAgent(scholar_client=MyScholarClient())`.
 
 ---
 
@@ -648,18 +648,18 @@ Construction is hermetic (no network I/O); API calls happen only inside `describ
 vision failure never propagates or aborts a `describe_figures` / `compose` run.
 
 ```bash
-CLIO_VISION=gemini GEMINI_API_KEY=... clio-parser describe \
+CLIO_VISION=gemini GEMINI_API_KEY=... clio-author describe \
   --blocks-file clio-out/2601.23265/blocks.json --format prose
 ```
 
 In-process:
 
 ```python
-from clio_parser.llm.vision import GeminiVisionClient
-from clio_parser import ClioParserAgent
+from clio_author.llm.vision import GeminiVisionClient
+from clio_author import ClioAuthorAgent
 
 vision = GeminiVisionClient(api_key="...", describe_model="gemini-2.5-flash")
-agent = ClioParserAgent(vision=vision)
+agent = ClioAuthorAgent(vision=vision)
 agent.describe_figures(blocks_dump)
 ```
 

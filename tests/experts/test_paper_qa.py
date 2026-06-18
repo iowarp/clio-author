@@ -8,12 +8,12 @@ and an Engine/Sequential run.
 
 from __future__ import annotations
 
-from clio_parser.experts.paper_qa import PAPER_QA_SYSTEM_PROMPT, PaperQAExpert
-from clio_parser.harness.engine import Engine
-from clio_parser.harness.patterns import Sequential
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import Message, Task
-from clio_parser.ingest.blocks import FigureInfo, MemoryBlocks, SectionBlock
+from clio_author.experts.paper_qa import PAPER_QA_SYSTEM_PROMPT, PaperQAExpert
+from clio_author.harness.engine import Engine
+from clio_author.harness.patterns import Sequential
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import Message, Task
+from clio_author.ingest.blocks import FigureInfo, MemoryBlocks, SectionBlock
 
 
 class RecordingLLMClient:

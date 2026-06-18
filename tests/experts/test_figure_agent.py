@@ -8,13 +8,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from clio_parser.experts.figure_agent import FigureAgentExpert
-from clio_parser.harness.engine import Engine
-from clio_parser.harness.patterns import Sequential
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import Message, Task
-from clio_parser.ingest.blocks import FigureInfo, MemoryBlocks
-from clio_parser.tools.files import SafeFiles
+from clio_author.experts.figure_agent import FigureAgentExpert
+from clio_author.harness.engine import Engine
+from clio_author.harness.patterns import Sequential
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import Message, Task
+from clio_author.ingest.blocks import FigureInfo, MemoryBlocks
+from clio_author.tools.files import SafeFiles
 
 _PLOT_CODE = (
     "Here is the figure code:\n"

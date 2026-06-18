@@ -6,7 +6,7 @@ Closes the gaps flagged across M1–M6: (1) **table fidelity** (the gap no refer
 hermetic, regex/string-based; no new runtime deps.
 
 ## Steps
-1. **`clio_parser/ingest/tables.py`** — `process_tables(content: str) -> str` (regex, idempotent,
+1. **`clio_author/ingest/tables.py`** — `process_tables(content: str) -> str` (regex, idempotent,
    pure):
    - Detect contiguous GFM table blocks (runs of lines containing `|`).
    - Ensure a header **separator row** (`| --- | --- |`) follows the header row if missing.
@@ -23,11 +23,11 @@ hermetic, regex/string-based; no new runtime deps.
    subscript/superscript spacing, `\\`-handling; ensure the transformer/GAN-specific regexes stay
    strictly behind `domain_fixes=True`. Add tests proving generality on non-transformer equations and
    that the generic path is domain-neutral (no spurious rewrites).
-3. **`clio_parser/eval/__init__.py` + `clio_parser/eval/report.py`** —
+3. **`clio_author/eval/__init__.py` + `clio_author/eval/report.py`** —
    - `compute_md_metrics(markdown: str) -> dict` (pure): counts of sections (headings), linked
      citations (`[[n]](#ref-n)`), embedded figures (`![`), tables (GFM blocks), references. Reusable
      by `tests/baselines/`.
-   - `build_report(results: dict) -> str` (pure): render a Markdown report comparing clio-parser vs
+   - `build_report(results: dict) -> str` (pure): render a Markdown report comparing clio-author vs
      reference metrics (PDF→MD fidelity counts; citation-verification rate; review win indicators) —
      operate on a metrics dict, hermetic. The actual real-PDF run stays gated in `tests/baselines/`.
    - Optional `scripts/run_baseline_report.py` (gated; needs `pdf` extra + the two papers) that runs
@@ -54,9 +54,9 @@ hermetic, regex/string-based; no new runtime deps.
 idempotent on a table fixture; equations default path domain-neutral.
 
 ## Files
-- New: `clio_parser/ingest/tables.py`, `clio_parser/eval/{__init__,report}.py`,
+- New: `clio_author/ingest/tables.py`, `clio_author/eval/{__init__,report}.py`,
   `tests/ingest/test_tables.py`, `tests/eval/{__init__,test_report}.py`; optional
   `scripts/run_baseline_report.py` (gated).
-- Modify: `clio_parser/ingest/postprocess/__init__.py` (add tables pass), `equations.py` (generalize),
+- Modify: `clio_author/ingest/postprocess/__init__.py` (add tables pass), `equations.py` (generalize),
   `tests/ingest/test_equations.py`.
 - Reuse: `ingest/postprocess/*`, `tests/baselines/` (use `compute_md_metrics`).

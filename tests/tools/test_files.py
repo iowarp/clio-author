@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from clio_parser.tools.files import (
+from clio_author.tools.files import (
     EditNotApplicableError,
     FileOutsideRootError,
     RefusedWriteError,

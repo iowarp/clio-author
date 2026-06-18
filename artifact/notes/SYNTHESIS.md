@@ -1,7 +1,7 @@
 # SYNTHESIS — similarities, differences, reuse-vs-rebuild
 
 Cross-artifact synthesis grounded in the per-artifact notes in this folder. The goal: decide
-what clio-parser **reuses**, what it **adapts**, and what it **builds new**, and how each piece
+what clio-author **reuses**, what it **adapts**, and what it **builds new**, and how each piece
 maps onto CLIO's actual extension points.
 
 ## 1. The one fact that drives everything: how CLIO is extended
@@ -20,8 +20,8 @@ Its only sanctioned extension surface is:
 - **ARC memory + context-files** — context is *compiled, not concatenated*; **no embeddings in
   core**. Selective injection via context-file attachments and ARC `Context`/`DatasetProfile`.
 
-**This describes how CLIO extends *itself*. clio-parser is deliberately NOT built that way.**
-clio-parser is a **standalone, pure-Python multi-agent harness** (a proper
+**This describes how CLIO extends *itself*. clio-author is deliberately NOT built that way.**
+clio-author is a **standalone, pure-Python multi-agent harness** (a proper
 agent like protoneo/papervizagent), not an MCP server or Markdown blueprint. CLIO integrates it as a
 **standalone subagent it can invoke** via a thin adapter (deferred). So the CLIO extension facts
 above are useful only for the eventual integration shim — the harness itself stands alone. See
@@ -69,7 +69,7 @@ DESIGN.md §1.
   blueprint experts**, not wtf-p commands. (The `/wtfp:` skills already in this harness can be a
   reference/fallback, but the deliverable targets CLIO's blueprint format.)
 - **License boundary.** protoneo is **AGPL-3.0**; CLIO is BSD-3. We must **re-implement** protoneo's
-  KG/deliberation *concepts* rather than vendoring its code, to keep clio-parser permissively
+  KG/deliberation *concepts* rather than vendoring its code, to keep clio-author permissively
   licensed. paper-to-md (MIT), PaperBanana/PaperOrchestra (Apache-2.0), phagocyte (first-party) are
   copy-compatible.
 - **MinerU vs Docling.** Standardize on **Docling** (already in phagocyte/protoneo; you own that
@@ -79,9 +79,9 @@ DESIGN.md §1.
 - **Equation repair is brittle.** phagocyte's equation regexes are transformer/GAN-paper-specific.
   Needs generalization (or a VLM-assisted equation pass) for arbitrary arXiv papers.
 
-## 5. The mapping — each capability → clio-parser harness component
+## 5. The mapping — each capability → clio-author harness component
 
-| Requirement | Source artifact | clio-parser realization (standalone harness) |
+| Requirement | Source artifact | clio-author realization (standalone harness) |
 |---|---|---|
 | arXiv/PDF → clean scientific Markdown | phagocyte ingestor + paper-to-md postprocess | `ingest/` (Docling+postprocess, fresh port) driven by `experts/ingestor.py` |
 | Vision (figures/tables/eq) w/ local model | phagocyte VLM + paper-to-md qwen3-vl | `experts/figure_agent.py` + `llm/client.py` vision path |
@@ -91,7 +91,7 @@ DESIGN.md §1.
 | Retrieval techniques | PaperOrchestra Semantic Scholar + protoneo KG + phagocyte RAG | `retrieval/scholar.py` + `retrieval/rag.py` + optional `retrieval/kg.py` |
 | Read/write/edit tools (review & write) | CLIO fs built-ins + wtf-p workflow | `tools/files.py` (read/write/propose+apply-edit) used by writer/editor experts |
 | Quality / review loop | PaperBanana critic + PaperOrchestra AgentReview + protoneo deliberation | `harness/patterns.py::CriticRefine` + `experts/reviewer.py` (multi-reviewer) |
-| Load/unload/invoke as one package | reference harnesses | `ClioParserAgent.invoke()`; `integration/clio_adapter.py` shim (deferred) |
+| Load/unload/invoke as one package | reference harnesses | `ClioAuthorAgent.invoke()`; `integration/clio_adapter.py` shim (deferred) |
 | Test against baselines | both papers' benchmarks | `tests/baselines/` vs paper-to-md/PaperBanana/PaperOrchestra |
 
 ## 6. Open cross-cutting questions (carry into DESIGN)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from clio_parser.eval import build_report, compute_md_metrics
+from clio_author.eval import build_report, compute_md_metrics
 
 # A small processed-Markdown fixture with known structural counts:
 #   3 headings, 2 linked citations, 1 embedded figure, 1 table block, 2 refs.
@@ -71,7 +71,7 @@ def test_compute_md_metrics_empty() -> None:
 
 def test_build_report_contains_systems_and_metrics() -> None:
     results = {
-        "clio-parser": {
+        "clio-author": {
             "sections": 5,
             "linked_citations": 10,
             "figures": 3,
@@ -91,7 +91,7 @@ def test_build_report_contains_systems_and_metrics() -> None:
     # Header row with humanized metric columns.
     assert "| System | Sections | Linked citations | Figures | Tables | References |" in report
     # A separator row and one data row per system.
-    assert "| clio-parser | 5 | 10 | 3 | 2 | 20 |" in report
+    assert "| clio-author | 5 | 10 | 3 | 2 | 20 |" in report
     assert "| reference | 5 | 4 | 3 | 0 | 20 |" in report
 
 

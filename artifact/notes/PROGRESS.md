@@ -1,12 +1,12 @@
-# PROGRESS — clio-parser
+# PROGRESS — clio-author
 
 Living status ledger. Maintained by the `progress` subagent (see `.claude/agents/progress.md`).
 Status legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked.
 
 **Last updated:** 2026-06-15
 **Where we left off:** **ALL MILESTONES COMPLETE (M0–M8).** M5/M6/M7 merged (PRs #6/#7/#8). **M8
-code-complete and reviewed** on branch `feat/m8-clio-adapter` (PR open): `ClioParserAgent` routes to
-all experts; `integration/clio_adapter.py` (`ClioParserSubagent`) + `cli.py` give CLIO a
+code-complete and reviewed** on branch `feat/m8-clio-adapter` (PR open): `ClioAuthorAgent` routes to
+all experts; `integration/clio_adapter.py` (`ClioAuthorSubagent`) + `cli.py` give CLIO a
 JSON-serializable, subprocess- and import-callable surface. **293 hermetic tests pass**; ruff + mypy
 clean. The full pipeline — ingest → retrieve/Q&A → ground citations → review → write/edit → figures
 — is built, tested, and invokable. Remaining: merge the M8 PR. Then the project is feature-complete
@@ -26,7 +26,7 @@ through the planned roadmap. See the **Session log** to resume.
 
 | # | Milestone | Status | Notes |
 |---|---|---|---|
-| M0 | Harness skeleton (`BaseAgent`, `AgentProtocol`, engine, patterns, session, types) + trivial expert; `ClioParserAgent.invoke()` runs | ✅ | `clio_parser/harness/` + `agent.py` + `experts/echo.py` + `llm/client.py`; 4 tests pass, ruff/mypy clean |
+| M0 | Harness skeleton (`BaseAgent`, `AgentProtocol`, engine, patterns, session, types) + trivial expert; `ClioAuthorAgent.invoke()` runs | ✅ | `clio_author/harness/` + `agent.py` + `experts/echo.py` + `llm/client.py`; 4 tests pass, ruff/mypy clean |
 | M1 | Processing track: `ingest/` port + `ingestor` expert → Markdown + memory blocks; baseline diff | ✅ | `ingest/{postprocess,blocks,docling_extract}` + `experts/ingestor.py` + `tests/baselines/`; 89 hermetic tests + 3 port-equivalence (byte-match phagocyte); reviewed. Live real-PDF run gated (needs `pdf` extra + network) |
 | M2 | Memory blocks + selective injection + `rag` retrieval; `paper_qa` | ✅ | `retrieval/rag.py` (HashingEmbedder default + lazy LanceDb/SentenceTransformer) + `experts/paper_qa.py`; 109 hermetic tests; reviewed. Real-embedding backend gated (`rag` extra) |
 | M3 | Grounding: `scholar` (Semantic Scholar) + `citation` expert | ✅ | `retrieval/scholar.py` (pure verification + lazy S2 client) + `experts/citation.py` (suggestions-only, bib-safe); 140 hermetic tests; reviewed (CHANGES-NEEDED → fixed: cutoff gate + symlink-safe write). S2 calls gated (`scholar` extra) |
@@ -34,7 +34,7 @@ through the planned roadmap. See the **Session log** to resume.
 | M5 | Write/edit: `writer` + `editor` + file tools | ✅ | `tools/files.py` (SafeFiles, sandbox-verified) + `experts/{write_models,writer,editor,write_loop}.py` (`run_write_review_loop` via CriticRefine); 207 hermetic tests; reviewed (APPROVE-WITH-NITS → applied) |
 | M6 | Figures (optional): `figure_agent` generation | ✅ | `experts/{figure_models,figure_agent}.py` (describe + matplotlib code-gen; gated `render_plot_code`; `run_figure_refine` via CriticRefine); 224 hermetic tests; reviewed. Diagram image-gen + vision deferred |
 | M7 | Harden gaps: table fidelity, generalized equations, baseline eval report | ✅ | `ingest/tables.py` (GFM normalization, narrowed detection — prose/math/code/lists safe) + `eval/{report}.py` (metrics + report) + equation generality; 256 hermetic tests; reviewed (CHANGES-NEEDED → table over-detection fixed) |
-| M8 | CLIO integration: thin `clio_adapter` so CLIO can invoke the harness | ✅ | `ClioParserAgent` routes to all experts; `integration/clio_adapter.py` (`ClioParserSubagent`: capabilities + run, JSON-serializable, CLIO-agnostic) + `cli.py` (`clio-parser`, generic `run <action>`); 293 hermetic tests; reviewed (APPROVE-WITH-NITS → applied) |
+| M8 | CLIO integration: thin `clio_adapter` so CLIO can invoke the harness | ✅ | `ClioAuthorAgent` routes to all experts; `integration/clio_adapter.py` (`ClioAuthorSubagent`: capabilities + run, JSON-serializable, CLIO-agnostic) + `cli.py` (`clio-author`, generic `run <action>`); 293 hermetic tests; reviewed (APPROVE-WITH-NITS → applied) |
 
 ## Open decisions / pending inputs
 
@@ -108,7 +108,7 @@ Scholar, fuzzy-match + date cutoff per PaperOrchestra) + a `citation` expert. Se
 ### 2026-06-15 — Session 3: merge PR #1, M1 hermetic core
 **Done this session:**
 - Merged **PR #1** to `main` (setup + M0). Started branch `feat/m1-processing`.
-- **M1 part 1 (hermetic core):** built `clio_parser/ingest/postprocess/` (sections, citations,
+- **M1 part 1 (hermetic core):** built `clio_author/ingest/postprocess/` (sections, citations,
   equations, figures, bibliography, cleanup) + `blocks.py` (`FigureInfo`/`Equation`/`CodeBlock`/
   `SectionBlock`/`MemoryBlocks` with `block_id`, `to_context`, `select`, and a section walker).
   Deps kept optional (`pdf` extra); default test suite hermetic.
@@ -135,7 +135,7 @@ injection (`retrieval/rag.py` over the memory blocks) + a `paper_qa` path. See `
 
 **Done this session:**
 - Pushed branch `setup/project-harness` to GitHub; wrote and pushed a real `README.md`.
-- **M0 complete:** scaffolded `clio_parser/` (`harness/` types, protocol, base, session, patterns,
+- **M0 complete:** scaffolded `clio_author/` (`harness/` types, protocol, base, session, patterns,
   engine; `llm/client.py`; `experts/echo.py`; `agent.py`) + `pyproject.toml` + tests. `Sequential`
   pattern implemented; `Parallel`/`RoundRobin`/`CriticRefine` are documented stubs.
 - Verified: `uv run pytest` → 4 passed; `ruff` + `mypy` clean; `invoke("hello world")` works.
@@ -143,12 +143,12 @@ injection (`retrieval/rag.py` over the memory blocks) + a `paper_qa` path. See `
 **Stopped at:** M0 done and verified; M0 commit pending push on `setup/project-harness`.
 
 **Next step:** M1 — processing track. Use `planner` to plan the fresh port of the paper-to-md /
-phagocyte post-processing into `clio_parser/ingest/`, then build the `ingestor` expert (PDF/arXiv →
+phagocyte post-processing into `clio_author/ingest/`, then build the `ingestor` expert (PDF/arXiv →
 scientific Markdown + memory blocks) and a baseline diff. Optionally run `code-reviewer` on M0 first.
 
 ### 2026-06-15 — Session 1: artifacts, design, dev harness
 **Decisions made:**
-- **Form (locked):** clio-parser is a **standalone, pure-Python multi-agent harness** — *not* an MCP
+- **Form (locked):** clio-author is a **standalone, pure-Python multi-agent harness** — *not* an MCP
   server, *not* a Markdown/blueprint agent. The CLIO agent (`iowarp/clio-agent`, develop) will
   **invoke** it as a standalone subagent (thin adapter, deferred). Reference harnesses:
   `papervizagent` + `protoneo/knowledge`.
@@ -163,7 +163,7 @@ scientific Markdown + memory blocks) and a baseline diff. Optionally run `code-r
   test-engineer/explorer/progress.
 
 **Done this session:**
-- Initialized git + pushed clio-parser to GitHub.
+- Initialized git + pushed clio-author to GitHub.
 - Acquired 7 repos + 2 papers into `artifact/`; wrote `MANIFEST.md`.
 - Deep-studied every artifact → 9 notes; wrote `SYNTHESIS.md` and `DESIGN.md`.
 - Built the `.claude/` dev harness (CLAUDE.md, settings.json, 7 agents, 2 skills); verified all
@@ -173,8 +173,8 @@ scientific Markdown + memory blocks) and a baseline diff. Optionally run `code-r
 
 **Stopped at:** setup complete (P0–P4). No build code yet. Everything uncommitted on `main`.
 
-**Next step:** M0 — scaffold the harness skeleton (`clio_parser/harness/`: `BaseAgent`,
-`AgentProtocol`, engine, patterns, session, types + a trivial expert so `ClioParserAgent.invoke()`
+**Next step:** M0 — scaffold the harness skeleton (`clio_author/harness/`: `BaseAgent`,
+`AgentProtocol`, engine, patterns, session, types + a trivial expert so `ClioAuthorAgent.invoke()`
 runs). Use `planner` to produce the M0 build plan first. (Optionally commit P0–P4 to a branch first.)
 
 ## Changelog
@@ -189,6 +189,6 @@ runs). Use `planner` to produce the M0 build plan first. (Optionally commit P0�
 - 2026-06-15 — PR #6 (M5) merged; **M6 figures** complete + reviewed (APPROVE-WITH-NITS → applied) on `feat/m6-figures` (224 hermetic tests; figure_agent describe + plot-code).
 - 2026-06-15 — PR #7 (M6) merged; **M7 hardening** complete + reviewed (CHANGES-NEEDED → table over-detection fixed) on `feat/m7-hardening` (256 hermetic tests; tables + eval report + equation generality).
 - 2026-06-15 — PR #8 (M7) merged; **M8 CLIO adapter + main-agent routing** complete + reviewed (APPROVE-WITH-NITS → applied) on `feat/m8-clio-adapter` (293 hermetic tests). **Roadmap M0–M8 complete.**
-- 2026-06-15 — Post-roadmap: docs refresh (README + docs/USAGE.md) + AGENTS.md; real `LLMClient` providers (`clio_parser/llm/providers.py`: Claude CLI, Codex CLI, Ollama); `scripts/real_test.py` end-to-end harness. **Real validation** (real PDF via PyMuPDF, real Ollama/Claude/Codex LLM, live Semantic Scholar, real matplotlib): ingest/ask/review/write/cite/plot-render/adapter all pass for real; RAG real-embeddings + Docling figures need torch (hermetically covered). 295 hermetic tests. GitHub About/topics set. Releases v0.1.0/v0.1.1.
+- 2026-06-15 — Post-roadmap: docs refresh (README + docs/USAGE.md) + AGENTS.md; real `LLMClient` providers (`clio_author/llm/providers.py`: Claude CLI, Codex CLI, Ollama); `scripts/real_test.py` end-to-end harness. **Real validation** (real PDF via PyMuPDF, real Ollama/Claude/Codex LLM, live Semantic Scholar, real matplotlib): ingest/ask/review/write/cite/plot-render/adapter all pass for real; RAG real-embeddings + Docling figures need torch (hermetically covered). 295 hermetic tests. GitHub About/topics set. Releases v0.1.0/v0.1.1.
 - 2026-06-15 — v0.1.1: CLI real-provider selection via `CLIO_LLM`. v0.1.2: GitHub Actions CI (ruff+mypy+hermetic pytest on every PR — green on main) and **ingest by paper title/topic** (`search_arxiv_pdf`/`resolve_source`; verified "Attention Is All You Need" → 1706.03762). 305 hermetic tests.
 - 2026-06-15 — **Heavy-path real validation** (installed CPU torch + sentence-transformers + lancedb + docling): real RAG (sentence-transformer embeddings + LanceDB — semantic retrieval + `kinds` filter) ✅; real **Docling** extraction (12 figures from the PaperBanana PDF) ✅; gated `live` tests (rag/figure-render/arXiv-search + Docling baseline) pass; only `scholar_live` fails on the Semantic Scholar public-endpoint 429 (needs an API key). Note: with `torch 2.12.0+cpu`, install `torchvision` from the same CPU index (`--index-url https://download.pytorch.org/whl/cpu`) to avoid an `nms` op mismatch.

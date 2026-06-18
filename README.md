@@ -1,6 +1,6 @@
-# clio-parser
+# clio-author
 
-clio-parser turns a scientific paper — an **arXiv link, a PDF, or even just its title** — into clean
+clio-author turns a scientific paper — an **arXiv link, a PDF, or even just its title** — into clean
 Markdown, then lets specialized AI agents **answer questions about it, check its citations, review
 it, and help write, compose, export, and edit it**. It runs on its own, and a larger agent (such as
 CLIO) can call it as a **subagent**.
@@ -21,22 +21,22 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 **Step 2. Get the code and install the core package.**
 
 ```bash
-git clone https://github.com/SIslamMun/clio-Parser.git
-cd clio-Parser
+git clone https://github.com/SIslamMun/clio-author.git
+cd clio-author
 uv sync
 ```
 
 **Step 3. Confirm it works** (prints the list of 16 things it can do — no model or network needed):
 
 ```bash
-uv run clio-parser capabilities
+uv run clio-author capabilities
 ```
 
 **Step 4. Turn a real paper into Markdown.** The `--extra pdf` flag adds the PDF/arXiv extractor for
 this run. (The first ingest also downloads ~500 MB of extraction models; later runs are fast.)
 
 ```bash
-uv run --extra pdf clio-parser ingest 2601.23265
+uv run --extra pdf clio-author ingest 2601.23265
 ```
 
 This creates a folder you can open and read:
@@ -52,8 +52,8 @@ clio-out/2601.23265/
 You can ingest other ways too:
 
 ```bash
-uv run --extra pdf clio-parser ingest "Attention Is All You Need"   # by paper title
-uv run --extra pdf clio-parser ingest ./mypaper.pdf                 # a local PDF file
+uv run --extra pdf clio-author ingest "Attention Is All You Need"   # by paper title
+uv run --extra pdf clio-author ingest ./mypaper.pdf                 # a local PDF file
 ```
 
 **Step 5. Look at what you got.**
@@ -67,7 +67,7 @@ ls clio-out/2601.23265/img/
 example uses the Claude CLI):
 
 ```bash
-CLIO_LLM=claude uv run clio-parser review \
+CLIO_LLM=claude uv run clio-author review \
   --paper-file clio-out/2601.23265/paper.md --format prose
 ```
 
@@ -85,14 +85,14 @@ JSON (the default, handy for programs). Anything that produces text needs a real
 
 ```bash
 # Convert a paper to Markdown + memory blocks (arXiv id | URL | title | topic | local PDF):
-uv run --extra pdf clio-parser ingest 2601.23265
+uv run --extra pdf clio-author ingest 2601.23265
 ```
 
 ### Question answering
 
 ```bash
 # Ask a question, grounded in that paper's blocks:
-CLIO_LLM=claude uv run clio-parser ask \
+CLIO_LLM=claude uv run clio-author ask \
   --question "What problem does this paper solve?" \
   --blocks-file clio-out/2601.23265/blocks.json --format prose
 ```
@@ -101,7 +101,7 @@ CLIO_LLM=claude uv run clio-parser ask \
 
 ```bash
 # Verify citations against Semantic Scholar + fallback backends (suggestions only):
-uv run --extra scholar clio-parser cite \
+uv run --extra scholar clio-author cite \
   --candidates-json '[{"title": "Attention Is All You Need", "year": 2017}]'
 ```
 
@@ -110,7 +110,7 @@ uv run --extra scholar clio-parser cite \
 ```bash
 # Extract a content knowledge graph (claims/methods/datasets/results + relations)
 # from a paper's memory blocks (distinct from a citation graph).
-uv run clio-parser kg --blocks-file clio-out/<id>/blocks.json
+uv run clio-author kg --blocks-file clio-out/<id>/blocks.json
 
 # Add --format prose to print a Mermaid `graph TD` rendering for a human view.
 ```
@@ -119,11 +119,11 @@ uv run clio-parser kg --blocks-file clio-out/<id>/blocks.json
 
 ```bash
 # Peer-review a paper (structured JSON, or --format prose):
-CLIO_LLM=claude uv run clio-parser review \
+CLIO_LLM=claude uv run clio-author review \
   --paper-file clio-out/2601.23265/paper.md --format prose
 
 # Aggregate several reviews into a single meta-review (no model needed):
-uv run clio-parser run meta_review \
+uv run clio-author run meta_review \
   --json '{"reviews": [{"Overall": 7, "Decision": "Accept"}, {"Overall": 5, "Decision": "Reject"}]}'
 ```
 
@@ -131,31 +131,31 @@ uv run clio-parser run meta_review \
 
 ```bash
 # Draft one section from an outline + source material:
-CLIO_LLM=claude uv run clio-parser write \
+CLIO_LLM=claude uv run clio-author write \
   --outline "Introduction" --source-file clio-out/2601.23265/paper.md --format prose
 
 # Polish a draft for clarity, flow, and academic voice:
-CLIO_LLM=claude uv run clio-parser polish \
+CLIO_LLM=claude uv run clio-author polish \
   --text-file clio-out/2601.23265/paper.md --voice concise --format prose
 
 # Check cross-section consistency of a manuscript:
-CLIO_LLM=claude uv run clio-parser coherence \
+CLIO_LLM=claude uv run clio-author coherence \
   --markdown-file clio-out/2601.23265/paper.md --format prose
 
 # Draft a WHOLE paper from an idea (outline → cite → write per section → assemble):
-CLIO_LLM=claude uv run clio-parser compose \
+CLIO_LLM=claude uv run clio-author compose \
   --idea "Propose a new attention mechanism for long-range dependencies." \
   --log "Ran experiments on WikiText-103; BLEU +2.1 over baseline." \
   --review --out-dir clio-out/mypaper --format prose
 
 # Same, but also emit paper.tex + references.bib:
-CLIO_LLM=claude uv run clio-parser compose \
+CLIO_LLM=claude uv run clio-author compose \
   --idea-file idea.txt --log-file log.txt \
   --candidates-file refs.json \
   --review --out-dir clio-out/mypaper --latex
 
 # Export an existing paper.md to LaTeX directly:
-uv run clio-parser export \
+uv run clio-author export \
   --markdown-file clio-out/mypaper/paper.md \
   --bibtex-file clio-out/mypaper/references.bib \
   --out-dir clio-out/mypaper
@@ -178,11 +178,11 @@ clio-out/mypaper/
 
 ```bash
 # Generate matplotlib plot code (code text only; never executed by default):
-CLIO_LLM=claude uv run clio-parser run plot \
+CLIO_LLM=claude uv run clio-author run plot \
   --json '{"spec": {"kind": "plot", "intent": "training loss vs epoch"}}'
 
 # Describe figures in a paper's memory blocks:
-CLIO_LLM=claude uv run clio-parser describe \
+CLIO_LLM=claude uv run clio-author describe \
   --blocks-file clio-out/2601.23265/blocks.json --format prose
 ```
 
@@ -190,7 +190,7 @@ CLIO_LLM=claude uv run clio-parser describe \
 
 ```bash
 # Any action by name (edit, write_review, figure_refine, …):
-uv run clio-parser run write_review \
+uv run clio-author run write_review \
   --json '{"outline": {"title": "Methods"}, "source": "...", "max_rounds": 2}'
 ```
 
@@ -200,7 +200,7 @@ The complete payload reference for every action is in [`docs/USAGE.md`](docs/USA
 
 ## 3. Use a real model
 
-By default clio-parser uses an **offline echo model**, so `review`/`ask`/`write`/`compose` return a
+By default clio-author uses an **offline echo model**, so `review`/`ask`/`write`/`compose` return a
 placeholder instead of real text. Pick a real one with the `CLIO_LLM` environment variable:
 
 | `CLIO_LLM` | What it uses | How to get it |
@@ -211,8 +211,8 @@ placeholder instead of real text. Pick a real one with the `CLIO_LLM` environmen
 | `ollama` | a local model server | install [Ollama](https://ollama.com), then `ollama pull llama3.1:8b` |
 
 ```bash
-CLIO_LLM=claude uv run clio-parser review --paper-file clio-out/2601.23265/paper.md --format prose
-CLIO_LLM=ollama CLIO_LLM_MODEL=llama3.1:8b uv run clio-parser ask \
+CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper.md --format prose
+CLIO_LLM=ollama CLIO_LLM_MODEL=llama3.1:8b uv run clio-author ask \
   --question "..." --blocks-file clio-out/2601.23265/blocks.json
 ```
 
@@ -247,7 +247,7 @@ with `spec.kind="diagram"` generates a real image PNG instead of matplotlib code
 both actions use the hermetic text/code path and no image API is ever called.
 
 ```bash
-CLIO_VISION=gemini GEMINI_API_KEY=... uv run clio-parser describe \
+CLIO_VISION=gemini GEMINI_API_KEY=... uv run clio-author describe \
   --blocks-file clio-out/2601.23265/blocks.json
 ```
 
@@ -260,7 +260,7 @@ cp .env.local.example .env.local
 chmod 600 .env.local
 ```
 
-Then edit `.env.local` with your keys. `uv run clio-parser ...` loads it automatically. Use
+Then edit `.env.local` with your keys. `uv run clio-author ...` loads it automatically. Use
 `CLIO_ENV_FILE=/path/to/file` if you want a different file. Never paste API keys into chat, issues,
 PRs, or commands; rotate any key that was exposed. See [`docs/SECURITY.md`](docs/SECURITY.md).
 
@@ -268,18 +268,18 @@ PRs, or commands; rotate any key that was exposed. See [`docs/SECURITY.md`](docs
 
 ## 4. Use it as a subagent (from another program)
 
-clio-parser is meant to be **called by a host agent**. Two ways:
+clio-author is meant to be **called by a host agent**. Two ways:
 
 ### A. In-process (Python) — recommended
 
 Save this as `use_clio.py` and run it with `uv run python use_clio.py`:
 
 ```python
-from clio_parser.integration.clio_adapter import ClioParserSubagent
-from clio_parser.llm.providers import resolve_llm
+from clio_author.integration.clio_adapter import ClioAuthorSubagent
+from clio_author.llm.providers import resolve_llm
 
 # Build the subagent. resolve_llm("claude") | "codex" | "ollama" | None (offline echo).
-sub = ClioParserSubagent(llm=resolve_llm("claude"))
+sub = ClioAuthorSubagent(llm=resolve_llm("claude"))
 
 # 1) Discover what it can do (16 actions).
 for a in sub.capabilities()["actions"]:
@@ -319,7 +319,7 @@ so the coupling is one-directional.
 Call the CLI and read JSON from stdout (exit code `0` = ok, `1` = error):
 
 ```bash
-CLIO_LLM=claude uv run clio-parser review --paper-file clio-out/2601.23265/paper.md
+CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper.md
 # -> {"action": "review", "content": "...", "structured": {...}, "metadata": {...}}
 ```
 
@@ -329,24 +329,24 @@ CLIO_LLM=claude uv run clio-parser review --paper-file clio-out/2601.23265/paper
 
 | # | Action | What it does | Dedicated subcommand |
 |---|--------|-------------|----------------------|
-| 1 | `ingest` | arXiv id / URL / PDF / title → Markdown + memory blocks | `clio-parser ingest <source>` |
-| 2 | `ask` | Answer a question grounded in memory blocks | `clio-parser ask` |
-| 3 | `cite` | Verify citation candidates (suggestions only, never edits) | `clio-parser cite` |
-| 4 | `review` | Structured peer review of a paper | `clio-parser review` |
-| 5 | `meta_review` | Aggregate several reviews into one area-chair meta-review | `clio-parser run meta_review` |
-| 6 | `write` | Draft a single section from an outline + source | `clio-parser write` |
-| 7 | `edit` | Revise a draft to address reviewer feedback | `clio-parser run edit` |
-| 8 | `polish` | Improve prose clarity, flow, and academic voice | `clio-parser polish` |
-| 9 | `coherence` | Check cross-section consistency of a manuscript | `clio-parser coherence` |
-| 10 | `kg` | Content knowledge graph: claims/methods/datasets/results + relations (from memory blocks) | `clio-parser kg` |
-| 11 | `describe_figures` | Fill figure descriptions / captions in memory blocks | `clio-parser describe` |
-| 12 | `plot` | Generate matplotlib plot code (code text only) | `clio-parser run plot` |
-| 13 | `compose` | Whole-paper orchestration: idea → outline → cite → write → assemble | `clio-parser compose` |
-| 14 | `export` | Markdown manuscript → standalone LaTeX (`paper.tex` + `references.bib`) | `clio-parser export` |
-| 15 | `write_review` | Writer ↔ reviewer critic-refine loop | `clio-parser run write_review` |
-| 16 | `figure_refine` | Figure visualizer ↔ critic refine loop | `clio-parser run figure_refine` |
+| 1 | `ingest` | arXiv id / URL / PDF / title → Markdown + memory blocks | `clio-author ingest <source>` |
+| 2 | `ask` | Answer a question grounded in memory blocks | `clio-author ask` |
+| 3 | `cite` | Verify citation candidates (suggestions only, never edits) | `clio-author cite` |
+| 4 | `review` | Structured peer review of a paper | `clio-author review` |
+| 5 | `meta_review` | Aggregate several reviews into one area-chair meta-review | `clio-author run meta_review` |
+| 6 | `write` | Draft a single section from an outline + source | `clio-author write` |
+| 7 | `edit` | Revise a draft to address reviewer feedback | `clio-author run edit` |
+| 8 | `polish` | Improve prose clarity, flow, and academic voice | `clio-author polish` |
+| 9 | `coherence` | Check cross-section consistency of a manuscript | `clio-author coherence` |
+| 10 | `kg` | Content knowledge graph: claims/methods/datasets/results + relations (from memory blocks) | `clio-author kg` |
+| 11 | `describe_figures` | Fill figure descriptions / captions in memory blocks | `clio-author describe` |
+| 12 | `plot` | Generate matplotlib plot code (code text only) | `clio-author run plot` |
+| 13 | `compose` | Whole-paper orchestration: idea → outline → cite → write → assemble | `clio-author compose` |
+| 14 | `export` | Markdown manuscript → standalone LaTeX (`paper.tex` + `references.bib`) | `clio-author export` |
+| 15 | `write_review` | Writer ↔ reviewer critic-refine loop | `clio-author run write_review` |
+| 16 | `figure_refine` | Figure visualizer ↔ critic refine loop | `clio-author run figure_refine` |
 
-Actions without a dedicated subcommand are reachable via `clio-parser run <action> --json '...'`.
+Actions without a dedicated subcommand are reachable via `clio-author run <action> --json '...'`.
 
 ---
 
@@ -379,8 +379,8 @@ uv run python scripts/real_test.py   # full real end-to-end run; set CLIO_TEST_L
 
 ## 8. Troubleshooting
 
-- **`clio-parser: command not found`** — it lives in the project's venv; always call it as
-  `uv run clio-parser …` (or `source .venv/bin/activate` first).
+- **`clio-author: command not found`** — it lives in the project's venv; always call it as
+  `uv run clio-author …` (or `source .venv/bin/activate` first).
 - **`ingest` says a dependency is missing** — run `uv sync --extra pdf`.
 - **First `ingest` is slow** — Docling downloads ~500 MB of models once; subsequent runs are fast.
 - **`review`/`ask`/`write`/`compose` output looks like a placeholder** — you're on the default echo

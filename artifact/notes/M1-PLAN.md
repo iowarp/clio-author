@@ -6,7 +6,7 @@ diff against the reference implementations. Approved direction; execute with the
 ## Context
 M0 ships a working sync harness (`BaseAgent.run(task, session) -> AgentOutput`, `Sequential`,
 `SessionContext`, Pydantic `types.py`, `EchoExpert`/`EchoLLMClient`). M1 adds the processing core
-under `clio_parser/ingest/` and an `ingestor` expert. The biggest quality lever is the deterministic
+under `clio_author/ingest/` and an `ingestor` expert. The biggest quality lever is the deterministic
 regex post-process pass layered on Docling — pure-Python, no heavy deps, landable and testable
 hermetically first; Docling/PyMuPDF extraction is a thin, dependency-gated wrapper.
 
@@ -74,15 +74,15 @@ minimal Step 3 (`docling_extract.process_pdf(source) -> ExtractionResult`) + min
 
 ## Verification
 1. `uv run pytest` (default hermetic) — postprocess + blocks + ingestor unit tests pass, no network/Docling.
-2. `uv run ruff check` / `format` + `uv run mypy clio_parser/ingest clio_parser/experts/ingestor.py` clean.
+2. `uv run ruff check` / `format` + `uv run mypy clio_author/ingest clio_author/experts/ingestor.py` clean.
 3. `uv run pytest -m baseline` — port-equivalence (exact) + full-pipeline metrics within tolerance on the 2 PDFs.
 4. **Manual smoke (first-slice acceptance):** `uv run --extra pdf` ingest of arXiv `2601.23265` →
    clean Markdown + populated `MemoryBlocks` (sections + figures).
 
 ## Files
-- Create: `clio_parser/ingest/__init__.py`, `ingest/postprocess/{__init__,sections,citations,equations,figures,bibliography,cleanup}.py`, `ingest/docling_extract.py`, `ingest/blocks.py`, `experts/ingestor.py`.
+- Create: `clio_author/ingest/__init__.py`, `ingest/postprocess/{__init__,sections,citations,equations,figures,bibliography,cleanup}.py`, `ingest/docling_extract.py`, `ingest/blocks.py`, `experts/ingestor.py`.
 - Modify: `pyproject.toml` (optional `pdf` extra + markers), `experts/__init__.py`.
 - Tests: `tests/ingest/test_*.py`, `tests/experts/test_ingestor.py`, `tests/baselines/{conftest,test_pdf_to_md}.py` (+ `__init__.py`).
-- Reuse (read-only): `clio_parser/harness/{base,protocol,types,patterns,session}.py`, `llm/client.py`.
+- Reuse (read-only): `clio_author/harness/{base,protocol,types,patterns,session}.py`, `llm/client.py`.
 - Behavior refs (read-only, clean-room): phagocyte `extractors/pdf/postprocess/*.py` + `pdf_extractor.py`; schemas from `paper-to-md.md` §6.
 - Fixtures: `artifact/papers/2601.23265-paperbanana.pdf`, `2604.05018-paperorchestra.pdf`.

@@ -6,7 +6,7 @@ out of git history, command history, issue comments, PRs, and chat transcripts.
 ## Local Env File
 
 For CLI use, put credentials in `.env.local` at the repository root. The file is ignored by git and
-loaded automatically by `uv run clio-parser ...`.
+loaded automatically by `uv run clio-author ...`.
 
 ```bash
 cp .env.local.example .env.local
@@ -23,7 +23,7 @@ GEMINI_API_KEY=your-rotated-gemini-key
 You can also point to another local file:
 
 ```bash
-CLIO_ENV_FILE=/secure/path/clio.env uv run clio-parser capabilities
+CLIO_ENV_FILE=/secure/path/clio.env uv run clio-author capabilities
 ```
 
 Real environment variables override values from `.env.local`.

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from clio_parser.ingest.blocks import build_section_blocks
-from clio_parser.ingest.postprocess import process_markdown
-from clio_parser.ingest.postprocess.sections import (
+from clio_author.ingest.blocks import build_section_blocks
+from clio_author.ingest.postprocess import process_markdown
+from clio_author.ingest.postprocess.sections import (
     _determine_header_level,
     process_sections,
 )

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Real end-to-end validation of clio-parser — NOT pytest.
+"""Real end-to-end validation of clio-author — NOT pytest.
 
 Drives the actual heavy paths (real PDF extraction, real LLM, real embeddings,
 real Semantic Scholar, real matplotlib) through the public API + CLI adapter.
@@ -47,24 +47,24 @@ def section(title: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Real LLMClient selection — see clio_parser/llm/providers.py
+# Real LLMClient selection — see clio_author/llm/providers.py
 #   CLIO_TEST_LLM = claude (default) | codex | ollama | echo
 # --------------------------------------------------------------------------- #
 def get_llm():
     choice = os.environ.get("CLIO_TEST_LLM", "claude").lower()
-    from clio_parser.llm.client import EchoLLMClient
+    from clio_author.llm.client import EchoLLMClient
 
     if choice == "echo":
         return EchoLLMClient(), "echo"
     if choice == "ollama":
-        from clio_parser.llm.providers import OllamaLLMClient
+        from clio_author.llm.providers import OllamaLLMClient
 
         return OllamaLLMClient(model=OLLAMA_MODEL, url=OLLAMA_URL), f"ollama:{OLLAMA_MODEL}"
     if choice == "codex":
-        from clio_parser.llm.providers import CodexCliLLMClient
+        from clio_author.llm.providers import CodexCliLLMClient
 
         return CodexCliLLMClient(), "codex"
-    from clio_parser.llm.providers import ClaudeCliLLMClient  # default: strongest
+    from clio_author.llm.providers import ClaudeCliLLMClient  # default: strongest
 
     return ClaudeCliLLMClient(), "claude"
 
@@ -79,16 +79,16 @@ def main() -> int:  # noqa: C901
     blocks_dump = None
     try:
         if os.environ.get("CLIO_FORCE_PYMUPDF") == "1":
-            import clio_parser.ingest.docling_extract as dx
+            import clio_author.ingest.docling_extract as dx
 
             def _boom(*a, **k):
                 raise dx.ExtractionDependencyError("forced pymupdf")
 
             dx._extract_with_docling = _boom  # type: ignore[attr-defined]
 
-        from clio_parser.experts.ingestor import IngestorExpert
-        from clio_parser.harness.session import SessionContext
-        from clio_parser.harness.types import Task
+        from clio_author.experts.ingestor import IngestorExpert
+        from clio_author.harness.session import SessionContext
+        from clio_author.harness.types import Task
 
         out_dir = ROOT / "scripts" / "_real_out"
         out_dir.mkdir(exist_ok=True)
@@ -123,7 +123,7 @@ def main() -> int:  # noqa: C901
 
     # A small synthetic blocks set so later stages run even if ingest was slow/failed
     if blocks_dump is None:
-        from clio_parser.ingest.blocks import MemoryBlocks, SectionBlock
+        from clio_author.ingest.blocks import MemoryBlocks, SectionBlock
 
         blocks_dump = MemoryBlocks(
             metadata={"title": "Demo"},
@@ -144,9 +144,9 @@ def main() -> int:  # noqa: C901
     # ----------------------------------------------------------------- ASK
     section("2. ASK — real LLM Q&A grounded in the paper's blocks")
     try:
-        from clio_parser.experts.paper_qa import PaperQAExpert
-        from clio_parser.harness.session import SessionContext
-        from clio_parser.harness.types import Task
+        from clio_author.experts.paper_qa import PaperQAExpert
+        from clio_author.harness.session import SessionContext
+        from clio_author.harness.types import Task
 
         out = PaperQAExpert(llm=llm).run(
             Task(
@@ -171,9 +171,9 @@ def main() -> int:  # noqa: C901
     # ----------------------------------------------------------------- REVIEW
     section("3. REVIEW — real LLM AgentReview rubric")
     try:
-        from clio_parser.experts.reviewer import ReviewerExpert
-        from clio_parser.harness.session import SessionContext
-        from clio_parser.harness.types import Task
+        from clio_author.experts.reviewer import ReviewerExpert
+        from clio_author.harness.session import SessionContext
+        from clio_author.harness.types import Task
 
         paper_text = "\n\n".join(
             f"## {s['title']}\n{s['text']}" for s in blocks_dump.get("sections", [])
@@ -201,9 +201,9 @@ def main() -> int:  # noqa: C901
     # ----------------------------------------------------------------- WRITE
     section("4. WRITE — real LLM drafts a section from an outline + source")
     try:
-        from clio_parser.experts.writer import WriterExpert
-        from clio_parser.harness.session import SessionContext
-        from clio_parser.harness.types import Task
+        from clio_author.experts.writer import WriterExpert
+        from clio_author.harness.session import SessionContext
+        from clio_author.harness.types import Task
 
         out = WriterExpert(llm=llm).run(
             Task(
@@ -233,10 +233,10 @@ def main() -> int:  # noqa: C901
     # ----------------------------------------------------------------- CITE (real Semantic Scholar)
     section("5. CITE — real Semantic Scholar verification")
     try:
-        from clio_parser.experts.citation import CitationExpert
-        from clio_parser.harness.session import SessionContext
-        from clio_parser.harness.types import Task
-        from clio_parser.retrieval.scholar import SemanticScholarClient
+        from clio_author.experts.citation import CitationExpert
+        from clio_author.harness.session import SessionContext
+        from clio_author.harness.types import Task
+        from clio_author.retrieval.scholar import SemanticScholarClient
 
         client = SemanticScholarClient()
         nv, bib = 0, ""
@@ -271,10 +271,10 @@ def main() -> int:  # noqa: C901
     # ----------------------------------------------------------------- PLOT + render (real matplotlib)
     section("6. PLOT — real LLM matplotlib code + real render to PNG")
     try:
-        from clio_parser.experts.figure_agent import FigureAgentExpert, render_plot_code
-        from clio_parser.harness.session import SessionContext
-        from clio_parser.harness.types import Task
-        from clio_parser.tools.files import SafeFiles
+        from clio_author.experts.figure_agent import FigureAgentExpert, render_plot_code
+        from clio_author.harness.session import SessionContext
+        from clio_author.harness.types import Task
+        from clio_author.tools.files import SafeFiles
 
         out_dir = ROOT / "scripts" / "_real_out"
         out = FigureAgentExpert(llm=llm, files=SafeFiles(out_dir)).run(
@@ -318,8 +318,8 @@ def main() -> int:  # noqa: C901
     # ----------------------------------------------------------------- RAG (real embeddings)
     section("7. RAG — real sentence-transformer embeddings + LanceDB retrieval")
     try:
-        from clio_parser.ingest.blocks import MemoryBlocks
-        from clio_parser.retrieval.rag import (
+        from clio_author.ingest.blocks import MemoryBlocks
+        from clio_author.retrieval.rag import (
             LanceDbRetriever,
             RetrievalDependencyError,
             SentenceTransformerEmbedder,
@@ -347,11 +347,11 @@ def main() -> int:  # noqa: C901
         record("rag", False, f"{type(exc).__name__}: {exc}")
 
     # ----------------------------------------------------------------- ADAPTER / CLI surface
-    section("8. ADAPTER — ClioParserSubagent.run returns JSON-serializable result")
+    section("8. ADAPTER — ClioAuthorSubagent.run returns JSON-serializable result")
     try:
-        from clio_parser.integration.clio_adapter import ClioParserSubagent
+        from clio_author.integration.clio_adapter import ClioAuthorSubagent
 
-        sub = ClioParserSubagent(llm=llm)
+        sub = ClioAuthorSubagent(llm=llm)
         res = sub.run("ask", {"question": "what is the contribution?", "blocks": blocks_dump})
         json.dumps(res)  # must be serializable
         caps = sub.capabilities()

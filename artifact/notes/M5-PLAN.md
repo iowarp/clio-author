@@ -61,8 +61,8 @@ refusals, apply_edit match guards); loop evolution of `session.data` + early sto
 offline writer smoke writes a file under tmp root.
 
 ## Files
-- New: `clio_parser/tools/{__init__,files}.py`, `clio_parser/experts/{write_models,writer,editor,write_loop}.py`;
+- New: `clio_author/tools/{__init__,files}.py`, `clio_author/experts/{write_models,writer,editor,write_loop}.py`;
   `tests/tools/{__init__,test_files}.py`, `tests/experts/test_{write_models,writer,editor,write_loop}.py`.
-- Modify: `clio_parser/experts/__init__.py`.
+- Modify: `clio_author/experts/__init__.py`.
 - Reuse (read-only): `harness/patterns.py` (`CriticRefine`,`NO_CHANGES_SENTINEL`), `experts/citation.py`
   (atomic-write pattern), `experts/{reviewer,review_models}.py`, `ingest/blocks.py`, `harness/{base,engine,session,types}.py`, `llm/client.py`.

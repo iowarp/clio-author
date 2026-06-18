@@ -1,7 +1,7 @@
 # paper-to-md — Deep Study Notes
 
-Repo: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-parser/artifact/repos/paper-to-md`
-Studied: 2026-06-15. Read-only. This is the PDF→Markdown conversion core for clio-parser.
+Repo: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-author/artifact/repos/paper-to-md`
+Studied: 2026-06-15. Read-only. This is the PDF→Markdown conversion core for clio-author.
 
 ---
 
@@ -303,21 +303,21 @@ No tests exercise Docling itself or the live LLM/VLM calls.
 
 ---
 
-## Reusable for clio-parser
+## Reusable for clio-author
 
 - **Deterministic postprocess layer** (`pdf2md/postprocess/`) is fully self-contained, regex-only, idempotent, and well-tested — directly reusable as a normalization pass independent of any LLM. `process_markdown(content, image_filenames)` is the single clean entry point.
-- **Enrichment dataclasses + JSON schemas** (`CodeBlock`, `Equation`, `FigureInfo`, `Enrichments`) are a ready blueprint for clio-parser memory blocks. `figures.json`/`equations.json`/`code_blocks.json` are the natural retrieval units; each enrichment carries `page` + `context`. Consider adopting these schemas (and adding a sections array, which is currently missing).
+- **Enrichment dataclasses + JSON schemas** (`CodeBlock`, `Equation`, `FigureInfo`, `Enrichments`) are a ready blueprint for clio-author memory blocks. `figures.json`/`equations.json`/`code_blocks.json` are the natural retrieval units; each enrichment carries `page` + `context`. Consider adopting these schemas (and adding a sections array, which is currently missing).
 - **Provider abstraction** (`agent/providers.py`) cleanly separates cloud vs LM Studio vs Ollama with env-driven model/host config and LiteLLM prefixing — reusable for any local-LLM-or-cloud toggle. Separate `PDF2MD_VLM_HOST` design (VLM on a different node) is a nice pattern.
 - **AgentBackend ABC + registry** (`agent/backends/`) is a clean strategy-pattern boundary: swap Claude-SDK agentic editing vs targeted LiteLLM calls behind one interface. The "judgment-only LLM, mechanics by regex" split (LocalBackend) is a good cost-control pattern.
 - **Logo/figure size filtering** at extraction time (`docling.py`, PIL dimension thresholds) is a simple, effective figure-quality gate.
-- **Ed25519 request signing** (`service/auth.py`, `scripts/generate_keypair.py`, `mcp/server.py`) — lightweight stateless auth pattern reusable for a clio-parser service/MCP surface.
+- **Ed25519 request signing** (`service/auth.py`, `scripts/generate_keypair.py`, `mcp/server.py`) — lightweight stateless auth pattern reusable for a clio-author service/MCP surface.
 - **MCP submit/status/retrieve + slash command** is a complete template for exposing a long-running conversion job to Claude Code.
 
 ## Open questions / risks to resolve before building on this
 
 1. **Figure-number alignment.** Stage 1 (`docling.py`) saves only size-passing images and renumbers them contiguously (`figure1..N`), but Stage 4 (`enrichments.py`) enumerates ALL `doc.pictures` as `figure_id = idx+1` and writes `image_path=./img/figure{idx+1}.png`. If any pictures were filtered out, `figures.json` `figure_id`/`image_path` will be **misaligned** with the actual saved files and with the markdown embeds. Needs verification on a real paper with logos.
 2. **`pymupdf` is declared but unused** — confirm whether it's dead weight or expected by Docling at runtime.
-3. **No "sections" enrichment JSON.** Section structure exists only as markdown headers. clio-parser memory design may need a separate sections/outline extractor.
+3. **No "sections" enrichment JSON.** Section structure exists only as markdown headers. clio-author memory design may need a separate sections/outline extractor.
 4. **No table enrichment.** Tables are only in markdown (Docling pipe tables); not represented in any JSON, and only the Claude agent path may reformat them.
 5. **"cloud (Claude)" VLM is a misnomer.** There is no Claude vision path; `-d high` without `--local` routes Docling's picture-description API at `PDF2MD_VLM_HOST`/Ollama. Claude SDK is text-retouch only.
 6. **Service retouch is Claude-only** (worker hardcodes `backend="claude"`) and depends on host `~/.claude` OAuth creds mounted into the container — operationally significant.

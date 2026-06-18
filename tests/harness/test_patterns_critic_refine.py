@@ -8,9 +8,9 @@ and degrading gracefully with fewer than two agents.
 
 from __future__ import annotations
 
-from clio_parser.harness.patterns import NO_CHANGES_SENTINEL, CriticRefine
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import AgentOutput, Task
+from clio_author.harness.patterns import NO_CHANGES_SENTINEL, CriticRefine
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import AgentOutput, Task
 
 
 class ScriptedAgent:

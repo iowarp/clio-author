@@ -7,8 +7,8 @@ Exercises :class:`HashingEmbedder` determinism, :class:`RagRetriever` ranking
 
 from __future__ import annotations
 
-from clio_parser.ingest.blocks import Equation, FigureInfo, MemoryBlocks, SectionBlock
-from clio_parser.retrieval.rag import (
+from clio_author.ingest.blocks import Equation, FigureInfo, MemoryBlocks, SectionBlock
+from clio_author.retrieval.rag import (
     HashingEmbedder,
     RagRetriever,
     ScoredBlock,

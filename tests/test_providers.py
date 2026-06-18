@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from clio_parser.harness.types import Message
-from clio_parser.llm import providers
+from clio_author.harness.types import Message
+from clio_author.llm import providers
 
 
 def test_flatten_messages_system_preamble_and_labels() -> None:
@@ -46,7 +46,7 @@ def test_clients_expose_complete() -> None:
 
 
 def test_resolve_llm_default_and_echo() -> None:
-    from clio_parser.llm.client import EchoLLMClient
+    from clio_author.llm.client import EchoLLMClient
 
     assert isinstance(providers.resolve_llm(None), EchoLLMClient)
     assert isinstance(providers.resolve_llm("echo"), EchoLLMClient)

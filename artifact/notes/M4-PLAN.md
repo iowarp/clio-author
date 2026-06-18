@@ -71,8 +71,8 @@ reviewer/meta-reviewer never raise on bad input (assert `error`/`parse_error`); 
 once. Manual smoke: 3-persona `run_panel` via Parallel → averaged `MetaReview`.
 
 ## Files
-- Modify: `clio_parser/harness/patterns.py`, `clio_parser/experts/__init__.py`.
-- New: `clio_parser/experts/{review_models,reviewer,meta_reviewer}.py`;
+- Modify: `clio_author/harness/patterns.py`, `clio_author/experts/__init__.py`.
+- New: `clio_author/experts/{review_models,reviewer,meta_reviewer}.py`;
   `tests/harness/{__init__,test_patterns_parallel,test_patterns_critic_refine}.py`;
   `tests/experts/{test_reviewer,test_meta_reviewer}.py`.
 - Reference (read, don't import/copy): `artifact/repos/paper-orchestra/autoraters/agent_review.py`.

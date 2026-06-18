@@ -1,15 +1,15 @@
 # AGENTS.md
 
-Guidance for AI agents (and humans) working in the **clio-parser** repository. This is the
+Guidance for AI agents (and humans) working in the **clio-author** repository. This is the
 tool-agnostic companion to `CLAUDE.md`; both describe the same rules.
 
 ## What this project is
 
-clio-parser is a **standalone, pure-Python multi-agent harness** for **processing, reviewing, and
-writing scientific papers**. A main agent (`ClioParserAgent`) routes work to specialized expert
+clio-author is a **standalone, pure-Python multi-agent harness** for **processing, reviewing, and
+writing scientific papers**. A main agent (`ClioAuthorAgent`) routes work to specialized expert
 subagents, backed by retrieval and safe read/write/edit tools. It is designed to be **invoked as a
 subagent by a host agent** (e.g. an external orchestration layer) via an in-process API
-(`ClioParserSubagent`) or a subprocess CLI (`clio-parser`).
+(`ClioAuthorSubagent`) or a subprocess CLI (`clio-author`).
 
 > **Form (do not change):** this is a *proper Python agent harness* — **not** an MCP server and
 > **not** a Markdown/blueprint agent. Do not reshape it into either.
@@ -25,10 +25,10 @@ code-gen) · `write_review` / `figure_refine` (iterative critic loops).
 ## Architecture
 
 ```
-clio_parser/
-  agent.py            ClioParserAgent — routes invoke() by payload["action"] to experts
-  integration/        ClioParserSubagent — host-facing adapter (JSON in/out, CLIO-agnostic)
-  cli.py              `clio-parser` console script
+clio_author/
+  agent.py            ClioAuthorAgent — routes invoke() by payload["action"] to experts
+  integration/        ClioAuthorSubagent — host-facing adapter (JSON in/out, CLIO-agnostic)
+  cli.py              `clio-author` console script
   harness/            BaseAgent, AgentProtocol, Engine, patterns (Sequential/Parallel/CriticRefine), session, types
   experts/            ingestor · paper_qa · citation · reviewer · meta_reviewer · writer · editor · literature_graph · figure_agent · echo
   ingest/             Docling+PyMuPDF extraction + postprocess (sections/citations/equations/figures/bibliography/tables/cleanup) + blocks
@@ -47,8 +47,8 @@ status + per-milestone plans: `artifact/notes/PROGRESS.md` and `artifact/notes/M
 - **Test:** `uv run pytest` — the default suite is **hermetic** (offline, no heavy deps). Heavy/real
   paths are gated by markers: `uv run pytest -m live` / `-m baseline` (need the relevant extra +
   network). Never make the default suite require network or the optional extras.
-- **Lint/types:** `uv run ruff check` / `ruff format`; `uv run mypy clio_parser`. Keep both clean.
-- **Run:** `uv run clio-parser capabilities`; `uv run clio-parser run <action> --json '{...}'`.
+- **Lint/types:** `uv run ruff check` / `ruff format`; `uv run mypy clio_author`. Keep both clean.
+- **Run:** `uv run clio-author capabilities`; `uv run clio-author run <action> --json '{...}'`.
 - **Real end-to-end check:** `uv run python scripts/real_test.py` (drives real PDF/LLM/embeddings/
   Semantic Scholar/matplotlib; see `docs/USAGE.md`).
 

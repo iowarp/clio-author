@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from clio_parser.experts.coherence import CoherenceExpert
-from clio_parser.harness.engine import Engine
-from clio_parser.harness.patterns import Sequential
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import Message, Task
-from clio_parser.integration import ClioParserSubagent
+from clio_author.experts.coherence import CoherenceExpert
+from clio_author.harness.engine import Engine
+from clio_author.harness.patterns import Sequential
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import Message, Task
+from clio_author.integration import ClioAuthorSubagent
 
 _TWO_ISSUE_JSON = """THOUGHT: comparing the sections.
 
@@ -140,6 +140,6 @@ def test_coherence_via_engine_sequential() -> None:
 
 
 def test_coherence_via_adapter_is_json_serializable() -> None:
-    result = ClioParserSubagent().run("coherence", {"sections": [{"title": "A", "draft": "x"}]})
+    result = ClioAuthorSubagent().run("coherence", {"sections": [{"title": "A", "draft": "x"}]})
     assert result["action"] == "coherence"
     assert set(result) == {"action", "content", "structured", "metadata"}

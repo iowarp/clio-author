@@ -1,6 +1,6 @@
-# Phagocyte — deep study notes (for clio-parser)
+# Phagocyte — deep study notes (for clio-author)
 
-Repo: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-parser/artifact/repos/phagocyte`
+Repo: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-author/artifact/repos/phagocyte`
 Branch: `main`. HEAD: `f8c76a9 feat: BigSet-style verify-before-commit tool-call generation (#83)`.
 Read-only study; nothing modified.
 
@@ -271,14 +271,14 @@ diversification prefers `claude`.
 - **CLIO** — appears as the **CLIO design system** used by `phagocyte_web` (CSS tokens
   `src/phagocyte_web/src/phagocyte_web/static/css/tokens.css`; README references the "CLIO design
   system"). Also `scripts/test_xlam_cliokit_mcps.py` references a "cliokit". So the relationship is
-  shared GRC tooling/branding (and clio-parser is the sibling project this study feeds).
+  shared GRC tooling/branding (and clio-author is the sibling project this study feeds).
 - **protoneo / wtf-p** — **no first-party references inside the Phagocyte source.** (`wtfp` shows up only
   as available Skills/slash-commands in *this* harness, not in the repo.) They are sibling GRC projects,
   not dependencies of Phagocyte.
 
 ---
 
-## What "phagocyte learnings" means for clio-parser
+## What "phagocyte learnings" means for clio-author
 
 The "phagocyte learnings" for PDF→scientific-Markdown are concretely:
 
@@ -300,7 +300,7 @@ The "phagocyte learnings" for PDF→scientific-Markdown are concretely:
 7. **Fallback discipline**: Docling primary, PyMuPDF/OCR fallback; never silently emit garbage —
    stamp metadata (`extractor`, `visual_embedding_fallback`) so consumers detect degraded modes.
 
-## Reusable for clio-parser (lift directly)
+## Reusable for clio-author (lift directly)
 
 - **The entire `postprocess/` package** (`sections.py`, `citations.py`, `equations.py`, `figures.py`,
   `bibliography.py`, `cleanup.py`) — pure-Python, regex-only, no heavy deps, self-contained
@@ -310,7 +310,7 @@ The "phagocyte learnings" for PDF→scientific-Markdown are concretely:
 - The **VLM figure-description** approach (`OllamaVLM`) for caption-less figures.
 - The **two-layer audit** design (`audit/heuristics.py` + `audit/llm_judge.py` head/mid/tail JSON
   verdict) as a corpus-quality gate.
-- The **provider abstraction** (`phagocyte_providers.get_client`) if clio-parser needs multi-LLM support
+- The **provider abstraction** (`phagocyte_providers.get_client`) if clio-author needs multi-LLM support
   with a local/no-API-key path (`claude_sdk`, `ollama`).
 - The **BigSet verify-before-commit** philosophy generalized: validate structured output against a schema
   and *drop* (don't just down-rank) invalid items before they enter the corpus.
@@ -318,20 +318,20 @@ The "phagocyte learnings" for PDF→scientific-Markdown are concretely:
 ## Open questions
 
 - Where is the upstream **paper-to-md** repo, and how much diverged is Phagocyte's port? (Only the
-  attribution comment exists here; no original repo to diff against.) Worth locating if clio-parser
+  attribution comment exists here; no original repo to diff against.) Worth locating if clio-author
   wants the latest upstream fixes.
 - **Tables**: the README claims "Table Extraction (tables→markdown)" via Docling, but there is **no
   dedicated table post-process module** — tables ride along as inline GFM inside the Markdown and are
   *not* repaired or made first-class (the processor likewise treats them as section prose). For
   "scientific-paper perfect," table fidelity may be the biggest remaining gap.
 - **Equation repair is hardcoded/heuristic** (transformer-paper and GAN-paper-specific regexes like
-  `MultiHead`, `p_{data}`). It will be brittle on papers outside that distribution; clio-parser should
+  `MultiHead`, `p_{data}`). It will be brittle on papers outside that distribution; clio-author should
   treat it as a starting heuristic, not a general solution.
-- How exactly does **CLIO / cliokit** relate to clio-parser? Phagocyte only consumes the CLIO *design
+- How exactly does **CLIO / cliokit** relate to clio-author? Phagocyte only consumes the CLIO *design
   system* in its web UI and references a `cliokit` in a test script — the deeper relationship lives in
   the CLIO repos, not here.
 - The synthetic `## Section N` injection (here in slide decks; also in processor `md_clean`) is a
-  fallback for header-poor inputs — verify clio-parser wants that vs. preserving the raw structure.
+  fallback for header-poor inputs — verify clio-author wants that vs. preserving the raw structure.
 
 ---
 
@@ -346,4 +346,4 @@ The "phagocyte learnings" for PDF→scientific-Markdown are concretely:
 7. The HEAD feature is **BigSet verify-before-commit** (`generator/tool/verified_commit.py`): validate every tool call against its real schema and *drop* invalid ones (search_term vs search_terms, missing/placeholder args) before curating.
 8. Processor (Phase 4) chunks Markdown via LlamaIndex header parser + tree-sitter for code, embeds with Qwen3/jina-code/OpenCLIP into LanceDB (hybrid search + bge reranker).
 9. Models: Gemini (research), gemma-3/Qwen/FunctionGemma (generation/finetune), llava (VLM), Qwen3-Embedding + OpenCLIP (embeddings); provider-agnostic via `phagocyte_providers` (incl. no-API-key Claude CLI path).
-10. Most reusable for clio-parser: the self-contained `postprocess/process_markdown()` package (regex-only, no heavy deps), the VLM figure-describer, and the two-layer audit; biggest open gap is **table fidelity** (no dedicated table post-processing) and the brittleness of hardcoded equation regexes.
+10. Most reusable for clio-author: the self-contained `postprocess/process_markdown()` package (regex-only, no heavy deps), the VLM figure-describer, and the two-layer audit; biggest open gap is **table fidelity** (no dedicated table post-processing) and the brittleness of hardcoded equation regexes.

@@ -25,7 +25,7 @@ def test_describe_tiny_png_returns_text(tmp_path: Path) -> None:
     if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
         pytest.skip("GEMINI_API_KEY/GOOGLE_API_KEY not set")
 
-    from clio_parser.llm.vision import GeminiVisionClient
+    from clio_author.llm.vision import GeminiVisionClient
 
     img = tmp_path / "tiny.png"
     img.write_bytes(_TINY_PNG)

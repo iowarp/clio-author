@@ -12,13 +12,13 @@ from pathlib import Path
 
 import pytest
 
-from clio_parser.experts.ingestor import IngestorExpert
-from clio_parser.harness.engine import Engine
-from clio_parser.harness.patterns import Sequential
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import Task
-from clio_parser.ingest import docling_extract
-from clio_parser.ingest.docling_extract import ExtractionDependencyError, ExtractionResult
+from clio_author.experts.ingestor import IngestorExpert
+from clio_author.harness.engine import Engine
+from clio_author.harness.patterns import Sequential
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import Task
+from clio_author.ingest import docling_extract
+from clio_author.ingest.docling_extract import ExtractionDependencyError, ExtractionResult
 
 CANNED_MD = """\
 # Sample Paper

@@ -5,16 +5,16 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from clio_parser import ClioParserAgent
-from clio_parser.harness.base import BaseAgent
-from clio_parser.harness.patterns import Sequential
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import AgentOutput, Message, Task
-from clio_parser.llm.client import EchoLLMClient
+from clio_author import ClioAuthorAgent
+from clio_author.harness.base import BaseAgent
+from clio_author.harness.patterns import Sequential
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import AgentOutput, Message, Task
+from clio_author.llm.client import EchoLLMClient
 
 
-def test_clio_parser_agent_invoke() -> None:
-    output = ClioParserAgent().invoke("hello world")
+def test_clio_author_agent_invoke() -> None:
+    output = ClioAuthorAgent().invoke("hello world")
     assert isinstance(output, AgentOutput)
     assert output.agent == "echo"
     assert "hello world" in output.content

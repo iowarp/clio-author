@@ -1,6 +1,6 @@
 # papervizagent (PaperBanana / PaperVizAgent) — Deep Study Notes
 
-Repo: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-parser/artifact/repos/papervizagent`
+Repo: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-author/artifact/repos/papervizagent`
 Source: Google Research — official implementation of **PaperBanana** (renamed **PaperVizAgent**), a reference-driven multi-agent framework for automated academic illustration (diagram + plot) generation. arXiv 2601.23265.
 
 ---
@@ -85,7 +85,7 @@ The framework's headline is **5 agents** (Retriever, Planner, Stylist, Visualize
 
 ## 4. Shared-State `data: Dict` Communication Pattern (KEY)
 
-There is **no message bus** — agents communicate purely by mutating a single `data: Dict[str, Any]` that is threaded through each `process(data)` call and returned. Key naming is **convention-driven** and parameterized by `task_name` ("diagram"/"plot") and a per-round index. This is the most reusable idea for clio-parser.
+There is **no message bus** — agents communicate purely by mutating a single `data: Dict[str, Any]` that is threaded through each `process(data)` call and returned. Key naming is **convention-driven** and parameterized by `task_name` ("diagram"/"plot") and a per-round index. This is the most reusable idea for clio-author.
 
 ### Input keys (set by caller / dataset; see `demo.create_sample_inputs`)
 ```python
@@ -236,7 +236,7 @@ Offline tool feeding the Stylist: batches reference images (BATCH_SIZE=20, concu
 
 ---
 
-## Reusable for clio-parser
+## Reusable for clio-author
 
 - **Shared-state `data: Dict` pattern as the agent interface.** A single dict threaded through `async process(data) -> data`, with **string-templated, task-and-round-parameterized keys** (`target_{task}_{stage}_desc{round}[_base64_jpg]`). No bus, no schemas — trivial to inspect/serialize/replay, and each stage is independently re-runnable (visualizer skips keys whose `*_base64_jpg` already exists — built-in idempotency/caching). Strong reference for an expert-agent harness.
 - **`BaseAgent` minimal contract:** ABC + one async `process` + per-task `system_prompt`/`task_config` chosen in `__init__`. Clean, copy-able.

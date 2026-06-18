@@ -229,7 +229,7 @@ wheels = [
 ]
 
 [[package]]
-name = "clio-parser"
+name = "clio-author"
 version = "0.3.0"
 source = { editable = "." }
 dependencies = [

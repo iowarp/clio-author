@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from clio_parser.ingest.postprocess.cleanup import cleanup_text
+from clio_author.ingest.postprocess.cleanup import cleanup_text
 
 
 def test_ligatures_replaced() -> None:

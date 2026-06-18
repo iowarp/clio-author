@@ -6,7 +6,7 @@ exact LaTeX shape with no model and no filesystem.
 
 from __future__ import annotations
 
-from clio_parser.export.latex import escape_latex, markdown_to_latex, to_latex_document
+from clio_author.export.latex import escape_latex, markdown_to_latex, to_latex_document
 
 
 # --------------------------------------------------------------------------- #
@@ -116,7 +116,7 @@ def test_document_skeleton() -> None:
     assert doc.startswith("\\documentclass{article}")
     assert "\\usepackage[utf8]{inputenc}" in doc
     assert "\\title{My Title}" in doc
-    assert "\\author{clio-parser}" in doc
+    assert "\\author{clio-author}" in doc
     assert "\\begin{document}" in doc
     assert "\\maketitle" in doc
     assert doc.rstrip().endswith("\\end{document}")

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from clio_parser.experts.write_models import PaperOutline, SectionOutline, SectionPlan
+from clio_author.experts.write_models import PaperOutline, SectionOutline, SectionPlan
 
 
 def test_section_outline_recursive_subsections() -> None:

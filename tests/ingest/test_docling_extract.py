@@ -1,4 +1,4 @@
-"""Hermetic tests for the pure logic in :mod:`clio_parser.ingest.docling_extract`.
+"""Hermetic tests for the pure logic in :mod:`clio_author.ingest.docling_extract`.
 
 These cover :func:`resolve_arxiv_url` and :class:`PdfConfig` defaults only --
 no Docling, PyMuPDF, network, or filesystem extraction. Importing the module
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from clio_parser.ingest.docling_extract import (
+from clio_author.ingest.docling_extract import (
     ExtractionDependencyError,
     ExtractionError,
     PdfConfig,
@@ -80,7 +80,7 @@ def test_error_hierarchy() -> None:
 
 
 # --- resolve_source: title / topic support (hermetic; search is mocked) --------
-from clio_parser.ingest import docling_extract as _dx  # noqa: E402
+from clio_author.ingest import docling_extract as _dx  # noqa: E402
 
 
 def test_resolve_source_arxiv_id() -> None:
