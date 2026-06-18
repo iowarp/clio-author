@@ -18,6 +18,7 @@ echo path naturally exercises the ``parse_error`` branch).
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from clio_author.harness.base import BaseAgent
@@ -133,28 +134,40 @@ class KGExpert(BaseAgent):
         return output
 
     def _maybe_write(self, task: Task, graph: KnowledgeGraph, mermaid: str) -> list[str]:
-        """Persist ``kg.json`` + ``kg.mmd`` under ``out_dir`` when configured.
+        """Persist ``kg.json`` + ``kg.mmd`` under ``out_dir`` when given.
 
-        Best-effort/never-raise: ``write_new`` does not create parent dirs, so
-        the ``out_dir`` folder is minted once; a refused or failed write is
-        skipped rather than aborting (mirrors :mod:`clio_author.experts.compose`).
+        When the expert was constructed with a :class:`SafeFiles`, ``out_dir`` is
+        a subdirectory under that sandbox root; otherwise ``out_dir`` is taken as
+        the output root directly (the common CLI case — mirrors how
+        :mod:`clio_author.experts.compose` / the ingestor derive a ``SafeFiles``
+        from ``payload["out_dir"]``). Best-effort/never-raise: ``write_new`` does
+        not create parent dirs, so the folder is minted once; a refused or failed
+        write is skipped rather than aborting.
         """
         out_dir = task.payload.get("out_dir")
-        if not self._files or not out_dir:
+        if not out_dir:
             return []
 
+        # Derive a SafeFiles from out_dir when none was injected (CLI/adapter path).
+        if self._files is not None:
+            files = self._files
+            prefix = f"{out_dir}/"
+        else:
+            files = SafeFiles(Path(str(out_dir)))
+            prefix = ""
+
         try:
-            (self._files.root / str(out_dir)).mkdir(parents=True, exist_ok=True)
+            (files.root / prefix).mkdir(parents=True, exist_ok=True)
         except OSError:
             return []
 
         wrote: list[str] = []
         for name, text in (
-            (f"{out_dir}/kg.json", json.dumps(graph.to_dict(), indent=2)),
-            (f"{out_dir}/kg.mmd", mermaid),
+            (f"{prefix}kg.json", json.dumps(graph.to_dict(), indent=2)),
+            (f"{prefix}kg.mmd", mermaid),
         ):
             try:
-                path = self._files.write_new(name, text)
+                path = files.write_new(name, text)
                 wrote.append(str(path))
             except FileToolError:
                 continue

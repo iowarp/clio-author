@@ -201,3 +201,39 @@ def test_build_kg_partial_parse_failure_is_tolerated() -> None:
     graph, err = build_kg_from_llm(blocks, FlakyLLM(), batch_size=6)
     assert err is None  # partial success
     assert len(graph.nodes) == 1
+
+
+def test_kg_writes_to_out_dir_without_constructor_files(tmp_path) -> None:
+    """Regression: `kg --json {out_dir}` must persist kg.json/kg.mmd even when the
+    expert was built with no SafeFiles (the CLI/adapter path)."""
+    from clio_author.experts.kg import KGExpert
+    from clio_author.harness.session import SessionContext
+    from clio_author.harness.types import Task
+
+    canned = (
+        '```json\n{"nodes":[{"id":"m1","label":"Transformer","type":"method"}],"edges":[]}\n```'
+    )
+
+    class CannedLLM:
+        def complete(self, messages, **kw):  # type: ignore[no-untyped-def]
+            return canned
+
+    out = tmp_path / "kg-out"
+    expert = KGExpert(CannedLLM())  # NO files= passed (mirrors agent/CLI)
+    result = expert.run(
+        Task(
+            id="t",
+            description="kg",
+            payload={
+                "blocks": {
+                    "metadata": {},
+                    "sections": [{"section_path": "S", "title": "S", "text": "x"}],
+                },
+                "out_dir": str(out),
+            },
+        ),
+        SessionContext(id="s"),
+    )
+    assert (out / "kg.json").exists(), "kg.json was not written from payload out_dir"
+    assert (out / "kg.mmd").exists(), "kg.mmd was not written from payload out_dir"
+    assert any(str(out) in p for p in result.metadata["wrote"])

@@ -32,3 +32,4 @@ dist/
 
 # ingest output
 /clio-out/
+/audit-out/
