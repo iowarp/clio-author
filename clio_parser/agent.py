@@ -31,7 +31,7 @@ from clio_parser.experts.echo import EchoExpert
 from clio_parser.experts.editor import EditorExpert
 from clio_parser.experts.figure_agent import FigureAgentExpert, run_figure_refine
 from clio_parser.experts.ingestor import IngestorExpert
-from clio_parser.experts.literature_graph import LiteratureGraphExpert
+from clio_parser.experts.kg import KGExpert
 from clio_parser.experts.meta_reviewer import MetaReviewerExpert
 from clio_parser.experts.paper_qa import PaperQAExpert
 from clio_parser.experts.polish import PolishExpert
@@ -45,7 +45,6 @@ from clio_parser.harness.session import SessionContext
 from clio_parser.harness.types import AgentOutput, Task
 from clio_parser.llm.client import EchoLLMClient, LLMClient
 from clio_parser.llm.vision import VisionClient
-from clio_parser.retrieval.literature_graph import LiteratureGraphClient
 from clio_parser.retrieval.scholar import ScholarClient
 from clio_parser.tools.files import SafeFiles
 
@@ -64,7 +63,6 @@ class ClioParserAgent:
         *,
         files: SafeFiles | None = None,
         scholar_client: ScholarClient | None = None,
-        graph_client: LiteratureGraphClient | None = None,
         vision: VisionClient | None = None,
     ) -> None:
         """Construct the expert set.
@@ -76,14 +74,12 @@ class ClioParserAgent:
                 (ingestor / writer / editor / figure).
             scholar_client: Optional scholar client given to the citation expert
                 (the network seam). Citation runs degrade gracefully when absent.
-            graph_client: Optional graph client given to the literature graph expert.
             vision: Optional :class:`VisionClient` (e.g. Gemini) given to the
                 figure agent. ``None`` (default) keeps the hermetic text/code path.
         """
         self.llm: LLMClient = llm if llm is not None else EchoLLMClient()
         self.files = files
         self.scholar_client = scholar_client
-        self.graph_client = graph_client
         self.vision = vision
 
         self.echo_expert = EchoExpert(self.llm)
@@ -96,7 +92,7 @@ class ClioParserAgent:
         self.editor = EditorExpert(self.llm, files=files)
         self.polish = PolishExpert(self.llm, files=files)
         self.coherence = CoherenceExpert(self.llm)
-        self.literature_graph_expert = LiteratureGraphExpert(self.llm, client=graph_client)
+        self.kg_expert = KGExpert(self.llm, files=files)
         self.figure = FigureAgentExpert(self.llm, files=files, vision=vision)
 
         # M0 echo wiring is preserved for the unknown/None-action fallthrough.
@@ -160,8 +156,8 @@ class ClioParserAgent:
             return self.polish.run(task, session)
         if action == "coherence":
             return self.coherence.run(task, session)
-        if action == "literature_graph":
-            return self.literature_graph_expert.run(task, session)
+        if action == "kg":
+            return self.kg_expert.run(task, session)
         if action == "describe_figures":
             return self.figure.run(
                 task.model_copy(update={"payload": {**task.payload, "mode": "describe"}}),
@@ -265,9 +261,9 @@ class ClioParserAgent:
         """Generate matplotlib plot code from ``spec`` (code text only)."""
         return self._invoke("plot", {"spec": spec})
 
-    def literature_graph(self, seeds: Any, **kw: Any) -> AgentOutput:
-        """Build a literature graph around one or more seed papers."""
-        return self._invoke("literature_graph", {"seeds": seeds, **kw})
+    def kg(self, blocks: Any, **kw: Any) -> AgentOutput:
+        """Extract a content knowledge graph from a paper's memory ``blocks``."""
+        return self._invoke("kg", {"blocks": blocks, **kw})
 
 
 def _bullets(label: str, items: Any) -> str:

@@ -110,12 +110,24 @@ def test_run_plot_reaches_figure_expert(capsys: pytest.CaptureFixture[str]) -> N
     assert code == (1 if "error" in result or "error" in result["metadata"] else 0)
 
 
-def test_graph_command_routes_without_network_when_off(capsys: pytest.CaptureFixture[str]) -> None:
-    code, result = _run(capsys, ["graph", "--seed", "Seed Paper", "--backend", "off"])
-
-    assert code == 1
-    assert result["action"] == "literature_graph"
-    assert "graph client" in result["metadata"]["error"]
+def test_kg_command_routes_with_blocks_json(capsys: pytest.CaptureFixture[str]) -> None:
+    blocks = json.dumps(
+        {
+            "metadata": {"title": "T"},
+            "sections": [
+                {
+                    "section_path": "Methods",
+                    "title": "Methods",
+                    "text": "We use a transformer evaluated on GLUE.",
+                }
+            ],
+            "figures": [],
+        }
+    )
+    code, result = _run(capsys, ["kg", "--blocks-json", blocks])
+    assert code == 0
+    assert result["action"] == "kg"
+    assert "num_nodes" in result["metadata"]
 
 
 def test_write_accepts_outline_flag(capsys: pytest.CaptureFixture[str]) -> None:

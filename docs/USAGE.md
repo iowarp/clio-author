@@ -32,7 +32,7 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 > host agent to branch on. Pass `--format prose` (CLI flag on dedicated text subcommands) or
 > `{"format": "prose"}` in any payload to get a human-readable text answer instead: `structured`
 > becomes `null` and the prose lands in `content`. `review` has the model *write* the prose; the
-> data-shaped actions (`cite`, `meta_review`, `literature_graph`, `describe_figures`, `coherence`)
+> data-shaped actions (`cite`, `meta_review`, `kg`, `describe_figures`, `coherence`)
 > render their result as text.
 
 > **File inputs for large payloads.** Every action that accepts blocks, sections, candidates, or
@@ -275,36 +275,27 @@ sub.run("coherence", {"sections": [{"title": "Introduction", "draft": "..."}, ..
 
 ---
 
-### 10. `literature_graph`
+### 10. `kg`
 
-Build a browsable literature graph around one or more seed papers.
+Extract a content knowledge graph of a paper -- its claims, methods, datasets, results, metrics,
+concepts, and tasks plus the relations between them -- from the paper's memory blocks. This is the
+paper's *content* graph, distinct from any citation / literature graph.
 
-- **Reads:** `seed` *(single string)* or `seeds` *(list of strings or `{title, paper_id, year, url}`
-  objects)*; `max_nodes` *(optional, default 40)*; `per_seed` *(optional, default 8)*;
-  `backend` *(optional: `auto`, `semantic`/`s2`, `openalex`, `off`)*; `out_dir` *(optional)*.
-- **Returns:** `content` = graph summary; `structured` = `{backend, seeds, nodes, edges,
-  prior_works, derivative_works, related_works}`. Nodes include paper title, authors, year,
-  citation count, source link, role, and `ingest_source`. Edges include citation/recommendation
-  semantics.
-- **Writes:** with `out_dir`, writes `graph.json` and a self-contained `graph.html`. The HTML uses
-  color for publication year, node size for citation count, thick outlines for seed papers, and a
-  details panel with the paper link plus a copyable `clio-parser ingest ...` command.
-- **Backends:** resolved from `CLIO_GRAPH` or the payload's `backend`; see
-  [Literature graph backends](#literature-graph-backends-clio_graph).
-- **Extra:** `scholar` is needed for Semantic Scholar. `openalex` works without a key/dependency.
+- **Reads:** `blocks` (a `MemoryBlocks` or its dump); `max_sections` *(optional cap on sections)*;
+  `out_dir` *(optional)*.
+- **Returns:** `content` = a one-line summary (or a Mermaid `graph TD` rendering with
+  `format=prose`); `structured` = `{nodes, edges}` (each node `{id, label, type, description,
+  section_path}`; each edge `{source, target, relation}`; edges whose endpoints are not nodes are
+  dropped); `metadata` = `{num_nodes, num_entities, num_edges, wrote}`. An unparseable LLM response
+  flags `metadata["parse_error"]` and returns an empty graph (never raises).
+- **Writes:** with a configured `SafeFiles` and `out_dir`, writes `<out_dir>/kg.json` and
+  `<out_dir>/kg.mmd` (Mermaid).
 
 ```bash
-clio-parser graph \
-  --seed "Attention Is All You Need" \
-  --max-nodes 40 \
-  --out-dir clio-out/graphs/attention
+clio-parser kg --blocks-file clio-out/2601.23265/blocks.json --format prose
 ```
 ```python
-sub.run("literature_graph", {
-    "seed": "Attention Is All You Need",
-    "max_nodes": 40,
-    "out_dir": "clio-out/graphs/attention",
-})
+sub.run("kg", {"blocks": blocks_dump, "out_dir": "clio-out/2601.23265"})
 ```
 
 ---
@@ -526,7 +517,7 @@ lazy-imported only when their action needs them:
 |-------|-----------|-----------------------------------|
 | `pdf` | `ingest`: Docling extraction + PyMuPDF OCR fallback | `ingest` returns `metadata["error"]` for the missing dependency |
 | `rag` | `ask`: `SentenceTransformerEmbedder` + `LanceDbRetriever` | deterministic `HashingEmbedder` + in-memory `RagRetriever` |
-| `scholar` | `cite` + `literature_graph`: Semantic Scholar `httpx` client + `thefuzz` fuzzy match | citation no-key fallbacks and graph OpenAlex fallback still work |
+| `scholar` | `cite`: Semantic Scholar `httpx` client + `thefuzz` fuzzy match | citation no-key fallbacks still work |
 | `viz` | gated `render_plot_code` (subprocess render) | `plot` emits code text only; never renders |
 
 Install a subset as needed, e.g. `uv sync --extra pdf --extra scholar`.
@@ -601,34 +592,6 @@ agent.review("# Title\n...")
 
 Both `ClioParserAgent` and `ClioParserSubagent` also accept `files=SafeFiles(root)` (for the
 write-capable experts) and `scholar_client=...` (for `cite`).
-
----
-
-## Literature graph backends (`CLIO_GRAPH`)
-
-`CLIO_GRAPH` selects the backend for `literature_graph` / `clio-parser graph`:
-
-| Value | Client | Notes |
-|-------|--------|-------|
-| `auto` / `cascade` *(default)* | `CascadeLiteratureGraphClient` | Semantic Scholar first, then OpenAlex fallback |
-| `semantic` / `s2` | `SemanticScholarGraphClient` | Uses title match, references, citations, and recommendations; reads `SEMANTIC_SCHOLAR_API_KEY` |
-| `openalex` / `oa` | `OpenAlexGraphClient` | No key required; related-work fallback |
-| `off` / `none` / `offline` | `None` | Graph expert reports "no literature graph client configured" |
-
-The Semantic Scholar graph path is rate-limit aware and spaces requests more conservatively than
-single citation checks because one graph run needs several API calls. The graph action writes
-portable artifacts:
-
-```bash
-uv run --extra scholar clio-parser graph \
-  --seed "Attention Is All You Need" \
-  --out-dir clio-out/graphs/attention
-```
-
-Open `clio-out/graphs/attention/graph.html` directly in a browser. No dev server is required.
-
-In-process, pass a `LiteratureGraphClient` protocol-compatible object directly:
-`ClioParserAgent(graph_client=MyGraphClient())`.
 
 ---
 

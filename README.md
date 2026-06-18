@@ -105,17 +105,14 @@ uv run --extra scholar clio-parser cite \
   --candidates-json '[{"title": "Attention Is All You Need", "year": 2017}]'
 ```
 
-### Literature graph visualization
+### Content knowledge graph
 
 ```bash
-# Build a Connected-Papers-style HTML graph: node color = year, size = citations.
-uv run --extra scholar clio-parser graph \
-  --seed "Attention Is All You Need" \
-  --max-nodes 40 \
-  --out-dir clio-out/graphs/attention
+# Extract a content knowledge graph (claims/methods/datasets/results + relations)
+# from a paper's memory blocks (distinct from a citation graph).
+uv run clio-parser kg --blocks-file clio-out/<id>/blocks.json
 
-# Open clio-out/graphs/attention/graph.html in a browser.
-# Click a node to see paper links and an ingest command for that paper.
+# Add --format prose to print a Mermaid `graph TD` rendering for a human view.
 ```
 
 ### Review
@@ -229,19 +226,6 @@ Other useful variables:
 | `CLIO_VISION_MODEL` | Gemini describe model | `gemini-2.5-flash` |
 | `CLIO_IMAGE_MODEL` | Gemini image generation model | `gemini-2.5-flash-image` |
 
-### Literature graph backends (`CLIO_GRAPH`)
-
-| `CLIO_GRAPH` | What it uses |
-|---|---|
-| `auto` *(default)* | Semantic Scholar first, then OpenAlex fallback |
-| `semantic` / `s2` | Semantic Scholar only; uses `SEMANTIC_SCHOLAR_API_KEY` when present |
-| `openalex` | OpenAlex only; no key required |
-| `off` / `none` / `offline` | disable graph lookup |
-
-`clio-parser graph` writes `graph.json` and a self-contained `graph.html` when `--out-dir` is set.
-The HTML graph shows publication year by color, citation count by node size, prior/derivative roles,
-paper links, and a copyable `clio-parser ingest ...` command for each node.
-
 ### Citation backends (`CLIO_SCHOLAR`)
 
 | `CLIO_SCHOLAR` | What it uses |
@@ -354,7 +338,7 @@ CLIO_LLM=claude uv run clio-parser review --paper-file clio-out/2601.23265/paper
 | 7 | `edit` | Revise a draft to address reviewer feedback | `clio-parser run edit` |
 | 8 | `polish` | Improve prose clarity, flow, and academic voice | `clio-parser polish` |
 | 9 | `coherence` | Check cross-section consistency of a manuscript | `clio-parser coherence` |
-| 10 | `literature_graph` | Visual paper graph: seed, prior works, derivative works, links, ingest commands | `clio-parser graph` |
+| 10 | `kg` | Content knowledge graph: claims/methods/datasets/results + relations (from memory blocks) | `clio-parser kg` |
 | 11 | `describe_figures` | Fill figure descriptions / captions in memory blocks | `clio-parser describe` |
 | 12 | `plot` | Generate matplotlib plot code (code text only) | `clio-parser run plot` |
 | 13 | `compose` | Whole-paper orchestration: idea → outline → cite → write → assemble | `clio-parser compose` |
@@ -373,7 +357,7 @@ The core install is tiny and offline. Each heavy capability is opt-in:
 ```bash
 uv sync --extra pdf        # real PDF/arXiv extraction (Docling + PyMuPDF) — needed for `ingest`
 uv sync --extra rag        # real semantic search for `ask` (sentence-transformers + LanceDB)
-uv sync --extra scholar    # live Semantic Scholar for `cite` + `graph` (httpx + thefuzz)
+uv sync --extra scholar    # live Semantic Scholar for `cite` (httpx + thefuzz)
 uv sync --extra viz        # actually render plot images (matplotlib)
 uv sync --all-extras       # everything at once
 ```

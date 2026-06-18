@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from clio_parser.agent import ClioParserAgent
 from clio_parser.harness.types import AgentOutput, Task
-from clio_parser.retrieval.literature_graph import GraphSeed, LiteratureGraph, PaperNode
 from clio_parser.retrieval.scholar import FakeScholarClient, S2Record
 
 _CITE_TITLE = "neural machine translation by jointly learning to align and translate"
@@ -33,28 +32,9 @@ def _blocks_payload() -> dict[str, object]:
     }
 
 
-class FakeGraphClient:
-    def build_graph(
-        self,
-        seeds: list[GraphSeed],
-        *,
-        max_nodes: int = 40,
-        per_seed: int = 8,
-    ) -> LiteratureGraph:
-        node = PaperNode(
-            id="s2:seed",
-            title=seeds[0].title or "Seed",
-            source="semantic_scholar",
-            role="seed",
-            ingest_source=seeds[0].title or "Seed",
-        )
-        return LiteratureGraph(backend="semantic", seeds=[node.title], nodes=[node], edges=[])
-
-
 def _agent() -> ClioParserAgent:
     return ClioParserAgent(
         scholar_client=FakeScholarClient({_CITE_TITLE: []}),
-        graph_client=FakeGraphClient(),
     )
 
 
@@ -117,10 +97,10 @@ def test_route_plot() -> None:
     assert out.metadata.get("mode") == "plot"
 
 
-def test_route_literature_graph() -> None:
-    out = _agent().invoke(_task("literature_graph", seed="Seed Paper"))
-    assert out.agent == "literature_graph"
-    assert out.metadata["num_nodes"] == 1
+def test_route_kg() -> None:
+    out = _agent().invoke(_task("kg", blocks=_blocks_payload()))
+    assert out.agent == "kg"
+    assert "num_nodes" in out.metadata
 
 
 def test_route_write_review_loop() -> None:
@@ -210,9 +190,9 @@ def test_convenience_plot() -> None:
     assert out.metadata.get("mode") == "plot"
 
 
-def test_convenience_literature_graph() -> None:
-    out = _agent().literature_graph("Seed Paper")
-    assert out.agent == "literature_graph"
+def test_convenience_kg() -> None:
+    out = _agent().kg(_blocks_payload())
+    assert out.agent == "kg"
 
 
 def test_prose_format_renders_meta_review_as_text() -> None:

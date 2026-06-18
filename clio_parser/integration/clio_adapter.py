@@ -24,7 +24,6 @@ from clio_parser.agent import ClioParserAgent
 from clio_parser.harness.types import Task
 from clio_parser.llm.client import LLMClient
 from clio_parser.llm.vision import VisionClient
-from clio_parser.retrieval.literature_graph import LiteratureGraphClient
 from clio_parser.retrieval.scholar import ScholarClient
 from clio_parser.tools.files import SafeFiles
 
@@ -92,12 +91,12 @@ _ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["sections", "markdown", "text"],
     },
     {
-        "action": "literature_graph",
+        "action": "kg",
         "description": (
-            "Build a visual literature graph around seed papers "
-            "(year color, citation-size nodes, ingest links)."
+            "Extract a content knowledge graph (claims/methods/datasets/results + "
+            "relations) from a paper's memory blocks."
         ),
-        "payload_keys": ["seed", "seeds", "max_nodes", "per_seed", "out_dir", "backend"],
+        "payload_keys": ["blocks", "out_dir"],
     },
     {
         "action": "describe_figures",
@@ -150,22 +149,19 @@ class ClioParserSubagent:
         *,
         files: SafeFiles | None = None,
         scholar_client: ScholarClient | None = None,
-        graph_client: LiteratureGraphClient | None = None,
         vision: VisionClient | None = None,
     ) -> None:
         """Build the subagent over a :class:`ClioParserAgent`.
 
         Args mirror the agent: an optional shared ``llm`` (default offline echo),
         ``files`` for write-capable experts, a ``scholar_client`` for citation
-        grounding, a ``graph_client`` for literature graph discovery, and an
-        optional ``vision`` client (e.g. Gemini) for the figure agent's real image
-        describe/generate route.
+        grounding, and an optional ``vision`` client (e.g. Gemini) for the figure
+        agent's real image describe/generate route.
         """
         self._agent = ClioParserAgent(
             llm,
             files=files,
             scholar_client=scholar_client,
-            graph_client=graph_client,
             vision=vision,
         )
 
