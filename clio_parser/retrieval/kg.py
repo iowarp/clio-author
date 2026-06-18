@@ -16,6 +16,7 @@ extractor and never raising.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -103,36 +104,15 @@ class KnowledgeGraph(BaseModel):
         return "\n".join(lines)
 
 
-def build_kg_from_llm(
-    blocks: MemoryBlocks,
-    llm: LLMClient,
-    *,
-    max_sections: int | None = None,
-) -> tuple[KnowledgeGraph, str | None]:
-    """Extract a :class:`KnowledgeGraph` from ``blocks`` using ``llm``.
-
-    Renders the paper's section blocks (via
-    :meth:`~clio_parser.ingest.blocks.MemoryBlocks.select` at ``detail="full"``,
-    optionally capped to ``max_sections``) into the :data:`KG_PROMPT`, calls the
-    LLM, and parses the response with the reviewer's stdlib
-    :func:`~clio_parser.experts.reviewer._extract_json_object`.
-
-    Nodes are coerced into :class:`KGNode` (entries failing validation are
-    dropped); edges whose ``source``/``target`` is not a known node id are
-    dropped. Returns ``(graph, error)``: on a parse failure the result is an
-    empty graph and ``"could not parse KG JSON"``; otherwise ``error`` is
-    ``None``. Pure stdlib plus the supplied ``llm``; never raises.
-    """
-    context = "\n\n".join(blocks.select(kinds=["section"], detail="full", max_blocks=max_sections))
+def _extract_one(context: str, llm: LLMClient) -> tuple[list[KGNode], list[KGEdge], bool]:
+    """Extract nodes/edges from one batch of section text. Returns (nodes, edges, parsed_ok)."""
     messages = [
         Message(role="system", content="You extract content knowledge graphs from papers."),
         Message(role="user", content=f"{KG_PROMPT}\n\nPaper sections:\n{context}"),
     ]
-    raw = llm.complete(messages)
-
-    parsed = _extract_json_object(raw)
+    parsed = _extract_json_object(llm.complete(messages))
     if parsed is None:
-        return KnowledgeGraph(), "could not parse KG JSON"
+        return [], [], False
 
     nodes: list[KGNode] = []
     for item in parsed.get("nodes", []) or []:
@@ -154,8 +134,83 @@ def build_kg_from_llm(
             continue
         if edge.source in node_ids and edge.target in node_ids:
             edges.append(edge)
+    return nodes, edges, True
 
-    return KnowledgeGraph(nodes=nodes, edges=edges), None
+
+def build_kg_from_llm(
+    blocks: MemoryBlocks,
+    llm: LLMClient,
+    *,
+    max_sections: int | None = None,
+    batch_size: int = 6,
+) -> tuple[KnowledgeGraph, str | None]:
+    """Extract a :class:`KnowledgeGraph` from ``blocks`` using ``llm``.
+
+    Section blocks (via :meth:`~clio_parser.ingest.blocks.MemoryBlocks.select` at
+    ``detail="full"``, optionally capped to ``max_sections``) are split into
+    batches of ``batch_size`` and each batch is extracted with one LLM call, so a
+    long paper does not overflow a single prompt. The per-batch sub-graphs are
+    merged: nodes are deduplicated by ``(type, normalised label)`` (the first
+    occurrence's id/description wins) and every edge is remapped onto the surviving
+    node ids (edges to dropped/unknown nodes are discarded, duplicates collapsed).
+
+    Parses each batch with the reviewer's stdlib
+    :func:`~clio_parser.experts.reviewer._extract_json_object`. Returns
+    ``(graph, error)``: ``error`` is set only when **every** batch failed to parse
+    (``"could not parse KG JSON"``) or there are no sections; a partial parse still
+    returns what was extracted with ``error=None``. Pure stdlib plus the supplied
+    ``llm``; never raises.
+    """
+    sections = blocks.select(kinds=["section"], detail="full", max_blocks=max_sections)
+    if not sections:
+        return KnowledgeGraph(), "no sections to extract"
+    size = max(1, batch_size)
+    batches = [sections[i : i + size] for i in range(0, len(sections), size)]
+
+    merged_nodes: list[KGNode] = []
+    canonical: dict[tuple[str, str], str] = {}  # (type, norm-label) -> canonical id
+    all_edges: list[KGEdge] = []
+    any_parsed = False
+
+    for batch in batches:
+        nodes, edges, ok = _extract_one("\n\n".join(batch), llm)
+        if not ok:
+            continue
+        any_parsed = True
+        remap: dict[str, str] = {}  # this batch's node id -> canonical id
+        for node in nodes:
+            key = (node.type, re.sub(r"\s+", " ", node.label.strip().lower()))
+            if key in canonical:
+                remap[node.id] = canonical[key]
+            else:
+                canonical[key] = node.id
+                remap[node.id] = node.id
+                merged_nodes.append(node)
+        for edge in edges:
+            all_edges.append(
+                KGEdge(
+                    source=remap.get(edge.source, edge.source),
+                    target=remap.get(edge.target, edge.target),
+                    relation=edge.relation,
+                )
+            )
+
+    if not any_parsed:
+        return KnowledgeGraph(), "could not parse KG JSON"
+
+    node_ids = {node.id for node in merged_nodes}
+    seen: set[tuple[str, str, str]] = set()
+    edges_final: list[KGEdge] = []
+    for edge in all_edges:
+        if edge.source not in node_ids or edge.target not in node_ids:
+            continue
+        sig = (edge.source, edge.relation, edge.target)
+        if sig in seen:
+            continue
+        seen.add(sig)
+        edges_final.append(edge)
+
+    return KnowledgeGraph(nodes=merged_nodes, edges=edges_final), None
 
 
 def _mermaid_id(node_id: str) -> str:
