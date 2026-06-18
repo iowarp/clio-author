@@ -1,8 +1,8 @@
-# DESIGN — clio-parser: a standalone multi-agent paper harness
+# DESIGN — clio-author: a standalone multi-agent paper harness
 
 Status: **draft for review**. Grounded in the per-artifact notes + SYNTHESIS.md in this folder.
 
-> **Form:** clio-parser is a **standalone, pure-Python multi-agent agent
+> **Form:** clio-author is a **standalone, pure-Python multi-agent agent
 > harness** — a *proper agent*, modeled on **papervizagent** (orchestrator/processor + shared-state
 > expert agents + critic refinement loop) and **protoneo/knowledge** (`BaseAgent` + `AgentProtocol`
 > + deliberation engine + knowledge graph). It is **NOT** an MCP server and **NOT** a
@@ -12,7 +12,7 @@ Status: **draft for review**. Grounded in the per-artifact notes + SYNTHESIS.md 
 
 ## 0. Goal
 
-clio-parser combines **paper-to-md + PaperBanana (arXiv 2601.23265)** for *processing papers* and
+clio-author combines **paper-to-md + PaperBanana (arXiv 2601.23265)** for *processing papers* and
 **wtf-p + PaperOrchestra (arXiv 2604.05018)** for *writing and editing*, decomposed into **expert
 agents, retrieval techniques, and read/write/edit tools** so that a main agent can **review and
 write papers**. The harness design draws on **papervizagent** and **protoneo/knowledge** as
@@ -25,8 +25,8 @@ A single importable package with a main orchestrator agent that routes to expert
 by retrieval and file read/write/edit tools.
 
 ```
-clio_parser/
-  __init__.py                 # exports ClioParserAgent (the main agent / entry surface)
+clio_author/
+  __init__.py                 # exports ClioAuthorAgent (the main agent / entry surface)
   agent.py                    # MainAgent: plans -> delegates to experts -> synthesizes (review & write)
   harness/
     base.py                   # BaseAgent (role, model, system_prompt, llm_client, tools) — protoneo-style
@@ -57,9 +57,9 @@ clio_parser/
   llm/
     client.py                 # provider abstraction (local Gemma/Qwen vision, Ollama, API) — vision-capable
   config.py                   # harness config (models, depths, retrieval, pattern selection)
-  cli.py                      # `clio-parser process <url>` / `review <md>` / `write <materials>`
+  cli.py                      # `clio-author process <url>` / `review <md>` / `write <materials>`
 integration/
-  clio_adapter.py             # thin shim so CLIO can invoke ClioParserAgent (deferred)
+  clio_adapter.py             # thin shim so CLIO can invoke ClioAuthorAgent (deferred)
 tests/
   baselines/                  # compare against paper-to-md / PaperBanana / PaperOrchestra / protoneo
 ```
@@ -100,7 +100,7 @@ in `artifact/papers/`.
 
 ## 5. Milestones
 - **M0 — Harness skeleton:** `BaseAgent`/`AgentProtocol`/engine/patterns/session/types + a trivial
-  echo expert; `ClioParserAgent.invoke()` works end-to-end.
+  echo expert; `ClioAuthorAgent.invoke()` works end-to-end.
 - **M1 — Processing track:** `ingest/` port + `ingestor` expert → Markdown + blocks; baseline diff.
 - **M2 — Retrieval + injection:** `rag.py` + selective block injection + Q&A.
 - **M3 — Grounding:** `scholar.py` + `citation` expert.

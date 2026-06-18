@@ -1,6 +1,6 @@
 # paper-orchestra (PaperOrchestra) — Deep Study Notes
 
-Repo: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-parser/artifact/repos/paper-orchestra`
+Repo: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-author/artifact/repos/paper-orchestra`
 Paper: "PaperOrchestra: A Multi-Agent Framework for Automated AI Research Paper Writing", Song, Song, Pfister, Yoon — Google Cloud AI Research, arXiv:2604.05018 (2026).
 Read-only study. Nothing in the repo was modified.
 
@@ -153,7 +153,7 @@ Schema (quoted from the prompt's example output):
 
 Key directives: (1) plotting plan picks essential figures; `figure_id` is a semantic slug, must NOT contain "Figure". (2) Intro vs Related-Work scopes are kept disjoint (macro 10-20 papers vs micro 30-50 SOTA/baselines); related work split into 2-4 methodology clusters each with a limitation hypothesis + "bridge"; a hard timeline rule forbids searching for papers after `{cutoff_date}`. (3) `citation_hints` must EXHAUSTIVELY cover every dataset, optimizer, metric, baseline, and foundational arch/model; anti-hallucination rule: use exact "Author (Title)" only if known, else `"research paper or technical report introducing '[Name]'"`.
 
-## 5. Literature Review agent — two-stage web-grounded RAG (KEY for clio-parser)
+## 5. Literature Review agent — two-stage web-grounded RAG (KEY for clio-author)
 
 File: `methods/agents/literature_review_agent.py` (`HybridLiteratureAgent`). Pydantic models: `CandidatePaper{title,year,reason}`, `DiscoveryResult{section_name,candidates}`, `PaperData{citation_key,title,authors,venue,year,abstract,citation_count,found_in_section,reason,journal,volume,pages,publication_date}`, `WriterOutput`.
 
@@ -191,7 +191,7 @@ File: `methods/agents/literature_review_agent.py` (`HybridLiteratureAgent`). Pyd
   i.e. the **">=90% verified"** coverage requirement. It also forbids citing anything outside `collected_papers`, forbids claiming SOTA over a paper not in `experimental_log.md`, and treats post-cutoff papers strictly as concurrent work.
 - **Phase 4 — Saving**: writes `outline_v1.json`, `updated_template.tex`, `references.bib`, `citation_map.json` to `literature_agent_output/`.
 
-Reusability highlight: the pattern "LLM+web-search proposes candidate titles → Semantic Scholar verifies/enriches with fuzzy title match + date cutoff + abstract presence → bibtex/citation-map" is exactly the retrieval/verification core relevant to clio-parser.
+Reusability highlight: the pattern "LLM+web-search proposes candidate titles → Semantic Scholar verifies/enriches with fuzzy title match + date cutoff + abstract presence → bibtex/citation-map" is exactly the retrieval/verification core relevant to clio-author.
 
 ## 6. AgentReview — simulated peer review
 
@@ -240,10 +240,10 @@ File: `methods/agents/section_writing_agent.py` (`SectionWritingAgent`), prompt 
 
 ---
 
-## Reusable for clio-parser
+## Reusable for clio-author
 
 - **Web-grounded → S2-verified retrieval pipeline** (`literature_review_agent.py` + `scholar_utils.py`): the canonical "propose-then-verify" RAG. LLM+Google-Search proposes candidate titles/years; Semantic Scholar authenticates via fuzzy title match (`thefuzz.fuzz.ratio > 70`, +10 year-match bonus), date-cutoff filtering (year/month/day, two independent checks), and abstract-presence gating; then bibtex + `citation_map.json` generation and citation-key minting (`_generate_key`). Directly transferable to a parser/retriever that must map noisy citation strings to verified records.
-- **`s2_title_search` signature & fields** (`utils/scholar_utils.py`): endpoint, fields list, headers, timeout, and the exact accept threshold — a ready reference for clio-parser's S2 calls.
+- **`s2_title_search` signature & fields** (`utils/scholar_utils.py`): endpoint, fields list, headers, timeout, and the exact accept threshold — a ready reference for clio-author's S2 calls.
 - **Citation-string → title normalization** (`utils/content_parsing_utils.py::extract_paper_title_from_citation` with `gemini-3-flash-preview`) and the P0/P1 priority taxonomy + S2-ID-based F1 (`autoraters/citation_f1.py`) — a concrete recipe for measuring retrieval quality against a ground-truth bibliography.
 - **De-dup by normalized title** (`_normalize_title = re.sub(r"[^a-z0-9]","",title.lower())`) under a lock — simple robust dedup key.
 - **Rate-limit discipline**: parallel discovery (10 threads) but **sequential** S2 enrichment with `time.sleep(1.0)`; `429` backoff in the F1 evaluator.

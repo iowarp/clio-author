@@ -1,23 +1,23 @@
 ---
 name: new-expert
-description: Scaffold a new expert subagent for the clio-parser harness. Use when adding an expert (e.g. ingestor, reviewer, writer, citation, figure) to clio_parser/experts/. Creates the expert module conforming to AgentProtocol/BaseAgent plus a matching pytest test, and registers it where experts are wired.
+description: Scaffold a new expert subagent for the clio-author harness. Use when adding an expert (e.g. ingestor, reviewer, writer, citation, figure) to clio_author/experts/. Creates the expert module conforming to AgentProtocol/BaseAgent plus a matching pytest test, and registers it where experts are wired.
 ---
 
-# Scaffold a clio-parser expert
+# Scaffold a clio-author expert
 
 Create a new expert subagent that conforms to the harness contract. Follow these steps; adapt names
 to the requested expert.
 
 ## 1. Confirm the contract
 Read `artifact/notes/DESIGN.md` (§1–§2) and the existing harness code:
-- `clio_parser/harness/base.py` (`BaseAgent`), `harness/protocol.py` (`AgentProtocol`),
+- `clio_author/harness/base.py` (`BaseAgent`), `harness/protocol.py` (`AgentProtocol`),
   `harness/types.py` (`Message`, `AgentOutput`, `Document`, `Block`).
-- An existing expert under `clio_parser/experts/` as a template (if one exists).
+- An existing expert under `clio_author/experts/` as a template (if one exists).
 If the harness modules don't exist yet, stop and report that the M0 skeleton must be built first
 (use the `planner` then `coder` agents).
 
 ## 2. Create the expert module
-`clio_parser/experts/<name>.py`:
+`clio_author/experts/<name>.py`:
 - A class `class <Name>Expert(BaseAgent):` implementing the `AgentProtocol` (typically an async
   `run`/`process` returning an `AgentOutput`).
 - Declare its `role`, default `system_prompt`, allowed `tools`, and any typed inputs/outputs
@@ -27,7 +27,7 @@ If the harness modules don't exist yet, stop and report that the M0 skeleton mus
 - License discipline: re-implement, never copy `protoneo` (AGPL) source.
 
 ## 3. Wire it in
-Register the expert where the `MainAgent`/engine discovers experts (see `clio_parser/agent.py`).
+Register the expert where the `MainAgent`/engine discovers experts (see `clio_author/agent.py`).
 Keep registration declarative and consistent with the other experts.
 
 ## 4. Add a test

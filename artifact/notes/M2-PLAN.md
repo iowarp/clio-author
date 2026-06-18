@@ -1,6 +1,6 @@
 # M2 Build Plan — Retrieval + Selective Injection + `paper_qa`
 
-Adds `clio_parser/retrieval/rag.py` and `clio_parser/experts/paper_qa.py` on top of the M1
+Adds `clio_author/retrieval/rag.py` and `clio_author/experts/paper_qa.py` on top of the M1
 memory-block model and M0 harness. Hermetic-first; heavy backend (LanceDB + real embeddings) behind
 an optional `rag` extra with lazy imports (mirrors the M1 `pdf` extra + `live` marker).
 
@@ -57,13 +57,13 @@ tests are additive.
 - Re-index per `run` for M2 (index caching deferred).
 
 ## Verification
-`uv run ruff check` / `mypy clio_parser` clean; `uv run pytest` hermetic green (live/baseline
+`uv run ruff check` / `mypy clio_author` clean; `uv run pytest` hermetic green (live/baseline
 deselected); `uv run pytest -m live` (with `--extra rag`) for the backend; manual M1→M2 hand-off:
 feed `IngestorExpert` `structured` dump as `paper_qa` `task.payload["blocks"]` via Engine/Sequential.
 
 ## Files
-- Create: `clio_parser/retrieval/{__init__,rag}.py`, `clio_parser/experts/paper_qa.py`,
+- Create: `clio_author/retrieval/{__init__,rag}.py`, `clio_author/experts/paper_qa.py`,
   `tests/retrieval/{__init__,test_rag,test_rag_live}.py`, `tests/experts/test_paper_qa.py`.
-- Modify: `pyproject.toml`, `clio_parser/experts/__init__.py` (export `PaperQAExpert`).
+- Modify: `pyproject.toml`, `clio_author/experts/__init__.py` (export `PaperQAExpert`).
 - Reuse (read-only): `ingest/blocks.py`, `experts/ingestor.py`, `harness/{base,types}.py`,
   `llm/client.py`, `ingest/docling_extract.py` (gating idiom), `tests/experts/test_ingestor.py` (shape).

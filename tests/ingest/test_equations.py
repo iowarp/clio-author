@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from clio_parser.ingest.postprocess.equations import (
+from clio_author.ingest.postprocess.equations import (
     FORMULA_PLACEHOLDER,
     process_equations,
 )

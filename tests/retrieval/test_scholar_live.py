@@ -15,7 +15,7 @@ pytestmark = pytest.mark.live
 def test_semantic_scholar_search_returns_records() -> None:
     pytest.importorskip("httpx")
 
-    from clio_parser.retrieval.scholar import SemanticScholarClient
+    from clio_author.retrieval.scholar import SemanticScholarClient
 
     client = SemanticScholarClient()
     records = client.search_title("Attention Is All You Need", year_hint=2017, cutoff_date=None)

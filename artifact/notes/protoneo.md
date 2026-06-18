@@ -1,6 +1,6 @@
 # ProtoNeo — Deep Study Notes
 
-Repo: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-parser/artifact/repos/protoneo`
+Repo: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-author/artifact/repos/protoneo`
 Source: `github.com/akougkas/protoneo`. Studied read-only, 2026-06-15.
 
 ---
@@ -249,7 +249,7 @@ So the kernel runs fixed algorithms (6-stage pipeline, 4 patterns); the paper-re
 
 ---
 
-## Reusable for clio-parser
+## Reusable for clio-author
 
 - **6-stage KG pipeline is the headline reusable asset** (`knowledge/pipeline.py` + the per-stage modules). The metadata→ontology→extraction→coref→verify→summary decomposition, with **per-stage checkpoints + snapshot resume**, is directly applicable to a parser/extractor harness. Note the durability pattern: snapshot graph into `session.graph_after_step[step]`, write `StageCheckpoint`, skip-on-resume.
 - **kernel/domain separation via `DomainConfig` + `AppManifest`/`AppRegistration`** is a clean template: keep generic extraction algorithms in a kernel, inject all prompts/seeds/keywords/classification through a single config object; apps register parsers/exporters/tools through a constrained facade and never import kernel internals. This is exactly the "expert-agent harness" shape.
@@ -262,8 +262,8 @@ So the kernel runs fixed algorithms (6-stage pipeline, 4 patterns); the paper-re
 
 ## Open Questions
 
-- **Docs vs. code drift on parsers:** `docs/kernel.md` advertises `PyMuPDFParser`/`Pdf2MdParser`; the code ships `DoclingParser` and CLAUDE.md bans PyMuPDF. Which is canonical for clio-parser's ingestion comparison? (Code wins, but worth flagging.)
-- **`get_accumulated_context` location:** the prompt expected it on the session; it actually lives on `KnowledgeGraph` (graph-level context for extraction), while deliberation state accumulation is via `SessionContext.add_*`. Confirm which "accumulated context" matters for clio-parser.
+- **Docs vs. code drift on parsers:** `docs/kernel.md` advertises `PyMuPDFParser`/`Pdf2MdParser`; the code ships `DoclingParser` and CLAUDE.md bans PyMuPDF. Which is canonical for clio-author's ingestion comparison? (Code wins, but worth flagging.)
+- **`get_accumulated_context` location:** the prompt expected it on the session; it actually lives on `KnowledgeGraph` (graph-level context for extraction), while deliberation state accumulation is via `SessionContext.add_*`. Confirm which "accumulated context" matters for clio-author.
 - **Anthropic provider disabled** — is the intent to re-enable Claude routing, or has the project standardized on OpenAI/local? The full Claude Max OAuth impl is present but dead-code.
 - I did not deep-read `apps/paper_review/*` internals, the `api/` route handlers, the Vue UI, or `llm/benchmark.py`/`discovery.py`/`policies.py` — only the kernel surfaces the task named. The paper-review `domain/` YAMLs and `prompts/adaptive/*.md` are the concrete `DomainConfig` payloads if a worked example is needed.
 - `extraction_batch_size` default differs: `DomainConfig` says 3, `extract_graph`/pipeline default 4. Minor, but note the effective value is the pipeline's `extraction_batch_size=4`.

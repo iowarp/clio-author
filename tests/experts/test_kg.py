@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import json
 
-from clio_parser.experts.kg import KGExpert
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import Message, Task
-from clio_parser.integration import ClioParserSubagent
-from clio_parser.llm.client import EchoLLMClient
+from clio_author.experts.kg import KGExpert
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import Message, Task
+from clio_author.integration import ClioAuthorSubagent
+from clio_author.llm.client import EchoLLMClient
 
 _KG_JSON = """\
 Here is the graph:
@@ -113,7 +113,7 @@ def test_kg_missing_blocks_is_error_flagged() -> None:
 
 
 def test_kg_writes_artifacts_when_files_and_out_dir(tmp_path) -> None:
-    from clio_parser.tools.files import SafeFiles
+    from clio_author.tools.files import SafeFiles
 
     files = SafeFiles(tmp_path)
     expert = KGExpert(CannedLLMClient(_KG_JSON), files=files)
@@ -125,7 +125,7 @@ def test_kg_writes_artifacts_when_files_and_out_dir(tmp_path) -> None:
 
 
 def test_kg_adapter_run_is_json_serializable_and_listed() -> None:
-    sub = ClioParserSubagent(CannedLLMClient(_KG_JSON))
+    sub = ClioAuthorSubagent(CannedLLMClient(_KG_JSON))
     caps = sub.capabilities()
     assert any(entry["action"] == "kg" for entry in caps["actions"])
 
@@ -135,7 +135,7 @@ def test_kg_adapter_run_is_json_serializable_and_listed() -> None:
 
 
 def test_kg_cli_blocks_json_exit_zero(capsys) -> None:
-    from clio_parser.cli import main
+    from clio_author.cli import main
 
     code = main(["kg", "--blocks-json", json.dumps(_blocks())])
     out = capsys.readouterr().out
@@ -148,8 +148,8 @@ def test_kg_cli_blocks_json_exit_zero(capsys) -> None:
 
 def test_build_kg_batches_and_merges_across_sections() -> None:
     """Many sections are split into batches; duplicate entities merge by type+label."""
-    from clio_parser.ingest.blocks import MemoryBlocks, SectionBlock
-    from clio_parser.retrieval.kg import build_kg_from_llm
+    from clio_author.ingest.blocks import MemoryBlocks, SectionBlock
+    from clio_author.retrieval.kg import build_kg_from_llm
 
     # A canned client returns the SAME node every call -> across batches it must
     # dedupe to ONE node, proving the merge (not N copies).
@@ -181,8 +181,8 @@ def test_build_kg_batches_and_merges_across_sections() -> None:
 
 def test_build_kg_partial_parse_failure_is_tolerated() -> None:
     """If some batches parse and some don't, return what parsed (error=None)."""
-    from clio_parser.ingest.blocks import MemoryBlocks, SectionBlock
-    from clio_parser.retrieval.kg import build_kg_from_llm
+    from clio_author.ingest.blocks import MemoryBlocks, SectionBlock
+    from clio_author.retrieval.kg import build_kg_from_llm
 
     good = '```json\n{"nodes": [{"id": "m1", "label": "X", "type": "method"}], "edges": []}\n```'
 

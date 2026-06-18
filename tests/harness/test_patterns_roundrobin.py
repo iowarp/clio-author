@@ -9,10 +9,10 @@ defensively, and the pattern runs through the :class:`Engine`.
 
 from __future__ import annotations
 
-from clio_parser.harness.engine import Engine
-from clio_parser.harness.patterns import RoundRobin
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import AgentOutput, Task
+from clio_author.harness.engine import Engine
+from clio_author.harness.patterns import RoundRobin
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import AgentOutput, Task
 
 
 class ScriptedAgent:

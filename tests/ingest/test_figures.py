@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from clio_parser.ingest.postprocess.figures import (
+from clio_author.ingest.postprocess.figures import (
     _build_figure_map,
     get_unembedded_figures,
     process_figures,

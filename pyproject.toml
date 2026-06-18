@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "clio-parser"
+name = "clio-author"
 version = "0.3.0"
 description = "Standalone multi-agent harness for processing, reviewing, and writing scientific papers."
 requires-python = ">=3.12"
@@ -11,7 +11,7 @@ license = "BSD-3-Clause"
 dependencies = ["pydantic>=2"]
 
 [project.scripts]
-clio-parser = "clio_parser.cli:main"
+clio-author = "clio_author.cli:main"
 
 [project.optional-dependencies]
 # Heavy PDF-extraction stack. Kept OUT of core deps: Docling pulls ~500MB of
@@ -50,7 +50,7 @@ torch = [{ index = "pytorch-cpu" }]
 torchvision = [{ index = "pytorch-cpu" }]
 
 [tool.hatch.build.targets.wheel]
-packages = ["clio_parser"]
+packages = ["clio_author"]
 
 [tool.ruff]
 line-length = 100

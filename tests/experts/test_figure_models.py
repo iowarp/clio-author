@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from clio_parser.experts.figure_models import (
+from clio_author.experts.figure_models import (
     FigureArtifact,
     FigureDescription,
     PlotSpec,

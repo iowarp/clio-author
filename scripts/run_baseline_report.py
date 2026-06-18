@@ -9,8 +9,8 @@ so it is kept out of the hermetic path. Run it manually:
     uv run python scripts/run_baseline_report.py
 
 It processes the two PDFs under ``artifact/papers/``, computes per-paper
-fidelity metrics with :func:`clio_parser.eval.compute_md_metrics`, and writes a
-Markdown report via :func:`clio_parser.eval.build_report`.
+fidelity metrics with :func:`clio_author.eval.compute_md_metrics`, and writes a
+Markdown report via :func:`clio_author.eval.build_report`.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from clio_parser.eval import build_report, compute_md_metrics
+from clio_author.eval import build_report, compute_md_metrics
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _PAPERS_DIR = _REPO_ROOT / "artifact" / "papers"
@@ -48,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        from clio_parser.ingest.docling_extract import PdfConfig, process_pdf
+        from clio_author.ingest.docling_extract import PdfConfig, process_pdf
     except ImportError as exc:  # pragma: no cover - gated path
         print(f"pdf extra not installed ({exc}); run: uv sync --extra pdf", file=sys.stderr)
         return 1
@@ -63,7 +63,7 @@ def main(argv: list[str] | None = None) -> int:
         result = process_pdf(pdf, out_dir=out_dir, config=PdfConfig())
         results[pdf.name] = compute_md_metrics(result.markdown)
 
-    report = build_report(results, title="clio-parser baseline fidelity report")
+    report = build_report(results, title="clio-author baseline fidelity report")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(report, encoding="utf-8")
     print(report)

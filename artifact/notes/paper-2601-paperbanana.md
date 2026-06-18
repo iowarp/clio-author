@@ -1,6 +1,6 @@
 # PaperBanana: Automating Academic Illustration for AI Scientists — Close Reading Notes
 
-Source PDF: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-parser/artifact/papers/2601.23265-paperbanana.pdf` (17 pages, arXiv:2601.23265v2 [cs.CL], 24 Mar 2026)
+Source PDF: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-author/artifact/papers/2601.23265-paperbanana.pdf` (17 pages, arXiv:2601.23265v2 [cs.CL], 24 Mar 2026)
 
 ---
 
@@ -80,7 +80,7 @@ INPUTS: Source Context (S) + Communicative Intent (C) → [LINEAR PLANNING PHASE
 
 ## 5. How Existing Paper Content Is Extracted/Understood (relevant to PDF→Markdown + figures)
 
-This is the most directly relevant part for clio-parser:
+This is the most directly relevant part for clio-author:
 - **Collection & Parsing (Sec 4.1):** "We begin by randomly sampling 2,000 papers from the 5,275 publications at NeurIPS 2025 and retrieving their PDF files. Subsequently, we utilize the **MinerU toolkit (Niu et al., 2025)** to parse these documents, **extracting the text of the methodology sections, and all the diagrams and their captions** in the paper."
   - MinerU reference: "Mineru2.5: A decoupled vision-language model for efficient high-resolution document parsing, 2025. https://arxiv.org/abs/2509.22186"
 - So the pipeline is: PDF → MinerU → (methodology section text S, diagram images I, captions C). Each curated sample is a **tuple (S, I, C)** where S = methodology description, I = methodology diagram, C = caption.
@@ -215,16 +215,16 @@ Reiterates: agentic framework with 5 agents (Retriever, Planner, Stylist, Visual
 
 ---
 
-## Implications for clio-parser
+## Implications for clio-author
 
-1. **MinerU is the parsing backbone here too.** PaperBanana uses MinerU 2.5 (arXiv:2509.22186) to convert NeurIPS PDFs into (methodology-section text, diagram images, captions). For clio-parser, this validates a PDF→structured-content pipeline where MinerU extracts (a) section text, (b) figure images, and (c) figure captions — exactly the "PDF→Markdown + figures" decomposition. Worth checking how clio-parser's parser compares to MinerU's section/figure/caption extraction quality.
-2. **The (S, I, C) triplet is a clean, reusable extraction schema:** source context (section text), illustration (figure image), communicative intent (caption). clio-parser could emit this triplet per figure as a first-class output — it is directly consumable by downstream retrieval/generation systems.
+1. **MinerU is the parsing backbone here too.** PaperBanana uses MinerU 2.5 (arXiv:2509.22186) to convert NeurIPS PDFs into (methodology-section text, diagram images, captions). For clio-author, this validates a PDF→structured-content pipeline where MinerU extracts (a) section text, (b) figure images, and (c) figure captions — exactly the "PDF→Markdown + figures" decomposition. Worth checking how clio-author's parser compares to MinerU's section/figure/caption extraction quality.
+2. **The (S, I, C) triplet is a clean, reusable extraction schema:** source context (section text), illustration (figure image), communicative intent (caption). clio-author could emit this triplet per figure as a first-class output — it is directly consumable by downstream retrieval/generation systems.
 3. **Caption ↔ figure ↔ section-text linkage matters.** Their curation depended on correctly associating each diagram with both its caption and the relevant methodology text. A parser that reliably links figures to captions and to the surrounding/method section text (not just dumping images) is more valuable. Human curation was still needed to fix mis-extracted descriptions/captions and filter low-quality figures — i.e., extraction is noisy and benefits from validation passes.
-4. **Filtering heuristics for figure quality:** aspect-ratio filtering (w:h in [1.5, 2.5]) and discarding overly simplistic/cluttered/abstract diagrams. If clio-parser surfaces figure metadata (dimensions, type/category), it eases downstream dataset construction.
-5. **Figure categorization is automatable** (Gemini-3-Pro into 4 topology/content classes). clio-parser could optionally tag extracted figures with a diagram-type label.
+4. **Filtering heuristics for figure quality:** aspect-ratio filtering (w:h in [1.5, 2.5]) and discarding overly simplistic/cluttered/abstract diagrams. If clio-author surfaces figure metadata (dimensions, type/category), it eases downstream dataset construction.
+5. **Figure categorization is automatable** (Gemini-3-Pro into 4 topology/content classes). clio-author could optionally tag extracted figures with a diagram-type label.
 6. **Average sizes for budgeting:** method-section context ~3,020 words; captions ~70 words — useful for chunking/context-window planning if clio outputs feed an LLM.
-7. **Grounding loop pattern:** the Critic's "Factual Verification" against (S, C) is a reusable QA pattern — if clio-parser produces structured extractions, a verify-against-source loop can catch hallucinated/dropped content.
-8. **Retrieval over a fixed corpus + synthesized style guide** is a lightweight, training-free augmentation pattern that clio-parser-style extracted corpora could feed directly (each parsed paper becomes a retrievable (S, C, I) exemplar).
+7. **Grounding loop pattern:** the Critic's "Factual Verification" against (S, C) is a reusable QA pattern — if clio-author produces structured extractions, a verify-against-source loop can catch hallucinated/dropped content.
+8. **Retrieval over a fixed corpus + synthesized style guide** is a lightweight, training-free augmentation pattern that clio-author-style extracted corpora could feed directly (each parsed paper becomes a retrievable (S, C, I) exemplar).
 
 ---
 

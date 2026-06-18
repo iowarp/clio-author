@@ -7,10 +7,10 @@ plus one meta-review, and the offline echo fallback that never raises.
 
 from __future__ import annotations
 
-from clio_parser.experts.meta_reviewer import MetaReviewerExpert, run_panel
-from clio_parser.experts.review_models import MetaReview, PaperReview, PersonaSpec
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import Task
+from clio_author.experts.meta_reviewer import MetaReviewerExpert, run_panel
+from clio_author.experts.review_models import MetaReview, PaperReview, PersonaSpec
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import Task
 
 
 def _review(overall: int, decision: str, originality: int) -> PaperReview:

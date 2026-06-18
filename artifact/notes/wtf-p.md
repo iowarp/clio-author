@@ -1,6 +1,6 @@
 # WTF-P (Write The F***ing Paper) — Deep Study Notes
 
-Repo: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-parser/artifact/repos/wtf-p`
+Repo: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-author/artifact/repos/wtf-p`
 Source: `github.com/akougkas/wtf-p`.
 Version studied: **v0.5.0**. This repo is the source of the `/wtfp:*` skills present in this environment.
 
@@ -301,14 +301,14 @@ Preference inheritance chain (`templates/base-prefs.yaml:1-6`): `~/.wtfp/base.ya
 
 ---
 
-## Reusable for clio-parser
+## Reusable for clio-author
 
 The **Claude Code packaging pattern** here is the most transferable asset:
 
-1. **Markdown-as-program.** All agent/command intelligence is plain Markdown + YAML frontmatter (`name`, `description`, `allowed-tools`) with an XML-tagged body. No code to ship the "logic" — the runtime executes the prompt files. clio-parser can package its own agents/commands the same way under `<cfg>/agents/<ns>/` and `<cfg>/commands/<ns>/`.
+1. **Markdown-as-program.** All agent/command intelligence is plain Markdown + YAML frontmatter (`name`, `description`, `allowed-tools`) with an XML-tagged body. No code to ship the "logic" — the runtime executes the prompt files. clio-author can package its own agents/commands the same way under `<cfg>/agents/<ns>/` and `<cfg>/commands/<ns>/`.
 2. **Thin orchestrator → agent → quality-loop.** Command = router that resolves config, `Task()`-spawns a `general-purpose` agent told to "First, read ~/.claude/agents/<ns>/<agent>.md", inlines runtime context into the prompt, then parses a **structured return header** (COMPLETE/CHECKPOINT/BLOCKED) for deterministic control flow. A second "checker" agent verifies in a fresh context. This is a clean, copyable multi-agent contract.
 3. **Manifest-driven multi-runtime installer.** `bin/lib/manifest.js` is a tiny declarative `{runtime → {configDir, components[{id,src,dest}]}}` map; `install-logic.js` walks it, does conflict resolution (overwrite/skip/backup/all), rewrites `~/.claude/` paths per runtime, and writes a version-tracking manifest for clean uninstall. Pure Node builtins, zero deps — trivially vendorable.
-4. **WCN compression** for fitting verbose agent instructions into small context windows (40–73% reduction measured), with a swap script and an integrity test that proves the compressed form preserves every step. Directly relevant if clio-parser ships large prompt files.
+4. **WCN compression** for fitting verbose agent instructions into small context windows (40–73% reduction measured), with a swap script and an integrity test that proves the compressed form preserves every step. Directly relevant if clio-author ships large prompt files.
 5. **Provenance + zero-risk file policy** (write to `suggested.*`, never the user's source of truth) and **git-as-state** (per-task commits, checkpoints via git tags in `bin/lib/checkpoint.js`).
 6. **Config-as-dial.** Single `config.json` with `grep -o` parsing inside prompts (no jq dependency) toggles gates, model profiles, parallelism, verification layers — lets the same prompts behave differently per project.
 

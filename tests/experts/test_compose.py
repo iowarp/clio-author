@@ -1,4 +1,4 @@
-"""Hermetic tests for :func:`clio_parser.experts.compose.run_compose`.
+"""Hermetic tests for :func:`clio_author.experts.compose.run_compose`.
 
 The orchestration and assembly are deterministic under :class:`EchoLLMClient`;
 scripted/canned clients exercise the review and outline-parse paths, and the
@@ -9,16 +9,16 @@ from __future__ import annotations
 
 import json
 
-from clio_parser.experts.citation import CitationExpert
-from clio_parser.experts.compose import run_compose
-from clio_parser.experts.reviewer import ReviewerExpert
-from clio_parser.experts.writer import WriterExpert
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import Message, Task
-from clio_parser.integration.clio_adapter import ClioParserSubagent
-from clio_parser.llm.client import EchoLLMClient
-from clio_parser.retrieval.scholar import FakeScholarClient, S2Record
-from clio_parser.tools.files import SafeFiles
+from clio_author.experts.citation import CitationExpert
+from clio_author.experts.compose import run_compose
+from clio_author.experts.reviewer import ReviewerExpert
+from clio_author.experts.writer import WriterExpert
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import Message, Task
+from clio_author.integration.clio_adapter import ClioAuthorSubagent
+from clio_author.llm.client import EchoLLMClient
+from clio_author.retrieval.scholar import FakeScholarClient, S2Record
+from clio_author.tools.files import SafeFiles
 
 _OUTLINE_3 = {
     "title": "A Study of Things",
@@ -395,7 +395,7 @@ def test_latex_false_writes_no_tex(tmp_path) -> None:  # type: ignore[no-untyped
 # Adapter + CLI                                                               #
 # --------------------------------------------------------------------------- #
 def test_adapter_compose_is_json_serializable() -> None:
-    sub = ClioParserSubagent()
+    sub = ClioAuthorSubagent()
     result = sub.run("compose", {"idea": "x", "outline": _OUTLINE_3})
     json.dumps(result)  # must not raise
     assert result["action"] == "compose"
@@ -403,13 +403,13 @@ def test_adapter_compose_is_json_serializable() -> None:
 
 
 def test_capabilities_lists_compose() -> None:
-    sub = ClioParserSubagent()
+    sub = ClioAuthorSubagent()
     actions = {a["action"] for a in sub.capabilities()["actions"]}
     assert "compose" in actions
 
 
 def test_cli_compose_with_json_outline(capsys) -> None:  # type: ignore[no-untyped-def]
-    from clio_parser.cli import main
+    from clio_author.cli import main
 
     blob = json.dumps({"outline": _OUTLINE_3})
     code = main(["compose", "--idea", "study things", "--json", blob])
@@ -421,7 +421,7 @@ def test_cli_compose_with_json_outline(capsys) -> None:  # type: ignore[no-untyp
 
 
 def test_cli_compose_malformed_json(capsys) -> None:  # type: ignore[no-untyped-def]
-    from clio_parser.cli import main
+    from clio_author.cli import main
 
     code = main(["compose", "--idea", "x", "--json", "{not json"])
     captured = capsys.readouterr()
@@ -431,7 +431,7 @@ def test_cli_compose_malformed_json(capsys) -> None:  # type: ignore[no-untyped-
 
 
 def test_section_body_dedupes_leading_heading() -> None:
-    from clio_parser.experts.compose import _section_body
+    from clio_author.experts.compose import _section_body
 
     # Writer emitted its own "## Introduction" — must not double up.
     out = _section_body("Introduction", "## Introduction\n\nBody text.")

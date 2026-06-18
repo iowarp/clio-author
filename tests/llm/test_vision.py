@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from clio_parser.llm.vision import (
+from clio_author.llm.vision import (
     GeminiVisionClient,
     VisionError,
     resolve_vision_client,

@@ -1,4 +1,4 @@
-"""Hermetic tests for the ``clio-parser`` CLI.
+"""Hermetic tests for the ``clio-author`` CLI.
 
 ``capabilities`` prints the manifest and exits 0; an action with the offline
 echo client prints a JSON result; malformed input degrades to an ``error`` JSON
@@ -13,13 +13,13 @@ import os
 
 import pytest
 
-from clio_parser.cli import _load_cli_env, main
+from clio_author.cli import _load_cli_env, main
 
 
 @pytest.fixture(autouse=True)
 def _disable_local_env_file(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep developer .env.local files from affecting hermetic CLI tests."""
-    monkeypatch.setenv("CLIO_ENV_FILE", "/__clio_parser_test_no_env__")
+    monkeypatch.setenv("CLIO_ENV_FILE", "/__clio_author_test_no_env__")
 
 
 def _run(capsys: pytest.CaptureFixture[str], argv: list[str]) -> tuple[int, dict]:
@@ -33,7 +33,7 @@ def test_capabilities_prints_manifest_and_returns_zero(
 ) -> None:
     code, result = _run(capsys, ["capabilities"])
     assert code == 0
-    assert result["name"] == "clio-parser"
+    assert result["name"] == "clio-author"
     assert any(entry["action"] == "ingest" for entry in result["actions"])
 
 
@@ -203,7 +203,7 @@ def test_cli_loads_explicit_env_file(monkeypatch: pytest.MonkeyPatch, tmp_path) 
 
 
 def test_default_out_dir_slug() -> None:
-    from clio_parser.cli import _default_out_dir
+    from clio_author.cli import _default_out_dir
 
     assert _default_out_dir("2601.23265") == "clio-out/2601.23265"
     assert _default_out_dir("Attention Is All You Need") == "clio-out/Attention-Is-All-You-Need"

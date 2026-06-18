@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from clio_parser.ingest.postprocess.bibliography import (
+from clio_author.ingest.postprocess.bibliography import (
     extract_reference_count,
     process_bibliography,
 )

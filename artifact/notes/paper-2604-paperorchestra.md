@@ -1,6 +1,6 @@
 # PaperOrchestra: A Multi-Agent Framework for Automated AI Research Paper Writing — Close Reading Notes
 
-**Source PDF:** `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-parser/artifact/papers/2604.05018-paperorchestra.pdf` (65 pages total; ~10 pages main body + extensive appendices A–F)
+**Source PDF:** `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-author/artifact/papers/2604.05018-paperorchestra.pdf` (65 pages total; ~10 pages main body + extensive appendices A–F)
 
 ---
 
@@ -67,7 +67,7 @@ Output: `P = (P_tex, P_pdf) = W(I, E, T, G, F)` (Eq. 1).
 
 ## 4. Literature Review Two-Stage RAG (Candidate Discovery + Semantic Scholar Authentication) — Appendix D.3
 
-This is the most load-bearing detail for clio-parser. The system "employs a two-phase retrieval and verification pipeline for citation gathering."
+This is the most load-bearing detail for clio-author. The system "employs a two-phase retrieval and verification pipeline for citation gathering."
 
 **Phase 1 — Parallel Candidate Discovery:** "First, we use **Gemini-3-Flash with Google Search grounding** to rapidly discover candidate papers based on the generated outline." Per Appendix B: "**Parallel Candidate Discovery**, which leverages **10 concurrent workers** for search-grounded LLM calls to rapidly pool candidate papers."
 
@@ -135,7 +135,7 @@ The main text uses **AgentReview (Jin et al., 2024)** as the default refinement 
 - Automated SxS Lit Review win margins **88%–99%**; Overall Quality margins **39%–86%** (vs AI Scientist-v2) and **52%–88%** (vs Single Agent).
 - **ScholarPeer simulated acceptance:** PaperOrchestra **84% (CVPR), 81% (ICLR)** — close to Human GT (**86% / 94%**); +13% (CVPR) and +9% (ICLR) over strongest autonomous baseline.
 
-### Citation Coverage (Table 3) — KEY for clio-parser
+### Citation Coverage (Table 3) — KEY for clio-author
 - "autonomous baselines achieve competitive Overall F1 ... a mathematical artifact of their extremely low citation counts (**averaging 9–14**). They focus on fetching obvious P0 papers but this **inflates their F1 scores but leaves P1 Recall near zero**."
 - "our framework generates **45.73–47.98 citations, closely mirroring Human (GT) writeups (~59)**." (Table 3 Avg #Cites: PaperOrchestra 47.98 CVPR / 45.73 ICLR; SingleAgent 11.46/9.75; AI Scientist-v2 14.18/13.71.)
 - P0 Recall improved by absolute **2.13%–6.07%**; **P1 Recall increased by 12.59%–13.75%** over strongest baselines. "This proves our method actively explores the broader academic landscape rather than relying on shallow keyword matching."
@@ -190,19 +190,19 @@ The main text uses **AgentReview (Jin et al., 2024)** as the default refinement 
 
 ---
 
-## Implications for clio-parser
+## Implications for clio-author
 
-1. **Two-stage citation pipeline is directly transferable.** The discover-then-authenticate pattern (LLM/web search to pool candidates → Semantic Scholar verification) with concrete thresholds — **Levenshtein ratio > 70, exact-year point bonus, retrievable-abstract requirement, month-floor date cutoff, dedup by Semantic Scholar paper ID, ≥90% verified-pool citation mandate** — is a concrete, parseable spec clio-parser can model/validate against. These are exactly the kinds of grounding constraints a citation parser/verifier would check.
+1. **Two-stage citation pipeline is directly transferable.** The discover-then-authenticate pattern (LLM/web search to pool candidates → Semantic Scholar verification) with concrete thresholds — **Levenshtein ratio > 70, exact-year point bonus, retrievable-abstract requirement, month-floor date cutoff, dedup by Semantic Scholar paper ID, ≥90% verified-pool citation mandate** — is a concrete, parseable spec clio-author can model/validate against. These are exactly the kinds of grounding constraints a citation parser/verifier would check.
 
-2. **Structured intermediate artifacts are well-defined and parser-friendly.** The JSON contracts (`plotting_plan` / `intro_related_work_plan` / `section_plan`, `citation_map.json`, `worklog.json`) are explicit schemas. If clio-parser ingests multi-agent paper-writing traces, these named keys and their nesting (e.g., `section_plan[].subsections[].citation_hints[]`) give a stable target grammar.
+2. **Structured intermediate artifacts are well-defined and parser-friendly.** The JSON contracts (`plotting_plan` / `intro_related_work_plan` / `section_plan`, `citation_map.json`, `worklog.json`) are explicit schemas. If clio-author ingests multi-agent paper-writing traces, these named keys and their nesting (e.g., `section_plan[].subsections[].citation_hints[]`) give a stable target grammar.
 
 3. **Anti-leakage / anti-hallucination prompt patterns** (treat session files as sole source of truth; placeholder citation-hint format `"research paper or technical report introducing '[X]'"`; "never state a limitation" to prevent reward hacking; ignore new-experiment requests) are useful as parser heuristics/flags for detecting grounded vs ungrounded generated text.
 
-4. **Citation-count realism as a quality signal.** The finding that low citation counts (9–14) inflate F1 while leaving P1 recall ~0, vs PaperOrchestra's ~46–48 matching human ~59, suggests clio-parser could surface **citation-count and P0/P1 recall** as first-class extracted metrics, not just presence/absence of references.
+4. **Citation-count realism as a quality signal.** The finding that low citation counts (9–14) inflate F1 while leaving P1 recall ~0, vs PaperOrchestra's ~46–48 matching human ~59, suggests clio-author could surface **citation-count and P0/P1 recall** as first-class extracted metrics, not just presence/absence of references.
 
-5. **Evaluation provenance is rich.** Multiple judges (Gemini-3.1-Pro temp 0.0, GPT-5 fixed temp 1.0), AgentReview/ScholarPeer/AI Scientist-v2 reviewers, six-axis lit-review rubric with hard caps/penalties — all reported with model IDs and temperatures. If clio-parser parses evaluation sections, these are concrete fields (judge model, temperature, axis scores, acceptance rates) worth structured capture.
+5. **Evaluation provenance is rich.** Multiple judges (Gemini-3.1-Pro temp 0.0, GPT-5 fixed temp 1.0), AgentReview/ScholarPeer/AI Scientist-v2 reviewers, six-axis lit-review rubric with hard caps/penalties — all reported with model IDs and temperatures. If clio-author parses evaluation sections, these are concrete fields (judge model, temperature, axis scores, acceptance rates) worth structured capture.
 
-6. **Toolchain references** (MinerU for PDF→Markdown, PDFFigures 2.0 for figure/caption extraction) overlap with what a "parser" project likely needs — these are the same extraction primitives clio-parser would use to ingest papers; PaperWritingBench's construction pipeline is essentially a reference implementation.
+6. **Toolchain references** (MinerU for PDF→Markdown, PDFFigures 2.0 for figure/caption extraction) overlap with what a "parser" project likely needs — these are the same extraction primitives clio-author would use to ingest papers; PaperWritingBench's construction pipeline is essentially a reference implementation.
 
 ---
 

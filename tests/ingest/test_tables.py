@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from clio_parser.ingest import process_markdown
-from clio_parser.ingest.tables import process_tables
+from clio_author.ingest import process_markdown
+from clio_author.ingest.tables import process_tables
 
 
 def test_separator_inserted_when_missing() -> None:

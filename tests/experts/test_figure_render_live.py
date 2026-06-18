@@ -25,7 +25,7 @@ _TINY_SCRIPT = (
 
 def test_render_plot_code_produces_png(tmp_path: Path) -> None:
     pytest.importorskip("matplotlib")
-    from clio_parser.experts.figure_agent import render_plot_code
+    from clio_author.experts.figure_agent import render_plot_code
 
     out_path = tmp_path / "out.png"
     result = render_plot_code(_TINY_SCRIPT, out_path, timeout=30)

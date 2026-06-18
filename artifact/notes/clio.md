@@ -1,6 +1,6 @@
-# CLIO Agent — Deep-Study Notes (integration target for clio-parser)
+# CLIO Agent — Deep-Study Notes (integration target for clio-author)
 
-Repo studied: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-parser/artifact/repos/clio`
+Repo studied: `/home/shazzadul/Illinois_Tech/Summer26/RA/clio-author/artifact/repos/clio`
 Branch: `develop` (HEAD = `475a8a3 Bundle GACT TUI for CLIO releases`). Read-only; nothing modified.
 
 > Bottom line up front: CLIO has **no privileged Python "expert" classes anymore**. Experts and their tools are loaded from **file-backed Agent Blueprints** (`AGENT.md` + `experts/*.md` Markdown-with-frontmatter), and all domain tools are **declared MCP servers** mounted into a FastMCP gateway. To add PDF/paper capability you author an Agent Blueprint + an MCP server (or a marketplace pack) — you do **not** edit core Python. This is the single most important fact for the integration.
@@ -199,7 +199,7 @@ Given the architecture, **the integration should be additive via the blueprint +
 
 ---
 
-## Reusable for clio-parser
+## Reusable for clio-author
 
 - **Agent Blueprint format** (`AGENT.md` frontmatter + `experts/*.md`) is the entire extension contract — author PDF experts as Markdown, no Python core changes. Loader: `gact/agent_blueprints.py`; expert schema: `gact/expert_packs.py::parse_expert_file`; DSPy compile: `gact/app.py::_build_blueprint_dspy_module`.
 - **Declared-MCP tool model** (`tools/mcp_config.py` + `tools/gateway.py`): a PDF/paper MCP server plugs in via a one-line `mcp_servers:` declaration; visibility is per-expert via `tools:`.

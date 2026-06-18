@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to clio-parser are documented here. The format is based on
+All notable changes to clio-author are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
@@ -20,18 +20,18 @@ All notable changes to clio-parser are documented here. The format is based on
   (dedupe nodes by type+label, remap/collapse edges). Long papers that previously overflowed a single
   prompt now extract a full graph (e.g. a 125-section paper → ~347 nodes / 529 edges). Partial batch
   parse failures are tolerated.
-- **Content knowledge graph.** New `kg` action and `clio-parser kg` subcommand extract a semantic
+- **Content knowledge graph.** New `kg` action and `clio-author kg` subcommand extract a semantic
   graph of a paper's *content* (claims/methods/datasets/results/metrics/concepts/tasks and the
   relations between them) from its memory blocks — distinct from any citation graph. Returns
   `{nodes, edges}` (edges with unknown endpoints dropped), a Mermaid `graph TD` rendering under
   `--format prose`, and writes `kg.json` + `kg.mmd` when `out_dir` is set. Re-implements protoneo's
   knowledge-graph concept from scratch (no AGPL code copied); hermetic on `EchoLLMClient`.
 - **`RoundRobin` pattern.** Implemented the round-robin deliberation pattern in
-  `clio_parser/harness/patterns.py`: agents take turns across `payload["rounds"]`, each turn
+  `clio_author/harness/patterns.py`: agents take turns across `payload["rounds"]`, each turn
   threaded into the shared session so later agents see prior turns.
 
 ### Removed
-- **Literature graph feature.** Removed the `literature_graph` action, the `clio-parser graph`
+- **Literature graph feature.** Removed the `literature_graph` action, the `clio-author graph`
   subcommand, the `CLIO_GRAPH` backends, and the literature-graph clients/expert. The new `kg`
   action covers content-level graphs; citation-level paper graphs are out of scope.
 
@@ -41,7 +41,7 @@ All notable changes to clio-parser are documented here. The format is based on
   `coherence` checks a manuscript's sections for terminology drift, contradictions, undefined terms,
   duplication, and broken flow, returning structured issues. Both are reachable as actions (now 16)
   via the CLI (`polish`/`coherence` subcommands), `run`, and the adapter.
-- **LaTeX export** (completes PaperOrchestra parity — a `.tex` manuscript). New `clio_parser/export/`:
+- **LaTeX export** (completes PaperOrchestra parity — a `.tex` manuscript). New `clio_author/export/`:
   pure-stdlib `escape_latex`, `markdown_to_latex` (headings/bold/italic/code/lists/links/citations),
   and `to_latex_document` (standalone `\documentclass` … `\end{document}` with `\section` per section
   and `\bibliography{references}` when a bib is present). New **`export`** action (13th) takes
@@ -54,10 +54,10 @@ All notable changes to clio-parser are documented here. The format is based on
   the writer↔reviewer refine loop) → deterministic Markdown assembly (with a `## References` block
   when a bib is produced). Persists `paper.md` + `sections/NN-slug.md` when `out_dir` is set. Never
   raises; a failed section degrades to a placeholder rather than aborting. Reachable as the 12th
-  action via `clio-parser compose` / `run compose` and the adapter. LaTeX export and the parallel
+  action via `clio-author compose` / `run compose` and the adapter. LaTeX export and the parallel
   plotting branch remain follow-ups.
 - **Gemini vision path** (PaperBanana's true-image route), optional and off by default.
-  `clio_parser/llm/vision.py`: `VisionClient` protocol + `GeminiVisionClient` (stdlib `urllib` REST,
+  `clio_author/llm/vision.py`: `VisionClient` protocol + `GeminiVisionClient` (stdlib `urllib` REST,
   lazy; reads `GEMINI_API_KEY`/`GOOGLE_API_KEY`) with `describe_image` (vision → text) and
   `generate_image` (text → image PNG), plus `resolve_vision_client`. `figure_agent` uses it when
   enabled: `describe_figures` *looks at* real figure images (metadata reports `vision_described` vs
@@ -67,7 +67,7 @@ All notable changes to clio-parser are documented here. The format is based on
 - **No-key citation backends.** `CLIO_SCHOLAR=auto` now cascades Semantic Scholar, OpenAlex,
   Crossref, and arXiv. Users can force one backend with `semantic`/`s2`, `openalex`, `crossref`,
   or `arxiv`, or disable lookup with `off`/`none`.
-- **Local CLI env files.** `clio-parser` now loads `.env.local` (or `CLIO_ENV_FILE`) without
+- **Local CLI env files.** `clio-author` now loads `.env.local` (or `CLIO_ENV_FILE`) without
   overriding existing environment variables, so API keys do not need to be pasted into commands.
 - **Security documentation and env template.** `.env.local.example` documents supported local
   credentials; `docs/SECURITY.md` covers key rotation, local env files, and S2 rate limits.
@@ -86,8 +86,8 @@ All notable changes to clio-parser are documented here. The format is based on
 - **`--format structured|prose` on every text action** (`write` and `describe` were missing it).
 
 ### Fixed
-- `clio-parser write … --format prose` previously errored with "unrecognized arguments".
-- `clio-parser ask --blocks-file clio-out/<id>/blocks.json` (and `review`/`write` via `*-file`) now
+- `clio-author write … --format prose` previously errored with "unrecognized arguments".
+- `clio-author ask --blocks-file clio-out/<id>/blocks.json` (and `review`/`write` via `*-file`) now
   handle real-paper-sized inputs.
 
 ## [0.2.2]
@@ -95,7 +95,7 @@ All notable changes to clio-parser are documented here. The format is based on
 ### Added
 - **Citation backend auto-wiring.** The CLI now selects the citation backend via the `CLIO_SCHOLAR`
   environment variable (`auto` (default) = real Semantic Scholar, reading `SEMANTIC_SCHOLAR_API_KEY`;
-  `off`/`none` = disabled). `resolve_scholar_client()` makes `clio-parser cite` work out of the box.
+  `off`/`none` = disabled). `resolve_scholar_client()` makes `clio-author cite` work out of the box.
 - **`CHANGELOG.md`.**
 
 ### Changed
@@ -108,7 +108,7 @@ All notable changes to clio-parser are documented here. The format is based on
 ### Added
 - **`format` output option** (`structured` (default) | `prose`) on the actions, so a host can
   request prose output in addition to the structured result.
-- **CLI / subagent invocation docs** — how to run via `uv run` and invoke clio-parser as a subagent.
+- **CLI / subagent invocation docs** — how to run via `uv run` and invoke clio-author as a subagent.
 
 ### Changed
 - More concise README.
@@ -116,7 +116,7 @@ All notable changes to clio-parser are documented here. The format is based on
 ## [0.2.0]
 
 ### Added
-- **Visible ingest output.** `clio-parser ingest <id|url|title|topic|path>` writes a browsable
+- **Visible ingest output.** `clio-author ingest <id|url|title|topic|path>` writes a browsable
   `./clio-out/<slug>/` containing `paper.md`, `blocks.json`, and `img/figureN.png`. `IngestorExpert`
   now honors `out_dir` from the task payload and persists the Markdown + memory blocks.
 - **Comprehensive `README.md`** + reconciled `docs/USAGE.md`: the 11-action catalog, every optional
@@ -138,7 +138,7 @@ All notable changes to clio-parser are documented here. The format is based on
 ### Added
 - **CLI real-provider selection** via `CLIO_LLM` (`echo` (default, offline) | `claude` | `codex` |
   `ollama`; model via `CLIO_LLM_MODEL`, Ollama URL via `CLIO_OLLAMA_URL`). Ready-made `LLMClient`
-  providers in `clio_parser.llm.providers`.
+  providers in `clio_author.llm.providers`.
 
 ## [0.1.0]
 
@@ -153,15 +153,15 @@ All notable changes to clio-parser are documented here. The format is based on
   SentenceTransformer + LanceDB backend; Semantic Scholar citation verification (suggestions only).
 - **Experts** — ingestor, paper_qa, citation, reviewer, meta_reviewer, writer, editor, figure_agent.
 - **Tools** — `SafeFiles` sandboxed read/write/edit; `eval/report.py` metrics.
-- **Integration** — `ClioParserAgent` routing, `ClioParserSubagent` adapter, and the `clio-parser` CLI.
+- **Integration** — `ClioAuthorAgent` routing, `ClioAuthorSubagent` adapter, and the `clio-author` CLI.
 - BSD-3-Clause. Adapted from paper-to-md (MIT), PaperBanana/PaperOrchestra (Apache-2.0); protoneo
   concepts re-implemented (not copied). ~300 hermetic tests.
 
-[0.3.0]: https://github.com/SIslamMun/clio-Parser/releases/tag/v0.3.0
-[0.2.3]: https://github.com/SIslamMun/clio-Parser/releases/tag/v0.2.3
-[0.2.2]: https://github.com/SIslamMun/clio-Parser/releases/tag/v0.2.2
-[0.2.1]: https://github.com/SIslamMun/clio-Parser/releases/tag/v0.2.1
-[0.2.0]: https://github.com/SIslamMun/clio-Parser/releases/tag/v0.2.0
-[0.1.2]: https://github.com/SIslamMun/clio-Parser/releases/tag/v0.1.2
-[0.1.1]: https://github.com/SIslamMun/clio-Parser/releases/tag/v0.1.1
-[0.1.0]: https://github.com/SIslamMun/clio-Parser/releases/tag/v0.1.0
+[0.3.0]: https://github.com/SIslamMun/clio-author/releases/tag/v0.3.0
+[0.2.3]: https://github.com/SIslamMun/clio-author/releases/tag/v0.2.3
+[0.2.2]: https://github.com/SIslamMun/clio-author/releases/tag/v0.2.2
+[0.2.1]: https://github.com/SIslamMun/clio-author/releases/tag/v0.2.1
+[0.2.0]: https://github.com/SIslamMun/clio-author/releases/tag/v0.2.0
+[0.1.2]: https://github.com/SIslamMun/clio-author/releases/tag/v0.1.2
+[0.1.1]: https://github.com/SIslamMun/clio-author/releases/tag/v0.1.1
+[0.1.0]: https://github.com/SIslamMun/clio-author/releases/tag/v0.1.0

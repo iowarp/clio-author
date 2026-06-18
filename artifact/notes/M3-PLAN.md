@@ -1,7 +1,7 @@
 # M3 Build Plan — Citation Grounding (`scholar.py` + `citation` expert)
 
-Adds `clio_parser/retrieval/scholar.py` (Semantic Scholar retrieval + pure verification) and
-`clio_parser/experts/citation.py` (discover → verify → **suggestions only**, never overwrites a
+Adds `clio_author/retrieval/scholar.py` (Semantic Scholar retrieval + pure verification) and
+`clio_author/experts/citation.py` (discover → verify → **suggestions only**, never overwrites a
 bibliography). Mirrors M2's `rag.py`/`paper_qa.py` patterns. Verification logic adapted from
 PaperOrchestra `utils/scholar_utils.py` (**Apache-2.0**, attributed).
 
@@ -59,12 +59,12 @@ Models + pure functions (difflib path) + `FakeScholarClient` + `test_scholar.py`
 
 ## Verification
 `uv run pytest tests/retrieval/test_scholar.py tests/experts/test_citation.py` hermetic green;
-full `uv run pytest` green; `ruff`/`mypy` clean; `import clio_parser.retrieval.scholar,
-clio_parser.experts.citation` works without the `scholar` extra; `pytest -m live` for real S2.
+full `uv run pytest` green; `ruff`/`mypy` clean; `import clio_author.retrieval.scholar,
+clio_author.experts.citation` works without the `scholar` extra; `pytest -m live` for real S2.
 
 ## Files
-- New: `clio_parser/retrieval/scholar.py`, `clio_parser/experts/citation.py`,
+- New: `clio_author/retrieval/scholar.py`, `clio_author/experts/citation.py`,
   `tests/retrieval/{test_scholar,test_scholar_live}.py`, `tests/experts/test_citation.py`.
-- Modify: `pyproject.toml`, `clio_parser/experts/__init__.py`.
+- Modify: `pyproject.toml`, `clio_author/experts/__init__.py`.
 - Reuse/templates: `retrieval/rag.py`, `experts/paper_qa.py`, `harness/{base,types}.py`, `llm/client.py`.
 - Adapt-from (Apache-2.0): `artifact/repos/paper-orchestra/utils/scholar_utils.py`.

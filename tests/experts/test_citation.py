@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import pytest
 
-from clio_parser.experts.citation import CitationExpert
-from clio_parser.harness.engine import Engine
-from clio_parser.harness.patterns import Sequential
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import Task
-from clio_parser.retrieval.scholar import FakeScholarClient, S2Record
+from clio_author.experts.citation import CitationExpert
+from clio_author.harness.engine import Engine
+from clio_author.harness.patterns import Sequential
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import Task
+from clio_author.retrieval.scholar import FakeScholarClient, S2Record
 
 _TITLE = "neural machine translation by jointly learning to align and translate"
 
@@ -220,7 +220,7 @@ def test_coverage_not_met_when_unverifiable() -> None:
 def test_protected_basename_guard_refuses_references_bib(tmp_path) -> None:  # type: ignore[no-untyped-def]
     # The safety guard refuses any write whose basename is references.bib, even
     # when no such file exists yet, and leaves the directory untouched.
-    from clio_parser.experts import citation as citation_mod
+    from clio_author.experts import citation as citation_mod
 
     expert = CitationExpert(client=_client())
     # references.bib is in the protected set, so writing it must raise the

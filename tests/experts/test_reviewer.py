@@ -10,14 +10,14 @@ from __future__ import annotations
 
 import json
 
-from clio_parser.experts.review_models import PaperReview, PersonaSpec
-from clio_parser.experts.reviewer import ReviewerExpert, build_reviewer_system_prompt
-from clio_parser.harness.engine import Engine
-from clio_parser.harness.patterns import Sequential
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import Message, Task
-from clio_parser.ingest.blocks import MemoryBlocks, SectionBlock
-from clio_parser.retrieval.scholar import FakeScholarClient, S2Record
+from clio_author.experts.review_models import PaperReview, PersonaSpec
+from clio_author.experts.reviewer import ReviewerExpert, build_reviewer_system_prompt
+from clio_author.harness.engine import Engine
+from clio_author.harness.patterns import Sequential
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import Message, Task
+from clio_author.ingest.blocks import MemoryBlocks, SectionBlock
+from clio_author.retrieval.scholar import FakeScholarClient, S2Record
 
 # Out-of-range scores deliberately included to test clamping.
 _REVIEW_JSON = {

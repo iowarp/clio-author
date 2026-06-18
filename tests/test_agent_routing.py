@@ -1,4 +1,4 @@
-"""Hermetic tests for :class:`ClioParserAgent` routing.
+"""Hermetic tests for :class:`ClioAuthorAgent` routing.
 
 Every action routes to the expected expert using the offline
 :class:`EchoLLMClient` (and a :class:`FakeScholarClient` for citation), unknown
@@ -9,9 +9,9 @@ for building the right task.
 
 from __future__ import annotations
 
-from clio_parser.agent import ClioParserAgent
-from clio_parser.harness.types import AgentOutput, Task
-from clio_parser.retrieval.scholar import FakeScholarClient, S2Record
+from clio_author.agent import ClioAuthorAgent
+from clio_author.harness.types import AgentOutput, Task
+from clio_author.retrieval.scholar import FakeScholarClient, S2Record
 
 _CITE_TITLE = "neural machine translation by jointly learning to align and translate"
 
@@ -32,8 +32,8 @@ def _blocks_payload() -> dict[str, object]:
     }
 
 
-def _agent() -> ClioParserAgent:
-    return ClioParserAgent(
+def _agent() -> ClioAuthorAgent:
+    return ClioAuthorAgent(
         scholar_client=FakeScholarClient({_CITE_TITLE: []}),
     )
 
@@ -64,7 +64,7 @@ def test_route_meta_review() -> None:
 
 
 def test_route_cite() -> None:
-    agent = ClioParserAgent(
+    agent = ClioAuthorAgent(
         scholar_client=FakeScholarClient(
             {_CITE_TITLE: [S2Record(paper_id="p1", title=_CITE_TITLE, year=2015)]}
         )
@@ -137,7 +137,7 @@ def test_none_action_falls_through_to_echo() -> None:
 
 def test_str_task_back_compat_echo() -> None:
     """The M0 contract: a bare str routes to echo and includes the text."""
-    out = ClioParserAgent().invoke("hello world")
+    out = ClioAuthorAgent().invoke("hello world")
     assert out.agent == "echo"
     assert "hello world" in out.content
 
@@ -164,7 +164,7 @@ def test_convenience_review() -> None:
 
 
 def test_convenience_cite() -> None:
-    agent = ClioParserAgent(scholar_client=FakeScholarClient({_CITE_TITLE: []}))
+    agent = ClioAuthorAgent(scholar_client=FakeScholarClient({_CITE_TITLE: []}))
     assert agent.cite([{"title": _CITE_TITLE}]).agent == "citation"
 
 
@@ -196,11 +196,11 @@ def test_convenience_kg() -> None:
 
 
 def test_prose_format_renders_meta_review_as_text() -> None:
-    from clio_parser.agent import ClioParserAgent
-    from clio_parser.harness.types import Task
+    from clio_author.agent import ClioAuthorAgent
+    from clio_author.harness.types import Task
     from uuid import uuid4
 
-    agent = ClioParserAgent()  # offline echo; meta_review is deterministic
+    agent = ClioAuthorAgent()  # offline echo; meta_review is deterministic
     out = agent.invoke(
         Task(
             id=uuid4().hex,

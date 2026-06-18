@@ -5,14 +5,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from clio_parser.experts.review_models import PersonaSpec
-from clio_parser.experts.reviewer import ReviewerExpert
-from clio_parser.experts.write_loop import ReviewerAsCritic, run_write_review_loop
-from clio_parser.experts.writer import WriterExpert
-from clio_parser.harness.patterns import NO_CHANGES_SENTINEL
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import Message, Task
-from clio_parser.tools.files import SafeFiles
+from clio_author.experts.review_models import PersonaSpec
+from clio_author.experts.reviewer import ReviewerExpert
+from clio_author.experts.write_loop import ReviewerAsCritic, run_write_review_loop
+from clio_author.experts.writer import WriterExpert
+from clio_author.harness.patterns import NO_CHANGES_SENTINEL
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import Message, Task
+from clio_author.tools.files import SafeFiles
 
 _REJECT_REVIEW = {
     "Summary": "Needs work.",

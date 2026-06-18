@@ -14,8 +14,8 @@ from xml.etree import ElementTree
 
 import pytest
 
-from clio_parser.retrieval import scholar as scholar_mod
-from clio_parser.retrieval.scholar import (
+from clio_author.retrieval import scholar as scholar_mod
+from clio_author.retrieval.scholar import (
     ArxivScholarClient,
     CascadeScholarClient,
     Candidate,
@@ -468,7 +468,7 @@ def test_cascade_tries_next_backend_after_empty_or_error() -> None:
 
 
 def test_resolve_scholar_client() -> None:
-    from clio_parser.retrieval.scholar import resolve_scholar_client
+    from clio_author.retrieval.scholar import resolve_scholar_client
 
     assert isinstance(resolve_scholar_client(None), CascadeScholarClient)
     assert isinstance(resolve_scholar_client("auto"), CascadeScholarClient)

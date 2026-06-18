@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import json
 
-from clio_parser.export.latex import run_export
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import Task
-from clio_parser.integration.clio_adapter import ClioParserSubagent
-from clio_parser.tools.files import SafeFiles
+from clio_author.export.latex import run_export
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import Task
+from clio_author.integration.clio_adapter import ClioAuthorSubagent
+from clio_author.tools.files import SafeFiles
 
 _SECTIONS = [
     {"title": "Intro", "draft": "**Hi** there with 90% and A & B."},
@@ -118,7 +118,7 @@ def test_run_export_bad_input_never_raises() -> None:
 # Adapter + CLI                                                               #
 # --------------------------------------------------------------------------- #
 def test_adapter_export_is_json_serializable() -> None:
-    sub = ClioParserSubagent()
+    sub = ClioAuthorSubagent()
     result = sub.run("export", {"title": "T", "sections": _SECTIONS})
     json.dumps(result)  # must not raise
     assert result["action"] == "export"
@@ -127,13 +127,13 @@ def test_adapter_export_is_json_serializable() -> None:
 
 
 def test_capabilities_lists_export() -> None:
-    sub = ClioParserSubagent()
+    sub = ClioAuthorSubagent()
     actions = {a["action"] for a in sub.capabilities()["actions"]}
     assert "export" in actions
 
 
 def test_cli_export(capsys) -> None:  # type: ignore[no-untyped-def]
-    from clio_parser.cli import main
+    from clio_author.cli import main
 
     code = main(
         [

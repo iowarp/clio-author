@@ -1,10 +1,10 @@
-# CLAUDE.md — clio-parser
+# CLAUDE.md — clio-author
 
 Project rules and context for Claude Code. Keep this file current; it is loaded every session.
 
 ## What this project is
 
-**clio-parser** is a **standalone, pure-Python multi-agent harness** for **processing, reviewing,
+**clio-author** is a **standalone, pure-Python multi-agent harness** for **processing, reviewing,
 and writing scientific papers**. A main agent decomposes work across specialized **expert
 subagents**, backed by **retrieval** (RAG + Semantic Scholar + optional knowledge graph) and
 **read/write/edit** file tools.
@@ -14,18 +14,18 @@ Two capability tracks:
   stored as structured *memory blocks* for selective context injection and Q&A.
 - **Writing & editing** — outline → plan → draft → review → revise, with grounded citations.
 
-It is consumed by the **CLIO agent** (`iowarp/clio-agent`), which can invoke clio-parser as a
+It is consumed by the **CLIO agent** (`iowarp/clio-agent`), which can invoke clio-author as a
 **standalone subagent**. That integration adapter is thin and deferred — **the harness stands and
 is tested on its own.**
 
-> **Hard rule — form.** clio-parser is a *proper Python agent harness* (à la the reference
+> **Hard rule — form.** clio-author is a *proper Python agent harness* (à la the reference
 > architectures `papervizagent` and `protoneo/knowledge`). It is **NOT** an MCP server and **NOT**
 > a Markdown/blueprint agent. Do not build it as a CLIO Agent Blueprint or a FastMCP server.
 
 ## Architecture (target)
 
 ```
-clio_parser/
+clio_author/
   agent.py            MainAgent: plan -> delegate to experts -> critic-refine -> synthesize
   harness/            BaseAgent, AgentProtocol, engine, patterns, session, types
   experts/            ingestor · figure_agent · retriever · reviewer · writer · editor · citation
@@ -33,7 +33,7 @@ clio_parser/
   retrieval/          rag (LanceDB) · scholar (Semantic Scholar) · kg (optional)
   tools/files.py      read / write / edit (diff-based)
   llm/client.py       provider abstraction (local vision models, Ollama, API)
-integration/clio_adapter.py   thin shim so CLIO can invoke ClioParserAgent (deferred)
+integration/clio_adapter.py   thin shim so CLIO can invoke ClioAuthorAgent (deferred)
 tests/baselines/      comparisons vs paper-to-md / PaperBanana / PaperOrchestra
 ```
 
@@ -51,7 +51,7 @@ before large changes — do not duplicate their content here.
 - **Async** where I/O-bound (LLM calls, downloads), mirroring the reference harnesses.
 - **Style:** match surrounding code; small, composable modules; docstrings on public APIs;
   no dead code or speculative abstractions.
-- **License:** clio-parser targets **BSD-3-Clause** (matches CLIO). See licensing rule below.
+- **License:** clio-author targets **BSD-3-Clause** (matches CLIO). See licensing rule below.
 
 ## Licensing rule (IMPORTANT)
 
@@ -71,7 +71,7 @@ organizations. Cite sources only by **repo URL** and **license identifier**.
 
 Cloned in `artifact/repos/`: `paper-to-md`, `papervizagent` (PaperBanana), `wtf-p`,
 `paper-orchestra` (PaperOrchestra), `protoneo`, `clio`, `phagocyte`. Papers in `artifact/papers/`.
-clio-parser is benchmarked against these (PDF→MD fidelity, figure VLM-as-Judge, ≥90% citation
+clio-author is benchmarked against these (PDF→MD fidelity, figure VLM-as-Judge, ≥90% citation
 verification, review win-rate).
 
 ## Working agreement

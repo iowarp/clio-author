@@ -1,6 +1,6 @@
 # M6 Build Plan — Figure Agent (PaperBanana-derived)
 
-Adds `clio_parser/experts/figure_agent.py` + figure models. Two capabilities, hermetic-first:
+Adds `clio_author/experts/figure_agent.py` + figure models. Two capabilities, hermetic-first:
 1. **Describe/caption** figures (fills the `FigureInfo.description` slot deferred from M1) — via the
    `LLMClient` (vision optional/gated); hermetic path uses the existing caption + surrounding text.
 2. **Generate plots** — produce **matplotlib code** (text) from a plot spec via the LLM; optional
@@ -22,11 +22,11 @@ for the visualizer↔critic loop rather than re-implementing it.
   timeout, cwd in an out-dir, `Agg` backend) only when called from a gated path; default never executes.
 
 ## Steps
-1. **`clio_parser/experts/figure_models.py`** (Pydantic v2): `PlotSpec{kind:Literal["plot","diagram"],
+1. **`clio_author/experts/figure_models.py`** (Pydantic v2): `PlotSpec{kind:Literal["plot","diagram"],
    intent:str, data_hint:str="", aspect_ratio:str|None}`, `FigureDescription{figure_id:int,
    description:str, caption:str|None}`, `FigureArtifact{kind, code:str|None, image_path:str|None,
    description:str|None}` + `from_loose_dict` where useful.
-2. **`clio_parser/experts/figure_agent.py`** — `FigureAgentExpert(BaseAgent)` role `figure`,
+2. **`clio_author/experts/figure_agent.py`** — `FigureAgentExpert(BaseAgent)` role `figure`,
    `__init__(llm=None,*,files=None)`. Modes via `task.payload["mode"]`:
    - `"describe"`: read figures from `payload["blocks"]`→`MemoryBlocks` (or `payload["figures"]`);
      for each `FigureInfo` lacking a description, prompt the LLM with caption + context → fill
@@ -63,8 +63,8 @@ for the visualizer↔critic loop rather than re-implementing it.
 render test renders a PNG when matplotlib installed; describe fills `FigureInfo.description`.
 
 ## Files
-- New: `clio_parser/experts/{figure_models,figure_agent}.py`; `tests/experts/test_figure_models.py`,
+- New: `clio_author/experts/{figure_models,figure_agent}.py`; `tests/experts/test_figure_models.py`,
   `tests/experts/test_figure_agent.py`, `tests/experts/test_figure_render_live.py` (gated).
-- Modify: `clio_parser/experts/__init__.py`, `pyproject.toml` (`viz` extra + mypy override).
+- Modify: `clio_author/experts/__init__.py`, `pyproject.toml` (`viz` extra + mypy override).
 - Reuse: `ingest/blocks.py` (`FigureInfo`/`MemoryBlocks`), `harness/patterns.py` (`CriticRefine`),
   `tools/files.py` (`SafeFiles`), `experts/{reviewer,write_loop}.py` (conventions/loop shape), `llm/client.py`.

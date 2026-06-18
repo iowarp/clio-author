@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from clio_parser.experts.polish import PolishExpert
-from clio_parser.harness.engine import Engine
-from clio_parser.harness.patterns import Sequential
-from clio_parser.harness.session import SessionContext
-from clio_parser.harness.types import Message, Task
-from clio_parser.integration import ClioParserSubagent
-from clio_parser.tools.files import SafeFiles
+from clio_author.experts.polish import PolishExpert
+from clio_author.harness.engine import Engine
+from clio_author.harness.patterns import Sequential
+from clio_author.harness.session import SessionContext
+from clio_author.harness.types import Message, Task
+from clio_author.integration import ClioAuthorSubagent
+from clio_author.tools.files import SafeFiles
 
 
 class RecordingLLM:
@@ -125,6 +125,6 @@ def test_polish_via_engine_sequential() -> None:
 
 
 def test_polish_via_adapter_is_json_serializable() -> None:
-    result = ClioParserSubagent().run("polish", {"text": "rough draft"})
+    result = ClioAuthorSubagent().run("polish", {"text": "rough draft"})
     assert result["action"] == "polish"
     assert set(result) == {"action", "content", "structured", "metadata"}

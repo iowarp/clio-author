@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from clio_parser.ingest.blocks import MemoryBlocks, SectionBlock
+from clio_author.ingest.blocks import MemoryBlocks, SectionBlock
 
 pytestmark = pytest.mark.live
 
@@ -35,7 +35,7 @@ def test_lancedb_retriever_index_and_search(tmp_path) -> None:  # type: ignore[n
     pytest.importorskip("lancedb")
     pytest.importorskip("sentence_transformers")
 
-    from clio_parser.retrieval.rag import LanceDbRetriever, SentenceTransformerEmbedder
+    from clio_author.retrieval.rag import LanceDbRetriever, SentenceTransformerEmbedder
 
     retriever = LanceDbRetriever(
         embedder=SentenceTransformerEmbedder(),
