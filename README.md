@@ -1,6 +1,6 @@
-# clio-author
+# AUTHOR: Agentic Understanding for Thesis, Hypothesis, and Objective Research
 
-clio-author turns a scientific paper — an **arXiv link, a PDF, or even just its title** — into clean
+AUTHOR turns a scientific paper — an **arXiv link, a PDF, or even just its title** — into clean
 Markdown, then lets specialized AI agents **answer questions about it, check its citations, review
 it, and help write, compose, export, and edit it**. It runs on its own, and a larger agent (such as
 CLIO) can call it as a **subagent**.
