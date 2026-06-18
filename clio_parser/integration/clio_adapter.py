@@ -91,6 +91,14 @@ _ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["sections", "markdown", "text"],
     },
     {
+        "action": "kg",
+        "description": (
+            "Extract a content knowledge graph (claims/methods/datasets/results + "
+            "relations) from a paper's memory blocks."
+        ),
+        "payload_keys": ["blocks", "out_dir"],
+    },
+    {
         "action": "describe_figures",
         "description": "Fill in descriptions/captions for the figures in memory blocks.",
         "payload_keys": ["blocks", "figures", "context"],
@@ -151,7 +159,10 @@ class ClioParserSubagent:
         agent's real image describe/generate route.
         """
         self._agent = ClioParserAgent(
-            llm, files=files, scholar_client=scholar_client, vision=vision
+            llm,
+            files=files,
+            scholar_client=scholar_client,
+            vision=vision,
         )
 
     def capabilities(self) -> dict[str, Any]:

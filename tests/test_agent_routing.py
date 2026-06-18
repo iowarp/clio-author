@@ -33,7 +33,9 @@ def _blocks_payload() -> dict[str, object]:
 
 
 def _agent() -> ClioParserAgent:
-    return ClioParserAgent(scholar_client=FakeScholarClient({_CITE_TITLE: []}))
+    return ClioParserAgent(
+        scholar_client=FakeScholarClient({_CITE_TITLE: []}),
+    )
 
 
 def _task(action: str, **payload: object) -> Task:
@@ -93,6 +95,12 @@ def test_route_plot() -> None:
     out = _agent().invoke(_task("plot", spec={"kind": "line", "intent": "trend"}))
     assert out.agent == "figure"
     assert out.metadata.get("mode") == "plot"
+
+
+def test_route_kg() -> None:
+    out = _agent().invoke(_task("kg", blocks=_blocks_payload()))
+    assert out.agent == "kg"
+    assert "num_nodes" in out.metadata
 
 
 def test_route_write_review_loop() -> None:
@@ -180,6 +188,11 @@ def test_convenience_plot() -> None:
     out = _agent().plot({"kind": "line", "intent": "trend"})
     assert out.agent == "figure"
     assert out.metadata.get("mode") == "plot"
+
+
+def test_convenience_kg() -> None:
+    out = _agent().kg(_blocks_payload())
+    assert out.agent == "kg"
 
 
 def test_prose_format_renders_meta_review_as_text() -> None:

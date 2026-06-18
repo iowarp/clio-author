@@ -32,8 +32,8 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 > host agent to branch on. Pass `--format prose` (CLI flag on dedicated text subcommands) or
 > `{"format": "prose"}` in any payload to get a human-readable text answer instead: `structured`
 > becomes `null` and the prose lands in `content`. `review` has the model *write* the prose; the
-> data-shaped actions (`cite`, `meta_review`, `describe_figures`, `coherence`) render their result
-> as text.
+> data-shaped actions (`cite`, `meta_review`, `kg`, `describe_figures`, `coherence`)
+> render their result as text.
 
 > **File inputs for large payloads.** Every action that accepts blocks, sections, candidates, or
 > source text has a companion `--*-file` flag (e.g. `--blocks-file`, `--paper-file`,
@@ -43,7 +43,7 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 
 ---
 
-## Action catalog (15 actions)
+## Action catalog (16 actions)
 
 Payload keys below are exactly the keys each expert reads. Keys marked *(optional)* have a fallback.
 
@@ -275,7 +275,32 @@ sub.run("coherence", {"sections": [{"title": "Introduction", "draft": "..."}, ..
 
 ---
 
-### 10. `describe_figures`
+### 10. `kg`
+
+Extract a content knowledge graph of a paper -- its claims, methods, datasets, results, metrics,
+concepts, and tasks plus the relations between them -- from the paper's memory blocks. This is the
+paper's *content* graph, distinct from any citation / literature graph.
+
+- **Reads:** `blocks` (a `MemoryBlocks` or its dump); `max_sections` *(optional cap on sections)*;
+  `out_dir` *(optional)*.
+- **Returns:** `content` = a one-line summary (or a Mermaid `graph TD` rendering with
+  `format=prose`); `structured` = `{nodes, edges}` (each node `{id, label, type, description,
+  section_path}`; each edge `{source, target, relation}`; edges whose endpoints are not nodes are
+  dropped); `metadata` = `{num_nodes, num_entities, num_edges, wrote}`. An unparseable LLM response
+  flags `metadata["parse_error"]` and returns an empty graph (never raises).
+- **Writes:** with a configured `SafeFiles` and `out_dir`, writes `<out_dir>/kg.json` and
+  `<out_dir>/kg.mmd` (Mermaid).
+
+```bash
+clio-parser kg --blocks-file clio-out/2601.23265/blocks.json --format prose
+```
+```python
+sub.run("kg", {"blocks": blocks_dump, "out_dir": "clio-out/2601.23265"})
+```
+
+---
+
+### 11. `describe_figures`
 
 Fill in descriptions/captions for figures in memory blocks.
 
@@ -301,7 +326,7 @@ agent.describe_figures(blocks_dump)
 
 ---
 
-### 11. `plot`
+### 12. `plot`
 
 Generate matplotlib plot **code** (text only; never executed on this path).
 
@@ -327,7 +352,7 @@ agent.plot({"kind": "plot", "intent": "bar chart of accuracy by model"})
 
 ---
 
-### 12. `compose`
+### 13. `compose`
 
 **Whole-paper orchestration.** Drafts a full multi-section manuscript from an idea and optional
 experimental log, chaining the existing experts in sequence.
@@ -391,7 +416,7 @@ print("section errors:", result["metadata"]["section_errors"])
 
 ---
 
-### 13. `export`
+### 14. `export`
 
 Export a composed Markdown manuscript to a standalone LaTeX document (`paper.tex` + optional
 `references.bib`).
@@ -441,7 +466,7 @@ print(result["metadata"]["wrote"])
 
 ---
 
-### 14. `write_review`
+### 15. `write_review`
 
 Run a writer ↔ reviewer **critic-refine** loop and return the final output.
 
@@ -463,7 +488,7 @@ sub.run("write_review", {"outline": {"title": "Methods"}, "source": "...", "max_
 
 ---
 
-### 15. `figure_refine`
+### 16. `figure_refine`
 
 Run a figure visualizer ↔ critic **critic-refine** loop and return the final output.
 
@@ -492,7 +517,7 @@ lazy-imported only when their action needs them:
 |-------|-----------|-----------------------------------|
 | `pdf` | `ingest`: Docling extraction + PyMuPDF OCR fallback | `ingest` returns `metadata["error"]` for the missing dependency |
 | `rag` | `ask`: `SentenceTransformerEmbedder` + `LanceDbRetriever` | deterministic `HashingEmbedder` + in-memory `RagRetriever` |
-| `scholar` | `cite`: Semantic Scholar `httpx` client + `thefuzz` fuzzy match | no-key OpenAlex/Crossref/arXiv clients and difflib fuzzy match still work |
+| `scholar` | `cite`: Semantic Scholar `httpx` client + `thefuzz` fuzzy match | citation no-key fallbacks still work |
 | `viz` | gated `render_plot_code` (subprocess render) | `plot` emits code text only; never renders |
 
 Install a subset as needed, e.g. `uv sync --extra pdf --extra scholar`.

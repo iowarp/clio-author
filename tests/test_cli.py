@@ -110,6 +110,26 @@ def test_run_plot_reaches_figure_expert(capsys: pytest.CaptureFixture[str]) -> N
     assert code == (1 if "error" in result or "error" in result["metadata"] else 0)
 
 
+def test_kg_command_routes_with_blocks_json(capsys: pytest.CaptureFixture[str]) -> None:
+    blocks = json.dumps(
+        {
+            "metadata": {"title": "T"},
+            "sections": [
+                {
+                    "section_path": "Methods",
+                    "title": "Methods",
+                    "text": "We use a transformer evaluated on GLUE.",
+                }
+            ],
+            "figures": [],
+        }
+    )
+    code, result = _run(capsys, ["kg", "--blocks-json", blocks])
+    assert code == 0
+    assert result["action"] == "kg"
+    assert "num_nodes" in result["metadata"]
+
+
 def test_write_accepts_outline_flag(capsys: pytest.CaptureFixture[str]) -> None:
     code, result = _run(capsys, ["write", "--outline", "1. Intro\n2. Method"])
     assert code == 0
@@ -123,7 +143,7 @@ def test_cli_clio_llm_env_accepted_for_capabilities(
     monkeypatch.setenv("CLIO_LLM", "claude")
     code, result = _run(capsys, ["capabilities"])
     assert code == 0
-    assert len(result["actions"]) == 15
+    assert len(result["actions"]) == 16
 
 
 def test_cli_invalid_clio_llm_degrades_to_error(

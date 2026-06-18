@@ -282,6 +282,25 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_coherence)
     _add_json(p_coherence)
 
+    p_kg = sub.add_parser(
+        "kg",
+        help="Extract a content knowledge graph from a paper's memory blocks.",
+    )
+    p_kg.add_argument(
+        "--blocks-json",
+        dest="blocks_json",
+        default=None,
+        help="A JSON MemoryBlocks dump (inline) to extract the knowledge graph from.",
+    )
+    p_kg.add_argument(
+        "--blocks-file",
+        dest="blocks_file",
+        default=None,
+        help="Path to a JSON MemoryBlocks file (e.g. clio-out/<id>/blocks.json).",
+    )
+    _add_format(p_kg)
+    _add_json(p_kg)
+
     p_run = sub.add_parser(
         "run",
         help="Dispatch any adapter action by name (generic escape hatch).",
@@ -492,6 +511,14 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         if args.text is not None:
             payload["text"] = args.text
         payload["format"] = args.fmt
+    elif command == "kg":
+        blocks = _json_input(
+            args.blocks_file, args.blocks_json, field="blocks (--blocks-json/--blocks-file)"
+        )
+        if blocks is not None:
+            payload["blocks"] = blocks
+        payload["format"] = args.fmt
+        return "kg", payload
     elif command == "run":
         return args.action, payload
     elif command == "describe":

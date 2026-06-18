@@ -86,11 +86,21 @@ class Parallel(Pattern):
 
 
 class RoundRobin(Pattern):
-    """Cycle through agents for a fixed number of turns.
+    """Cycle through agents for a fixed number of turns (protoneo round-robin).
 
-    Planned: iterate over agents in rounds, threading each turn's output back
-    into the session as context for the next agent, until a turn budget or
-    convergence condition is met.
+    Agents take turns across ``task.payload["rounds"]`` (default ``1``) rounds:
+    in each round every agent runs once, in input order. Each turn's output is
+    appended to the shared :class:`~clio_parser.harness.session.SessionContext`
+    (each agent owns its own :meth:`session.add`, exactly once), so a later agent
+    -- in the same round or a subsequent one -- can read every prior turn from
+    ``session.history``. This is the same session-threading discipline as
+    :class:`Sequential` / :class:`Parallel`.
+
+    Returns the **full ordered list** of outputs across all turns; its length is
+    ``len(agents) * rounds``. With no agents the result is empty. Never raises;
+    ``rounds`` is coerced defensively (mirroring :class:`CriticRefine`'s
+    ``max_rounds`` handling) and clamped to ``>= 0``. Re-implemented from scratch
+    from protoneo's round-robin deliberation concept (AGPL-3.0; no code copied).
     """
 
     def run(
@@ -99,7 +109,20 @@ class RoundRobin(Pattern):
         task: Task,
         session: SessionContext,
     ) -> list[AgentOutput]:
-        raise NotImplementedError("planned for a later milestone")
+        outputs: list[AgentOutput] = []
+        if not agents:
+            return outputs
+
+        try:
+            rounds = int(task.payload.get("rounds", 1))
+        except (TypeError, ValueError):
+            rounds = 1
+        rounds = max(0, rounds)
+
+        for _ in range(rounds):
+            for agent in agents:
+                outputs.append(agent.run(task, session))
+        return outputs
 
 
 class CriticRefine(Pattern):

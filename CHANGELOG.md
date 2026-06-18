@@ -7,10 +7,26 @@ All notable changes to clio-parser are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Content knowledge graph.** New `kg` action and `clio-parser kg` subcommand extract a semantic
+  graph of a paper's *content* (claims/methods/datasets/results/metrics/concepts/tasks and the
+  relations between them) from its memory blocks — distinct from any citation graph. Returns
+  `{nodes, edges}` (edges with unknown endpoints dropped), a Mermaid `graph TD` rendering under
+  `--format prose`, and writes `kg.json` + `kg.mmd` when `out_dir` is set. Re-implements protoneo's
+  knowledge-graph concept from scratch (no AGPL code copied); hermetic on `EchoLLMClient`.
+- **`RoundRobin` pattern.** Implemented the round-robin deliberation pattern in
+  `clio_parser/harness/patterns.py`: agents take turns across `payload["rounds"]`, each turn
+  threaded into the shared session so later agents see prior turns.
+
+### Removed
+- **Literature graph feature.** Removed the `literature_graph` action, the `clio-parser graph`
+  subcommand, the `CLIO_GRAPH` backends, and the literature-graph clients/expert. The new `kg`
+  action covers content-level graphs; citation-level paper graphs are out of scope.
+
+### Added (earlier in this cycle)
 - **`polish` and `coherence` experts** (wtf-p-style writing roles). `polish` improves prose for
   clarity, flow, and academic voice (optional `voice`) while preserving citations/claims;
   `coherence` checks a manuscript's sections for terminology drift, contradictions, undefined terms,
-  duplication, and broken flow, returning structured issues. Both are reachable as actions (now 15)
+  duplication, and broken flow, returning structured issues. Both are reachable as actions (now 16)
   via the CLI (`polish`/`coherence` subcommands), `run`, and the adapter.
 - **LaTeX export** (completes PaperOrchestra parity — a `.tex` manuscript). New `clio_parser/export/`:
   pure-stdlib `escape_latex`, `markdown_to_latex` (headings/bold/italic/code/lists/links/citations),

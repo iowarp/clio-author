@@ -31,6 +31,7 @@ from clio_parser.experts.echo import EchoExpert
 from clio_parser.experts.editor import EditorExpert
 from clio_parser.experts.figure_agent import FigureAgentExpert, run_figure_refine
 from clio_parser.experts.ingestor import IngestorExpert
+from clio_parser.experts.kg import KGExpert
 from clio_parser.experts.meta_reviewer import MetaReviewerExpert
 from clio_parser.experts.paper_qa import PaperQAExpert
 from clio_parser.experts.polish import PolishExpert
@@ -91,6 +92,7 @@ class ClioParserAgent:
         self.editor = EditorExpert(self.llm, files=files)
         self.polish = PolishExpert(self.llm, files=files)
         self.coherence = CoherenceExpert(self.llm)
+        self.kg_expert = KGExpert(self.llm, files=files)
         self.figure = FigureAgentExpert(self.llm, files=files, vision=vision)
 
         # M0 echo wiring is preserved for the unknown/None-action fallthrough.
@@ -154,6 +156,8 @@ class ClioParserAgent:
             return self.polish.run(task, session)
         if action == "coherence":
             return self.coherence.run(task, session)
+        if action == "kg":
+            return self.kg_expert.run(task, session)
         if action == "describe_figures":
             return self.figure.run(
                 task.model_copy(update={"payload": {**task.payload, "mode": "describe"}}),
@@ -256,6 +260,10 @@ class ClioParserAgent:
     def plot(self, spec: Any) -> AgentOutput:
         """Generate matplotlib plot code from ``spec`` (code text only)."""
         return self._invoke("plot", {"spec": spec})
+
+    def kg(self, blocks: Any, **kw: Any) -> AgentOutput:
+        """Extract a content knowledge graph from a paper's memory ``blocks``."""
+        return self._invoke("kg", {"blocks": blocks, **kw})
 
 
 def _bullets(label: str, items: Any) -> str:

@@ -18,8 +18,9 @@ subagent by a host agent** (e.g. an external orchestration layer) via an in-proc
 
 `ingest` (arXiv/PDF → scientific Markdown + memory blocks) · `ask` (grounded Q&A) · `cite`
 (Semantic Scholar verification, suggestions-only) · `review` / `meta_review` (AgentReview rubric +
-panel) · `write` / `edit` (outline→draft→revise) · `describe_figures` / `plot` (figure captioning +
-matplotlib code-gen) · `write_review` / `figure_refine` (iterative critic loops).
+panel) · `write` / `edit` (outline→draft→revise) · `literature_graph` (visual paper graph with
+year/citation/link/ingest metadata) · `describe_figures` / `plot` (figure captioning + matplotlib
+code-gen) · `write_review` / `figure_refine` (iterative critic loops).
 
 ## Architecture
 
@@ -29,9 +30,9 @@ clio_parser/
   integration/        ClioParserSubagent — host-facing adapter (JSON in/out, CLIO-agnostic)
   cli.py              `clio-parser` console script
   harness/            BaseAgent, AgentProtocol, Engine, patterns (Sequential/Parallel/CriticRefine), session, types
-  experts/            ingestor · paper_qa · citation · reviewer · meta_reviewer · writer · editor · figure_agent · echo
+  experts/            ingestor · paper_qa · citation · reviewer · meta_reviewer · writer · editor · literature_graph · figure_agent · echo
   ingest/             Docling+PyMuPDF extraction + postprocess (sections/citations/equations/figures/bibliography/tables/cleanup) + blocks
-  retrieval/          rag (embeddings) · scholar (Semantic Scholar)
+  retrieval/          rag (embeddings) · scholar (Semantic Scholar) · literature_graph (S2/OpenAlex)
   tools/files.py      SafeFiles — sandboxed read/write/edit
   llm/client.py       LLMClient protocol + EchoLLMClient (offline default)
   eval/report.py      metrics + report

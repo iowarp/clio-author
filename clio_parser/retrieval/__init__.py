@@ -16,6 +16,14 @@ from clio_parser.retrieval.rag import (
     inject_context,
     render_scored,
 )
+from clio_parser.retrieval.kg import (
+    EdgeRelation,
+    KGEdge,
+    KGNode,
+    KnowledgeGraph,
+    NodeType,
+    build_kg_from_llm,
+)
 
 __all__ = [
     "Embedder",
@@ -25,6 +33,12 @@ __all__ = [
     "RetrievalDependencyError",
     "ScoredBlock",
     "SentenceTransformerEmbedder",
+    "EdgeRelation",
+    "KGEdge",
+    "KGNode",
+    "KnowledgeGraph",
+    "NodeType",
+    "build_kg_from_llm",
     "inject_context",
     "render_scored",
 ]
