@@ -143,6 +143,7 @@ def build_kg_from_llm(
     *,
     max_sections: int | None = None,
     batch_size: int = 6,
+    max_workers: int = 4,
 ) -> tuple[KnowledgeGraph, str | None]:
     """Extract a :class:`KnowledgeGraph` from ``blocks`` using ``llm``.
 
@@ -167,13 +168,23 @@ def build_kg_from_llm(
     size = max(1, batch_size)
     batches = [sections[i : i + size] for i in range(0, len(sections), size)]
 
+    # Extract batches concurrently (LLM calls are I/O-bound); a single batch runs
+    # inline to avoid pool overhead. Results are collected in deterministic batch
+    # order so the merge below is reproducible regardless of completion order.
+    if len(batches) == 1 or max_workers <= 1:
+        results = [_extract_one("\n\n".join(b), llm) for b in batches]
+    else:
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(batches))) as pool:
+            results = list(pool.map(lambda b: _extract_one("\n\n".join(b), llm), batches))
+
     merged_nodes: list[KGNode] = []
     canonical: dict[tuple[str, str], str] = {}  # (type, norm-label) -> canonical id
     all_edges: list[KGEdge] = []
     any_parsed = False
 
-    for batch in batches:
-        nodes, edges, ok = _extract_one("\n\n".join(batch), llm)
+    for nodes, edges, ok in results:
         if not ok:
             continue
         any_parsed = True

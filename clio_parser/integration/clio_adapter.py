@@ -53,7 +53,7 @@ _ACTIONS: list[dict[str, Any]] = [
     {
         "action": "review",
         "description": "Produce a structured, persona-conditioned peer review of a paper.",
-        "payload_keys": ["paper", "persona"],
+        "payload_keys": ["paper", "persona", "ground"],
     },
     {
         "action": "meta_review",
