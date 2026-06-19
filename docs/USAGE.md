@@ -71,7 +71,7 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 
 ---
 
-## Action catalog (17 actions)
+## Action catalog (19 actions)
 
 Payload keys below are exactly the keys each expert reads. Keys marked *(optional)* have a fallback.
 
@@ -132,23 +132,51 @@ agent.ask("What is the main result?", blocks_dump)
 
 ### 3. `review`
 
-Produce a structured, persona-conditioned peer review.
+Produce a structured, persona-conditioned peer review. Optionally multimodal: when a vision client
+is configured (`CLIO_VISION=gemini`) and figures are supplied, the reviewer looks at each figure
+image and folds a description of what it actually shows into the reviewed text.
 
-- **Reads:** `paper` *(optional — falls back to `markdown`, then `blocks`, then the task
-  description)*; `persona` *(optional `PersonaSpec`)*. A `MemoryBlocks` paper is rendered to text.
+- **Reads:**
+  - `paper` *(optional — falls back to `markdown`, then `blocks`, then the task description)*;
+    a `MemoryBlocks` paper is rendered to text.
+  - `persona` *(optional `PersonaSpec`)*.
+  - `ground` *(optional bool)* — retrieve related prior work via the configured scholar client and
+    ground weaknesses/questions in it; adds `metadata["related_work"]`.
+  - `figures` *(optional)* — a list of `{figure_id?, image_path, caption?}` dicts to look at with
+    vision. When absent, falls back to `blocks.figures` when `blocks` is in the payload.
+  - `blocks` *(optional)* — a `MemoryBlocks` dump; figures are drawn from it when `figures` is not
+    supplied explicitly.
 - **Returns:** `content` = one-line summary (decision + overall); `structured` = a `PaperReview`
   dump (summary, strengths, weaknesses, questions, limitations, the 1–4 axes, overall 1–10,
-  confidence, decision); `metadata` = `{persona, decision, overall}`. If the LLM response has no
-  parseable JSON, `structured` is `null` and `metadata["parse_error"]` is set.
-- **Extra:** none; needs a real `LLMClient` to produce a parseable review.
-- **File inputs:** `--paper-file clio-out/2601.23265/paper.md`.
+  confidence, decision); `metadata` = `{persona, decision, overall}`. With vision active and figures
+  supplied, `metadata` also carries `vision_review=True` and `figures_seen` (count of figures whose
+  image was successfully described). If the LLM response has no parseable JSON, `structured` is
+  `null` and `metadata["parse_error"]` is set.
+- **Extra:** none; needs a real `LLMClient` to produce a parseable review. Vision path needs
+  `CLIO_VISION=gemini` and a `GEMINI_API_KEY`.
+- **File inputs:** `--paper-file clio-out/2601.23265/paper.md`; `--figures-file figures.json` (or
+  `--figures-json '[{...}]'` inline).
 
 ```bash
+# text-only review:
 clio-author review --paper-file clio-out/2601.23265/paper.md --format prose
+
+# multimodal review — reviewer sees the actual figure images:
+CLIO_VISION=gemini GEMINI_API_KEY=... \
+clio-author review --paper-file clio-out/2601.23265/paper.md \
+  --figures-file clio-out/2601.23265/figures.json --format prose
 ```
 ```python
+# text-only:
 sub.run("review", {"paper": "# Title\n\nAbstract..."})
-agent.review("# Title\n\nAbstract...")
+
+# multimodal (figures list + vision client configured):
+sub.run("review", {
+    "paper": "# Title\n\nAbstract...",
+    "figures": [{"figure_id": 1, "image_path": "clio-out/2601.23265/img/figure1.png", "caption": "Overview"}],
+})
+# or supply blocks and let the reviewer pull figures from them:
+sub.run("review", {"paper": "# Title\n\nAbstract...", "blocks": blocks_dump})
 ```
 
 ---
@@ -174,7 +202,55 @@ sub.run("meta_review", {"reviews": [review_a_dump, review_b_dump]})
 
 ---
 
-### 5. `cite`
+### 5. `rebuttal`
+
+Draft an author rebuttal that addresses a peer review point by point, grounded strictly in the
+paper, inventing no new results or citations.
+
+- **Reads:**
+  - `paper` *(optional — falls back to `draft`, then `markdown`)*; a `MemoryBlocks` paper is
+    rendered to text.
+  - `review` *(optional)* — a `PaperReview` object or its `model_dump()` dict; weaknesses and
+    questions are rendered into directive text via `render_review_feedback`.
+  - `review_text` *(optional)* — free-form review text string (used when `review` is not a
+    structured `PaperReview`).
+  - `critic_notes` *(optional)* — alias for `review_text`.
+  - `target` *(optional)* — when set with a `SafeFiles`, the rebuttal is written to this file.
+- **Returns:** `content` = the rebuttal prose; `structured` = `{rebuttal}` (same text);
+  `metadata` = `{wrote}` (paths written, when `target` was set). Missing `paper`/`review` inputs
+  produce an error-flagged output; the expert never raises.
+- **Extra:** none; needs a real `LLMClient` for useful prose.
+- **File inputs:** `--paper-file clio-out/2601.23265/paper.md`; `--review-file review.json` (or
+  `--review-json '{...}'` inline).
+
+```bash
+# respond to a structured review saved from a prior review run:
+clio-author rebuttal \
+  --paper-file clio-out/2601.23265/paper.md \
+  --review-file clio-out/2601.23265/review.json \
+  --format prose --out rebuttal.md
+
+# respond to a loose dict of weaknesses + questions:
+CLIO_LLM=claude clio-author rebuttal \
+  --paper-file clio-out/2601.23265/paper.md \
+  --review-json '{"weaknesses":["no baseline comparison","evaluation unclear"],"questions":["how is X measured?"]}' \
+  --format prose
+```
+```python
+sub.run("rebuttal", {
+    "paper": "# Title\n\nAbstract...",
+    "review": review_dump,          # PaperReview model_dump()
+})
+# or free-form review text:
+sub.run("rebuttal", {
+    "paper": "# Title\n\nAbstract...",
+    "review_text": "Weakness 1: ...\nQuestion 1: ...",
+})
+```
+
+---
+
+### 6. `cite`
 
 Verify citation candidates against scholarly metadata backends and emit **suggestions only**.
 
@@ -205,7 +281,7 @@ agent.cite([{"title": "Attention Is All You Need", "year": 2017}], out_dir="/tmp
 
 ---
 
-### 6. `plan`
+### 7. `plan`
 
 Turn an idea (or a provided `PaperOutline`) into per-section **writing plans**: ordered tasks,
 claims, sources/evidence, refined word budgets, and citation hints — one `SectionPlan` per section.
@@ -254,7 +330,7 @@ sub.run("write", {"section_plan": plans[0], "source": "..."})
 
 ---
 
-### 7. `write`
+### 8. `write`
 
 Draft a single paper section grounded in scoped source material.
 
@@ -279,7 +355,7 @@ agent.write(outline={"title": "Methods"}, source="...")
 
 ---
 
-### 8. `edit`
+### 9. `edit`
 
 Revise existing prose to address reviewer feedback (one-shot).
 
@@ -298,7 +374,7 @@ agent.edit("...", review_dump)
 
 ---
 
-### 9. `polish`
+### 10. `polish`
 
 Polish existing prose for clarity, flow, and academic voice **without changing meaning or removing
 citations**.
@@ -325,7 +401,7 @@ sub.run("polish", {"text": "...", "target": "sections/01-introduction.md"})
 
 ---
 
-### 10. `coherence`
+### 11. `coherence`
 
 Check **cross-section consistency** of a manuscript — terminology drift, contradictions, undefined
 terms, duplication, and broken narrative flow.
@@ -352,7 +428,7 @@ sub.run("coherence", {"sections": [{"title": "Introduction", "draft": "..."}, ..
 
 ---
 
-### 11. `kg`
+### 12. `kg`
 
 Extract a content knowledge graph of a paper -- its claims, methods, datasets, results, metrics,
 concepts, and tasks plus the relations between them -- from the paper's memory blocks. This is the
@@ -378,7 +454,7 @@ sub.run("kg", {"blocks": blocks_dump, "out_dir": "clio-out/2601.23265"})
 
 ---
 
-### 12. `describe_figures`
+### 13. `describe_figures`
 
 Fill in descriptions/captions for figures in memory blocks.
 
@@ -404,7 +480,7 @@ agent.describe_figures(blocks_dump)
 
 ---
 
-### 13. `plot`
+### 14. `plot`
 
 Generate matplotlib plot **code** (text only; never executed on this path).
 
@@ -430,7 +506,7 @@ agent.plot({"kind": "plot", "intent": "bar chart of accuracy by model"})
 
 ---
 
-### 14. `compose`
+### 15. `compose`
 
 **Whole-paper orchestration.** Drafts a full multi-section manuscript from an idea and optional
 experimental log, chaining the existing experts in sequence.
@@ -496,7 +572,7 @@ print("section errors:", result["metadata"]["section_errors"])
 
 ---
 
-### 15. `export`
+### 16. `export`
 
 Export a composed Markdown manuscript to a standalone LaTeX document (`paper.tex` + optional
 `references.bib`).
@@ -546,7 +622,7 @@ print(result["metadata"]["wrote"])
 
 ---
 
-### 16. `write_review`
+### 17. `write_review`
 
 Run a writer ↔ reviewer **critic-refine** loop and return the final output.
 
@@ -568,7 +644,7 @@ sub.run("write_review", {"outline": {"title": "Methods"}, "source": "...", "max_
 
 ---
 
-### 17. `figure_refine`
+### 18. `figure_refine`
 
 Run a figure visualizer ↔ critic **critic-refine** loop and return the final output.
 
@@ -584,6 +660,31 @@ clio-author run figure_refine \
 ```
 ```python
 sub.run("figure_refine", {"spec": {"kind": "plot", "intent": "line chart of loss"}, "max_rounds": 2})
+```
+
+---
+
+### 19. `orchestrate`
+
+Plan and run a sequence of the other actions to achieve a natural-language **goal** (dynamic
+multi-step). An LLM proposes a minimal ordered plan of action calls, which are executed through the
+router; `@name` references in a step's payload are resolved from prior steps / supplied `inputs`.
+
+- **Reads:** `goal` *(required)*; `inputs` *(optional dict of named values, referenced as `@name`)*;
+  `max_steps` *(optional, default 6)*; `out_dir` *(optional — persists `orchestrate.json`)*.
+- **Returns:** `content` = a per-step summary; `structured` = `{goal, plan, steps, context_keys}`;
+  `metadata` = `{num_steps, actions, errors}`. Never recurses into itself; never raises (an
+  unparseable plan → an error-flagged output).
+- **Extra:** none; needs a real `LLMClient` to produce a plan (the offline echo model returns
+  "could not plan for goal"). Reachable via `clio-author orchestrate` or `run orchestrate`.
+
+```bash
+CLIO_LLM=claude CLIO_SCHOLAR=auto clio-author orchestrate \
+  --goal "Verify the citation, then aggregate the two reviews into a decision." \
+  --inputs-json '{"candidates": [{"title": "Attention Is All You Need", "year": 2017}], "reviews": [{"Overall": 7, "Decision": "Accept"}, {"Overall": 5, "Decision": "Reject"}]}'
+```
+```python
+sub.run("orchestrate", {"goal": "...", "inputs": {"source": "2601.23265"}, "max_steps": 4})
 ```
 
 ---
@@ -700,12 +801,12 @@ In-process, pass any `ScholarClient` protocol-compatible object directly:
 
 ## Gemini vision (`CLIO_VISION=gemini`)
 
-`CLIO_VISION` selects the optional image-understanding path for the figure agent (resolved via
-`resolve_vision_client()`):
+`CLIO_VISION` selects the optional image-understanding path for the figure agent and the reviewer
+(resolved via `resolve_vision_client()`):
 
 | Value | Client | Notes |
 |-------|--------|-------|
-| `off` / `none` *(default)* | `None` | Figure agent stays on the hermetic text/code path; no image API is called |
+| `off` / `none` *(default)* | `None` | Figure agent and reviewer stay on the hermetic text/code path; no image API is called |
 | `gemini` / `google` | `GeminiVisionClient` | Reads `GEMINI_API_KEY` or `GOOGLE_API_KEY`; uses stdlib `urllib` REST |
 
 When `CLIO_VISION=gemini` is active:
@@ -713,6 +814,10 @@ When `CLIO_VISION=gemini` is active:
 - `describe_figures` *looks at* the real image file for each figure (from `figure.image_path`) and
   returns a Gemini-generated caption. `metadata["vision_described"]` counts the figures described
   this way; `metadata["text_described"]` counts the fallback path.
+- `review` with `figures` (or `blocks` containing figures) in the payload *looks at* each figure
+  image and folds a factual description into the reviewed text. Sets `metadata["vision_review"]=True`
+  and `metadata["figures_seen"]` (count of images successfully described). Without
+  `CLIO_VISION=gemini` or without figures, review behaviour is unchanged.
 - `plot` with `spec.kind="diagram"` calls Gemini's image generation API and writes a PNG to
   `out_path` instead of returning matplotlib code. `spec.kind="plot"` always uses the code path.
 

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 from typing import Any
 
 from clio_author.experts.review_models import PaperReview, PersonaSpec
@@ -31,6 +32,7 @@ from clio_author.harness.session import SessionContext
 from clio_author.harness.types import AgentOutput, Message, Task
 from clio_author.ingest.blocks import MemoryBlocks
 from clio_author.llm.client import EchoLLMClient, LLMClient
+from clio_author.llm.vision import VisionClient
 from clio_author.retrieval.scholar import S2Record, ScholarClient
 
 # How many related-work records to retrieve and inject when grounding is on.
@@ -138,6 +140,7 @@ class ReviewerExpert(BaseAgent):
         *,
         persona: PersonaSpec | None = None,
         scholar_client: ScholarClient | None = None,
+        vision: VisionClient | None = None,
     ) -> None:
         """Build a reviewer expert.
 
@@ -148,9 +151,14 @@ class ReviewerExpert(BaseAgent):
             scholar_client: Optional scholar client (the network seam) used only
                 when a review requests grounding (``payload["ground"]`` truthy).
                 ``None`` (default) leaves the review behaviour exactly as before.
+            vision: Optional :class:`VisionClient` (e.g. Gemini). When set *and* the
+                review payload carries figures, the reviewer looks at the real
+                figure images and folds their descriptions into the paper text it
+                reviews; ``None`` (default) keeps the text-only review path.
         """
         self.persona = persona or PersonaSpec()
         self._scholar = scholar_client
+        self._vision = vision
         super().__init__(
             role="reviewer",
             system_prompt=build_reviewer_system_prompt(self.persona),
@@ -169,6 +177,90 @@ class ReviewerExpert(BaseAgent):
             return raw
         blocks = raw if isinstance(raw, MemoryBlocks) else MemoryBlocks.model_validate(raw)
         return "\n\n".join(blocks.select(detail="full"))
+
+    @staticmethod
+    def _coerce_figures(payload: dict[str, Any]) -> list[dict[str, Any]]:
+        """Resolve a list of figure dicts (``image_path`` / ``caption`` / id) from ``payload``.
+
+        Prefers an explicit ``payload["figures"]`` (a list of
+        ``{figure_id?, image_path, caption?}``); else pulls ``figures`` out of a
+        ``payload["blocks"]`` MemoryBlocks dump. Returns ``[]`` when neither is
+        present or usable.
+        """
+        figures_raw = payload.get("figures")
+        if isinstance(figures_raw, (list, tuple)):
+            return [dict(fig) for fig in figures_raw if isinstance(fig, dict)]
+
+        blocks_raw = payload.get("blocks")
+        if blocks_raw is not None:
+            try:
+                blocks = (
+                    blocks_raw
+                    if isinstance(blocks_raw, MemoryBlocks)
+                    else MemoryBlocks.model_validate(blocks_raw)
+                )
+            except Exception:  # noqa: BLE001 - bad blocks just mean no figures
+                return []
+            return [fig.model_dump() for fig in blocks.figures]
+        return []
+
+    @staticmethod
+    def _images_dir(payload: dict[str, Any]) -> Path | None:
+        """Resolve a base directory for figure images from ``payload``."""
+        for key in ("images_dir", "out_dir"):
+            raw = payload.get(key)
+            if raw:
+                return Path(str(raw))
+        return None
+
+    @staticmethod
+    def _resolve_image(image_path: str, images_dir: Path | None) -> Path | None:
+        """Resolve ``image_path`` to a readable file, or ``None`` if not found."""
+        if not image_path:
+            return None
+        candidate = Path(image_path)
+        if candidate.is_file():
+            return candidate
+        if images_dir is not None:
+            joined = images_dir / image_path
+            if joined.is_file():
+                return joined
+        return None
+
+    def _describe_figures(self, payload: dict[str, Any]) -> list[str]:
+        """Look at each payload figure with vision; return readable descriptions.
+
+        Per figure: resolve its ``image_path`` (against ``images_dir``/``out_dir``
+        or an absolute/existing path) and call :meth:`VisionClient.describe_image`.
+        Wraps each call in try/except so a missing image or a vision failure simply
+        skips that figure and continues. Returns ``[]`` when no figures describe.
+        """
+        assert self._vision is not None  # guarded by the caller
+        figures = self._coerce_figures(payload)
+        if not figures:
+            return []
+        images_dir = self._images_dir(payload)
+        descriptions: list[str] = []
+        for figure in figures:
+            image = self._resolve_image(str(figure.get("image_path", "")), images_dir)
+            if image is None:
+                continue
+            figure_id = figure.get("figure_id")
+            caption = str(figure.get("caption", "")).strip()
+            prompt_parts = ["Describe this figure for a peer reviewer of the paper."]
+            if caption:
+                prompt_parts.append(f"Caption:\n{caption}")
+            prompt_parts.append("State concisely and factually what the image actually shows.")
+            try:
+                described = self._vision.describe_image(
+                    str(image), "\n\n".join(prompt_parts)
+                ).strip()
+            except Exception:  # noqa: BLE001 - VisionError/any failure -> skip this figure
+                continue
+            if described:
+                label = f"Figure {figure_id}: " if figure_id is not None else ""
+                descriptions.append(f"{label}{described}")
+        return descriptions
 
     def _error(self, session: SessionContext, message: str) -> AgentOutput:
         output = AgentOutput(agent=self.name, content="", metadata={"error": message})
@@ -217,6 +309,17 @@ class ReviewerExpert(BaseAgent):
             instructions = _PROSE_INSTRUCTIONS if fmt == "prose" else _INSTRUCTIONS
 
             paper_text = self._coerce_paper(raw_paper)
+
+            # Multimodal grounding (opt-in): when a vision client is set *and* the
+            # payload carries figures, look at the real images and fold their
+            # descriptions into the reviewed text. Default (no vision / no figures)
+            # leaves the text and metadata exactly as before.
+            if self._vision is not None:
+                descriptions = self._describe_figures(task.payload)
+                if descriptions:
+                    paper_text += "\n\n## Figures\n" + "\n\n".join(descriptions)
+                    metadata["figures_seen"] = len(descriptions)
+                    metadata["vision_review"] = True
 
             # Retrieval grounding (opt-in; default off keeps the legacy behaviour).
             ground = bool(task.payload.get("ground", False)) and self._scholar is not None

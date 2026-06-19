@@ -134,8 +134,46 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Retrieve related prior work (via CLIO_SCHOLAR) and ground the review in it.",
     )
+    p_review.add_argument(
+        "--figures-json",
+        dest="figures_json",
+        default=None,
+        help="A JSON list of figures ([{figure_id?, image_path, caption?}], inline) to "
+        "look at (needs CLIO_VISION=gemini).",
+    )
+    p_review.add_argument(
+        "--figures-file",
+        dest="figures_file",
+        default=None,
+        help="Path to a JSON file of figures ([{figure_id?, image_path, caption?}]).",
+    )
     _add_format(p_review)
     _add_json(p_review)
+
+    p_rebuttal = sub.add_parser(
+        "rebuttal", help="Draft an author rebuttal addressing a review point by point."
+    )
+    p_rebuttal.add_argument("--paper", default=None, help="The paper/draft Markdown text (inline).")
+    p_rebuttal.add_argument(
+        "--paper-file",
+        dest="paper_file",
+        default=None,
+        help="Path to a paper/draft Markdown file (e.g. clio-out/<id>/paper.md).",
+    )
+    p_rebuttal.add_argument(
+        "--review-json",
+        dest="review_json",
+        default=None,
+        help="A JSON PaperReview dump (inline) to respond to.",
+    )
+    p_rebuttal.add_argument(
+        "--review-file",
+        dest="review_file",
+        default=None,
+        help="Path to a JSON PaperReview file (e.g. a saved review result's structured).",
+    )
+    _add_format(p_rebuttal)
+    _add_json(p_rebuttal)
 
     p_cite = sub.add_parser("cite", help="Verify citation candidates (suggestions only).")
     p_cite.add_argument(
@@ -559,6 +597,22 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
             payload["paper"] = args.paper
         if args.ground:
             payload["ground"] = True
+        figures = _json_input(
+            args.figures_file, args.figures_json, field="figures (--figures-json/--figures-file)"
+        )
+        if figures is not None:
+            payload["figures"] = figures
+        payload["format"] = args.fmt
+    elif command == "rebuttal":
+        if args.paper_file is not None:
+            payload["paper"] = _read_file(args.paper_file, field="--paper-file")
+        elif args.paper is not None:
+            payload["paper"] = args.paper
+        review = _json_input(
+            args.review_file, args.review_json, field="review (--review-json/--review-file)"
+        )
+        if review is not None:
+            payload["review"] = review
         payload["format"] = args.fmt
     elif command == "cite":
         candidates = _json_input(

@@ -29,7 +29,7 @@ SLIDES: list[dict] = [
             "One host-invocable package across the whole scientific-paper lifecycle:\n"
             "read -> understand -> verify citations -> review -> plan -> write -> illustrate -> export"
         ),
-        "footer": "Invoked by the CLIO agent as a subagent   .   18 actions   .   grounded, not hallucinated",
+        "footer": "Invoked by the CLIO agent as a subagent   .   19 actions   .   grounded, not hallucinated",
     },
     {
         "type": "bullets",
@@ -49,7 +49,7 @@ SLIDES: list[dict] = [
             ),
             (
                 0,
-                "Status: built end-to-end - 18 actions, ~460 hermetic tests, CI green; validated live (Claude / Codex / Ollama / Gemini vision / live citation backends).",
+                "Status: built end-to-end - 19 actions, ~470 hermetic tests, CI green; validated live (Claude / Codex / Ollama / Gemini vision / live citation backends).",
             ),
         ],
     },
@@ -186,7 +186,7 @@ SLIDES: list[dict] = [
     },
     {
         "type": "bullets",
-        "title": "5 . What we built - the 18 actions",
+        "title": "5 . What we built - the 19 actions",
         "bullets": [
             (
                 0,
@@ -198,7 +198,7 @@ SLIDES: list[dict] = [
             ),
             (
                 0,
-                "Review: review (decision + scores + --ground), meta_review (panel), write_review (loop)",
+                "Review: review (decision + scores + --ground; multimodal - sees figures via vision), meta_review (panel), rebuttal (point-by-point), write_review (loop)",
             ),
             (
                 0,
@@ -278,7 +278,7 @@ SLIDES: list[dict] = [
             [
                 "Review",
                 "must track ground-truth decisions; does --ground help?",
-                "AgentReview, DeepReview",
+                "AgentReview, DeepReview (data: ASAP-Review, PeerRead, ORB, MMReview)",
             ],
             [
                 "Writing",
@@ -287,7 +287,7 @@ SLIDES: list[dict] = [
             ],
             ["Orchestration + cost", "composability is part of the novelty; budgets", "-"],
         ],
-        "note": "Phasing: Phase 0 automated metrics (now) -> Phase 1 LLM/VLM-as-Judge -> Phase 2 human win-rates.  Full plan: docs/BENCHMARK-PLAN.md",
+        "note": "Review datasets secured: PeerRead, ASAP-Review, NLPeer, MOPRD, ORB, MMReview (cross-domain + multimodal).  Phasing: Phase 0 automated metrics (now) -> Phase 1 LLM/VLM-as-Judge -> Phase 2 human win-rates.  Full plan: docs/BENCHMARK-PLAN.md",
         "col0": 40,
         "font": 12,
     },
@@ -313,6 +313,10 @@ SLIDES: list[dict] = [
             ),
             (
                 0,
+                "External validation: the newest cross-domain + multimodal review benchmark (MMReview) tests exactly our edge - vision-grounded review across 17 domains, which text-only reviewers structurally can't do.",
+            ),
+            (
+                0,
                 "Objection - 'isn't this just tool orchestration?': frameworks (MCP, LangGraph) are domain-agnostic plumbing that ship zero paper-lifecycle capability. AUTHOR is the missing domain package; MCP is just how a host reaches it.",
             ),
         ],
@@ -323,7 +327,7 @@ SLIDES: list[dict] = [
         "bullets": [
             (
                 0,
-                "Done: 18 actions . ~460 hermetic tests + CI . live-validated (Claude/Codex/Ollama/Gemini, real citation backends) . motivation + benchmark plan . dynamic orchestrate.",
+                "Done: 19 actions . ~470 hermetic tests + CI . live-validated (Claude/Codex/Ollama/Gemini, real citation backends) . motivation + benchmark plan . dynamic orchestrate.",
             ),
             (0, "Next:"),
             (

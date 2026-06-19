@@ -7,6 +7,8 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Multimodal review.** `review` now *looks at* figures when a vision client is enabled (`CLIO_VISION=gemini` + `--figures-json`/`--figures-file` or `blocks`): each figure is described and folded into the reviewed text, so the critique is vision-grounded. Backward compatible (no vision / no figures -> unchanged); records `vision_review` / `figures_seen`.
+- **`rebuttal` action** (19th) + `RebuttalExpert` — draft an author response addressing a review point by point (concede/clarify/propose revisions), grounded in the paper, inventing no new claims or citations. CLI: `clio-author rebuttal --paper-file P --review-json '{...}'`.
 - **`plan` action + `PlannerExpert`** (17th action) — turn an idea or a `PaperOutline` into per-section
   **writing plans**: ordered `tasks`, `claims`, `sources`, word budgets, and citation hints (the
   `SectionPlan` schema the `writer` already consumes). Writes `plan.json` to `out_dir`; `write` follows

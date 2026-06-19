@@ -277,3 +277,104 @@ def test_reviewer_grounding_error_is_caught_and_review_still_produced() -> None:
     assert output.metadata["grounded"] is False
     assert output.structured is not None  # review still produced
     assert output.metadata["decision"] == "Accept"
+
+
+# --- multimodal (vision-grounded) review --------------------------------- #
+class FakeVision:
+    """A fake VisionClient that records calls and returns a fixed description."""
+
+    def __init__(self, description: str = "A bar chart comparing accuracy.") -> None:
+        self.description = description
+        self.calls: list[tuple[str, str]] = []
+
+    def describe_image(self, image_path: str, prompt: str) -> str:
+        self.calls.append((image_path, prompt))
+        return self.description
+
+    def generate_image(self, prompt, out_path):  # type: ignore[no-untyped-def]
+        raise NotImplementedError
+
+
+def _write_png(path) -> str:  # type: ignore[no-untyped-def]
+    # A minimal 1x1 PNG is enough -- the fake vision never decodes it.
+    png = bytes.fromhex(
+        "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
+        "890000000a49444154789c6360000002000154a24f5d0000000049454e44ae426082"
+    )
+    path.write_bytes(png)
+    return str(path)
+
+
+def test_reviewer_vision_folds_figure_descriptions_into_prompt(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    image = _write_png(tmp_path / "fig1.png")
+    vision = FakeVision()
+    client = CannedJSONLLMClient(_REVIEW_JSON)
+    expert = ReviewerExpert(llm=client, vision=vision)
+    session = SessionContext(id="s")
+    task = Task(
+        id="t",
+        description="review",
+        payload={
+            "paper": "# Paper\nbody",
+            "figures": [{"figure_id": 1, "image_path": image, "caption": "Accuracy by model."}],
+        },
+    )
+
+    output = expert.run(task, session)
+
+    assert vision.calls and vision.calls[0][0] == image
+    user_prompt = client.messages[1].content
+    assert "## Figures" in user_prompt
+    assert "A bar chart comparing accuracy." in user_prompt
+    assert output.metadata["vision_review"] is True
+    assert output.metadata["figures_seen"] == 1
+    assert output.structured is not None
+
+
+def test_reviewer_no_vision_is_text_only_unchanged() -> None:
+    client = CannedJSONLLMClient(_REVIEW_JSON)
+    expert = ReviewerExpert(llm=client)  # no vision
+    session = SessionContext(id="s")
+    task = Task(
+        id="t",
+        description="review",
+        payload={"paper": "# Paper\nbody", "figures": [{"image_path": "/nope.png"}]},
+    )
+
+    output = expert.run(task, session)
+
+    assert "vision_review" not in output.metadata
+    assert "figures_seen" not in output.metadata
+    assert "## Figures" not in client.messages[1].content
+
+
+def test_reviewer_vision_never_called_when_no_figures(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    vision = FakeVision()
+    client = CannedJSONLLMClient(_REVIEW_JSON)
+    expert = ReviewerExpert(llm=client, vision=vision)
+    session = SessionContext(id="s")
+    task = Task(id="t", description="review", payload={"paper": "# Paper\nbody"})
+
+    output = expert.run(task, session)
+
+    assert vision.calls == []
+    assert "vision_review" not in output.metadata
+    assert output.structured is not None
+
+
+def test_reviewer_vision_skips_unreadable_figure_without_raising() -> None:
+    vision = FakeVision()
+    client = CannedJSONLLMClient(_REVIEW_JSON)
+    expert = ReviewerExpert(llm=client, vision=vision)
+    session = SessionContext(id="s")
+    task = Task(
+        id="t",
+        description="review",
+        payload={"paper": "# Paper\nbody", "figures": [{"image_path": "/does/not/exist.png"}]},
+    )
+
+    output = expert.run(task, session)
+
+    assert vision.calls == []  # unreadable image -> skipped, vision never called
+    assert "vision_review" not in output.metadata
+    assert output.structured is not None

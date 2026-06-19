@@ -34,12 +34,20 @@ ACTIONS: list[dict[str, Any]] = [
     {
         "action": "review",
         "description": "Produce a structured, persona-conditioned peer review of a paper.",
-        "payload_keys": ["paper", "persona", "ground"],
+        "payload_keys": ["paper", "persona", "ground", "figures", "blocks"],
     },
     {
         "action": "meta_review",
         "description": "Aggregate several reviews into a single area-chair meta-review.",
         "payload_keys": ["reviews"],
+    },
+    {
+        "action": "rebuttal",
+        "description": (
+            "Draft an author rebuttal addressing a review point by point "
+            "(grounded; invents nothing)."
+        ),
+        "payload_keys": ["paper", "review", "review_text", "target"],
     },
     {
         "action": "cite",
