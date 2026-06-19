@@ -1,0 +1,58 @@
+{
+  "task": "Produce a grounded peer review of eval/agentic/paper.md (Decision + 3 strengths + 3 weaknesses; ground >=1 weakness in real/verified related work).",
+  "host_access": "full tools (--dangerously-skip-permissions: Bash, WebSearch, Read, ...)",
+  "runs": [
+    {
+      "host": "claude",
+      "model": "sonnet",
+      "arm": "without_author",
+      "total_tokens": 231045,
+      "output_tokens": 2603,
+      "wall_s": 68,
+      "tool_calls": 8,
+      "turns": 9,
+      "errors": 0,
+      "cost_usd": 0.244,
+      "grounding": "web search (unverified snippets)"
+    },
+    {
+      "host": "claude",
+      "model": "sonnet",
+      "arm": "with_author",
+      "total_tokens": 224217,
+      "output_tokens": 2644,
+      "wall_s": 63,
+      "tool_calls": 6,
+      "turns": 7,
+      "errors": 0,
+      "cost_usd": 0.213,
+      "grounding": "clio-author cite (VERIFIED vs scholarly DBs)",
+      "used_author": true
+    },
+    {
+      "host": "codex",
+      "arm": "without_author",
+      "total_tokens": 47059,
+      "wall_s": 40,
+      "tool_calls": 7,
+      "errors": 0,
+      "grounding": "from-memory citation (unverified)"
+    },
+    {
+      "host": "codex",
+      "arm": "with_author",
+      "total_tokens": 35907,
+      "wall_s": 78,
+      "tool_calls": 6,
+      "errors": 0,
+      "grounding": "clio-author cite (VERIFIED): 'The AI Scientist' (Lu et al. 2024)",
+      "used_author": true
+    },
+    {
+      "host": "codex",
+      "arm": "with_author_FAILED",
+      "note": "first attempt with CLIO_LLM=codex -> clio-author review spawned codex-inside-codex -> deadlock/timeout (460s). Integration lesson: never nest a host in itself; use a no-LLM action (cite) or a different model for nested calls.",
+      "errors": 1
+    }
+  ]
+}
