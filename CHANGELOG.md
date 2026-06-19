@@ -7,6 +7,10 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`plan` action + `PlannerExpert`** (17th action) — turn an idea or a `PaperOutline` into per-section
+  **writing plans**: ordered `tasks`, `claims`, `sources`, word budgets, and citation hints (the
+  `SectionPlan` schema the `writer` already consumes). Writes `plan.json` to `out_dir`; `write` follows
+  a plan via `section_plan`, and `compose --plan` runs the planner per section before drafting.
 - **`--out FILE` on every CLI action** — save the result directly (prose `content` for `.md`/`.txt`,
   full JSON for `.json`) instead of redirecting stdout; works for the print-only actions too
   (ask/review/edit/polish/coherence/meta_review).

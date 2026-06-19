@@ -13,6 +13,7 @@ from clio_author.experts.ingestor import IngestorExpert
 from clio_author.experts.kg import KGExpert
 from clio_author.experts.meta_reviewer import MetaReviewerExpert, run_panel
 from clio_author.experts.paper_qa import PaperQAExpert
+from clio_author.experts.planner import PlannerExpert
 from clio_author.experts.polish import PolishExpert
 from clio_author.experts.reviewer import ReviewerExpert
 from clio_author.experts.write_loop import ReviewerAsCritic, run_write_review_loop
@@ -28,6 +29,7 @@ __all__ = [
     "KGExpert",
     "MetaReviewerExpert",
     "PaperQAExpert",
+    "PlannerExpert",
     "PolishExpert",
     "ReviewerExpert",
     "ReviewerAsCritic",

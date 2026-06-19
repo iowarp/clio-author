@@ -34,6 +34,7 @@ from clio_author.experts.ingestor import IngestorExpert
 from clio_author.experts.kg import KGExpert
 from clio_author.experts.meta_reviewer import MetaReviewerExpert
 from clio_author.experts.paper_qa import PaperQAExpert
+from clio_author.experts.planner import PlannerExpert
 from clio_author.experts.polish import PolishExpert
 from clio_author.experts.reviewer import ReviewerExpert
 from clio_author.experts.write_loop import run_write_review_loop
@@ -93,6 +94,7 @@ class ClioAuthorAgent:
         self.polish = PolishExpert(self.llm, files=files)
         self.coherence = CoherenceExpert(self.llm)
         self.kg_expert = KGExpert(self.llm, files=files)
+        self.planner = PlannerExpert(self.llm, files=files)
         self.figure = FigureAgentExpert(self.llm, files=files, vision=vision)
 
         # M0 echo wiring is preserved for the unknown/None-action fallthrough.
@@ -158,6 +160,8 @@ class ClioAuthorAgent:
             return self.coherence.run(task, session)
         if action == "kg":
             return self.kg_expert.run(task, session)
+        if action == "plan":
+            return self.planner.run(task, session)
         if action == "describe_figures":
             return self.figure.run(
                 task.model_copy(update={"payload": {**task.payload, "mode": "describe"}}),
@@ -248,6 +252,15 @@ class ClioAuthorAgent:
         if outline is not None:
             payload["outline"] = outline
         return self._invoke("compose", payload)
+
+    def plan(self, *, idea: Any = None, outline: Any = None, **kw: Any) -> AgentOutput:
+        """Turn an ``idea`` (+ optional ``outline``) into per-section writing plans."""
+        payload: dict[str, Any] = dict(kw)
+        if idea is not None:
+            payload["idea"] = idea
+        if outline is not None:
+            payload["outline"] = outline
+        return self._invoke("plan", payload)
 
     def edit(self, draft: Any, review: Any) -> AgentOutput:
         """Revise ``draft`` to address ``review`` feedback."""

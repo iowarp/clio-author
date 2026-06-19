@@ -28,7 +28,7 @@ from uuid import uuid4
 from clio_author.experts.citation import CitationExpert
 from clio_author.experts.reviewer import ReviewerExpert, _extract_json_object
 from clio_author.experts.write_loop import run_write_review_loop
-from clio_author.experts.write_models import PaperOutline, SectionOutline
+from clio_author.experts.write_models import PaperOutline, SectionOutline, SectionPlan
 from clio_author.experts.writer import WriterExpert
 from clio_author.export.latex import to_latex_document
 from clio_author.harness.session import SessionContext
@@ -158,6 +158,11 @@ def _run_compose(
     max_rounds = int(payload.get("max_rounds", 3))
     base_source = "\n\n".join(part for part in (idea, experimental_log) if part)
 
+    # --- Optional per-section planning (off by default) --------------------- #
+    plans = _maybe_plan(payload, outline, llm) if bool(payload.get("plan", False)) else {}
+    if plans:
+        metadata["planned"] = True
+
     sections: list[dict[str, Any]] = []
     section_errors: list[dict[str, str]] = []
     for section in outline.sections:
@@ -170,6 +175,7 @@ def _run_compose(
             reviewer=reviewer,
             review=review,
             max_rounds=max_rounds,
+            section_plan=plans.get(_section_key(section)),
         )
         section_path = section.section_path or section.title
         if err is not None:
@@ -249,6 +255,45 @@ def _build_outline(
     return PaperOutline.from_loose_dict(parsed)
 
 
+def _section_key(section: SectionOutline) -> str:
+    """Stable key identifying a section across the outline and its plans."""
+    return section.section_path or section.title
+
+
+def _maybe_plan(
+    payload: dict[str, Any],
+    outline: PaperOutline,
+    llm: LLMClient,
+) -> dict[str, SectionPlan]:
+    """Run the planner once over the resolved outline; index plans by section key.
+
+    Best-effort / never-raise: the planner already flags its own failures, so a
+    planning failure yields an empty index and compose falls back to the bare
+    outline. The :class:`PlannerExpert` import is local to avoid a circular import
+    (the planner reuses :func:`_build_outline` from this module).
+    """
+    from clio_author.experts.planner import PlannerExpert
+
+    plan_payload: dict[str, Any] = {"outline": outline}
+    for key in ("blocks", "source", "candidates", "citation_hints", "idea", "experimental_log"):
+        if payload.get(key) is not None:
+            plan_payload[key] = payload[key]
+    plan_task = Task(id=uuid4().hex, description="plan", payload=plan_payload)
+    out = PlannerExpert(llm).run(plan_task, SessionContext(id=uuid4().hex))
+    if "error" in out.metadata or out.structured is None:
+        return {}
+
+    indexed: dict[str, SectionPlan] = {}
+    for raw in out.structured.get("plans", []):
+        try:
+            plan = SectionPlan.from_loose_dict(raw) if isinstance(raw, dict) else None
+        except Exception:  # noqa: BLE001 - planning is best-effort
+            plan = None
+        if plan is not None:
+            indexed[_section_key(plan.outline)] = plan
+    return indexed
+
+
 def _coerce_blocks(raw: Any) -> MemoryBlocks | None:
     """Coerce ``raw`` into :class:`MemoryBlocks` (``None`` when absent/invalid)."""
     if raw is None:
@@ -270,14 +315,18 @@ def _write_section(
     reviewer: ReviewerExpert,
     review: bool,
     max_rounds: int,
+    section_plan: SectionPlan | None = None,
 ) -> tuple[str, str | None]:
     """Draft one section in a FRESH session; return ``(draft, error_or_None)``.
 
     A fresh :class:`SessionContext` per section is critical: it stops the
     writer's ``session.data["draft"]`` / ``["critic_feedback"]`` from leaking
-    between sections (section isolation).
+    between sections (section isolation). When ``section_plan`` is given it is
+    passed through as the writer's ``section_plan`` so the draft follows the plan.
     """
     section_payload: dict[str, Any] = {"outline": section, "vision": outline.vision}
+    if section_plan is not None:
+        section_payload["section_plan"] = section_plan
     if blocks is not None:
         section_payload["blocks"] = blocks
     else:

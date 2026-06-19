@@ -99,6 +99,14 @@ _ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["blocks", "out_dir"],
     },
     {
+        "action": "plan",
+        "description": (
+            "Turn an idea or outline into per-section writing plans "
+            "(tasks, claims, sources, word budgets)."
+        ),
+        "payload_keys": ["idea", "experimental_log", "outline", "blocks", "candidates", "out_dir"],
+    },
+    {
         "action": "describe_figures",
         "description": "Fill in descriptions/captions for the figures in memory blocks.",
         "payload_keys": ["blocks", "figures", "context"],
@@ -119,6 +127,7 @@ _ACTIONS: list[dict[str, Any]] = [
             "blocks",
             "review",
             "max_rounds",
+            "plan",
             "out_dir",
         ],
     },
