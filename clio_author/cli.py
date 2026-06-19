@@ -35,9 +35,29 @@ import argparse
 import json
 import os
 import re
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
+
+
+def _write_out(path: str, result: dict[str, Any]) -> None:
+    """Write a CLI result to ``path``.
+
+    A ``.json`` path gets the full indented result; any other extension (e.g.
+    ``.md``/``.txt``) gets the human-facing ``content`` when present, falling
+    back to the full JSON when there is no prose content.
+    """
+    if path.lower().endswith(".json"):
+        text = json.dumps(result, indent=2)
+    else:
+        content = result.get("content")
+        text = (
+            content
+            if isinstance(content, str) and content.strip()
+            else json.dumps(result, indent=2)
+        )
+    Path(path).write_text(text, encoding="utf-8")
 
 
 def _default_out_dir(source: str) -> str:
@@ -329,6 +349,16 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_describe)
     _add_json(p_describe)
 
+    # `--out FILE` on every subcommand: also save the result (prose `content`
+    # for .md/.txt, full JSON for .json) so callers need not redirect stdout.
+    for _p in sub.choices.values():
+        _p.add_argument(
+            "--out",
+            dest="out_file",
+            default=None,
+            help="Also write the result to this file (prose for .md/.txt, full JSON for .json).",
+        )
+
     return parser
 
 
@@ -573,6 +603,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = subagent.run(action, payload)
     except Exception as exc:  # noqa: BLE001 - degrade to an error dict, never a traceback
         result = {"error": str(exc)}
+
+    out_file = getattr(args, "out_file", None)
+    if out_file:
+        try:
+            _write_out(out_file, result)
+            print(f"[saved to {out_file}]", file=sys.stderr)
+        except OSError as exc:
+            print(f"[warning: could not write {out_file}: {exc}]", file=sys.stderr)
 
     print(json.dumps(result, indent=2))
     return 1 if _has_error(result) else 0

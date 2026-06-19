@@ -4,6 +4,13 @@ All notable changes to clio-author are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`--out FILE` on every CLI action** — save the result directly (prose `content` for `.md`/`.txt`,
+  full JSON for `.json`) instead of redirecting stdout; works for the print-only actions too
+  (ask/review/edit/polish/coherence/meta_review).
+
 ## [0.3.0]
 
 ### Added

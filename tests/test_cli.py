@@ -256,3 +256,36 @@ def test_bad_blocks_file_degrades_to_error(capsys: pytest.CaptureFixture[str]) -
     code, result = _run(capsys, ["ask", "--question", "q", "--blocks-file", "/no/such/file.json"])
     assert code == 1
     assert "error" in result
+
+
+def test_out_flag_writes_prose_and_json(capsys: pytest.CaptureFixture[str], tmp_path) -> None:
+    # .md path -> prose content; .json path -> full JSON. Uses offline echo (no model).
+    md = tmp_path / "review.md"
+    code, _ = _run(
+        capsys, ["review", "--paper", "# T\n\nAbstract.", "--format", "prose", "--out", str(md)]
+    )
+    assert md.exists() and md.read_text().strip()  # prose written
+
+    js = tmp_path / "review.json"
+    _run(capsys, ["review", "--paper", "# T\n\nAbstract.", "--out", str(js)])
+    import json as _json
+
+    obj = _json.loads(js.read_text())  # full JSON written + parseable
+    assert obj["action"] == "review"
+
+
+def test_out_flag_available_on_ask(capsys: pytest.CaptureFixture[str], tmp_path) -> None:
+    p = tmp_path / "ans.md"
+    _run(
+        capsys,
+        [
+            "ask",
+            "--question",
+            "what?",
+            "--blocks-json",
+            '{"sections":[{"section_path":"S","title":"S","text":"x"}]}',
+            "--out",
+            str(p),
+        ],
+    )
+    assert p.exists()
