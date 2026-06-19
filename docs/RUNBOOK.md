@@ -220,6 +220,7 @@ print('rendered:', p, Path(p).stat().st_size, 'bytes')"
 ---
 
 ## 3. Tips
+- **Save any result to a file:** add `--out FILE` to any action (`--out review.md` → prose, `--out review.json` → full JSON). Works on every action, incl. the print-only ones (ask/review/edit/polish/coherence/meta_review).
 - Clean JSON: append `2>/dev/null`. Pretty-print: `… 2>/dev/null | python3 -m json.tool`.
 - Swap the model anytime: `CLIO_LLM=codex` or `CLIO_LLM=ollama CLIO_LLM_MODEL=llama3.1:8b`.
 - Any action is also reachable generically: `uv run clio-author run <action> --json '{...}'`.
