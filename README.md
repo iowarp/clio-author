@@ -424,6 +424,7 @@ uv sync --extra pdf        # real PDF/arXiv extraction (Docling + PyMuPDF) — n
 uv sync --extra rag        # real semantic search for `ask` (sentence-transformers + LanceDB)
 uv sync --extra scholar    # live Semantic Scholar for `cite` (httpx + thefuzz)
 uv sync --extra viz        # actually render plot images (matplotlib)
+uv sync --extra mcp        # the MCP bridge so MCP-only hosts (e.g. CLIO) can invoke it (fastmcp)
 uv sync --all-extras       # everything at once
 ```
 
@@ -456,14 +457,23 @@ uv run python scripts/real_test.py   # full real end-to-end run; set CLIO_TEST_L
   `uv pip install --reinstall torchvision --index-url https://download.pytorch.org/whl/cpu`.
 - **`compose` / `export` produce no `.tex` file** — `--latex` requires `--out-dir` to be set so a
   `SafeFiles` can be rooted there; or use `export --markdown-file` to convert an existing `paper.md`.
+- **A host invoking AUTHOR hangs** — don't point AUTHOR's nested model at the *same* host (e.g.
+  `CLIO_LLM=codex` while the host is Codex) — it recurses. For grounding inside a host, prefer a
+  no-LLM action like `cite`, or set the nested `CLIO_LLM` to a different provider.
 
 ---
 
 ## More
 
+- **Why AUTHOR — motivation, the gap, capability matrix** → [`docs/MOTIVATION.md`](docs/MOTIVATION.md)
 - **Full action & payload reference, providers, output details** → [`docs/USAGE.md`](docs/USAGE.md)
+- **Copy-paste runbook (every command, every flag)** → [`docs/RUNBOOK.md`](docs/RUNBOOK.md)
+- **Invoking AUTHOR as a subagent (in-process / CLI / MCP)** → [`docs/INTEGRATION.md`](docs/INTEGRATION.md)
+- **Evaluation plan vs. the reference systems** → [`docs/BENCHMARK-PLAN.md`](docs/BENCHMARK-PLAN.md)
+- **With-vs-without comparison across hosts** → [`docs/ABLATION.md`](docs/ABLATION.md) · agentic test in [`eval/agentic/`](eval/agentic/)
 - **API keys and local env-file handling** → [`docs/SECURITY.md`](docs/SECURITY.md)
 - **Design and architecture** → [`artifact/notes/DESIGN.md`](artifact/notes/DESIGN.md)
+- **Presentation** → [`docs/AUTHOR.pdf`](docs/AUTHOR.pdf) / [`docs/AUTHOR.pptx`](docs/AUTHOR.pptx)
 - **Working in this repo (for agents/contributors)** → [`AGENTS.md`](AGENTS.md)
 - **Changes** → [`CHANGELOG.md`](CHANGELOG.md)
 
