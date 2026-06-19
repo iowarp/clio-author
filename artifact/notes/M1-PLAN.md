@@ -12,7 +12,7 @@ hermetically first; Docling/PyMuPDF extraction is a thin, dependency-gated wrapp
 
 Reference impls (both "Ported from paper-to-md"): phagocyte
 `artifact/repos/phagocyte/src/ingestor/src/ingestor/extractors/pdf/postprocess/` (6 modules +
-`equations.py`) and paper-to-md (MIT, © 2025 Jaime Cernuda; richer enrichment JSON, no equations
+`equations.py`) and paper-to-md (MIT; richer enrichment JSON, no equations
 pass). Fixed pass order (order matters): **sections → citations → equations → figures →
 bibliography → cleanup**. Entry: `process_markdown(content: str, images: list[str] | None) -> str`.
 
@@ -58,7 +58,7 @@ minimal Step 3 (`docling_extract.process_pdf(source) -> ExtractionResult`) + min
    metrics (section/citation/figure/reference counts within tolerance) on the two `artifact/papers/`
    PDFs, recorded to a report for the M7 eval.
 7. **Licensing** — preserve MIT attribution where logic mirrors paper-to-md (header: "Re-implemented
-   from the paper-to-md project (MIT, © 2025 Jaime Cernuda), <repo URL>"). Phagocyte license
+   from the paper-to-md project (MIT), <repo URL>"). Phagocyte license
    unspecified → clean-room re-implementation from the notes' behavior descriptions, **no verbatim
    copy**. **[Human decision]** confirm phagocyte attribution wording before merge. Keep BSD-3.
 

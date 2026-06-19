@@ -1,4 +1,4 @@
-# Adapted from the paper-to-md project (MIT, (c) 2025 Jaime Cernuda): https://github.com/JaimeCernuda/paper-to-md
+# Adapted from the paper-to-md project (MIT): https://github.com/JaimeCernuda/paper-to-md
 """Figure processing: embed extracted images directly above their captions.
 
 Logo/badge filtering happens earlier during extraction (by image dimensions),

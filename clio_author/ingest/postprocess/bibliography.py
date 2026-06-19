@@ -1,4 +1,4 @@
-# Adapted from the paper-to-md project (MIT, (c) 2025 Jaime Cernuda): https://github.com/JaimeCernuda/paper-to-md
+# Adapted from the paper-to-md project (MIT): https://github.com/JaimeCernuda/paper-to-md
 """Bibliography processing: separate reference entries with blank lines.
 
 Ensures each ``[N]`` reference entry is separated by a blank line (anchor-aware,

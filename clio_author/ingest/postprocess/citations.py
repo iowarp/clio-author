@@ -1,4 +1,4 @@
-# Adapted from the paper-to-md project (MIT, (c) 2025 Jaime Cernuda): https://github.com/JaimeCernuda/paper-to-md
+# Adapted from the paper-to-md project (MIT): https://github.com/JaimeCernuda/paper-to-md
 """Citation processing: link inline numeric citations and anchor references.
 
 Turns ``[7]`` into ``[[7]](#ref-7)``, expands ranges like ``[11]-[14]`` into a

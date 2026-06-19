@@ -9,8 +9,7 @@ levels, so the harness can inject just the right amount of context.
 (``metadata`` / ``code_blocks`` / ``equations`` / ``figures``) plus a ``sections``
 array, keeping the on-disk shape compatible with that MIT project's output.
 
-The enrichment block schemas mirror the paper-to-md project (MIT, (c) 2025 Jaime
-Cernuda): https://github.com/JaimeCernuda/paper-to-md
+The enrichment block schemas mirror the paper-to-md project (MIT): https://github.com/JaimeCernuda/paper-to-md
 """
 
 from __future__ import annotations
