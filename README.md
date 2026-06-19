@@ -8,6 +8,16 @@ CLIO) can call it as a **subagent**.
 > Runs **offline out of the box** with a built-in echo model (good for trying the plumbing). Add a
 > real model (Claude / Codex / Ollama) for real answers. Requires **Python ≥ 3.12**. BSD-3-Clause.
 
+## Why AUTHOR
+
+Today these capabilities are scattered across **separate, non-interoperating tools**: a PDF parser
+(Docling/MinerU), a literature-QA tool (PaperQA2/OpenScholar), a citation auditor (CiteCheck), a
+writing agent (PaperOrchestra/AutoSurvey), a figure agent (PaperBanana), a LaTeX exporter. A 2024–2026
+survey finds **no single system that unifies the whole paper lifecycle — ingest → understand → verify
+citations → review → write → figures → export — as one grounded, host-invocable package.** That gap is
+what AUTHOR fills: one package, grounded (verified citations, source-grounded writing), and callable by
+a host agent. Full argument, capability matrix, and citations: **[`docs/MOTIVATION.md`](docs/MOTIVATION.md)**.
+
 ---
 
 ## 1. Quickstart — copy & paste, top to bottom
@@ -26,7 +36,7 @@ cd clio-author
 uv sync
 ```
 
-**Step 3. Confirm it works** (prints the list of 17 things it can do — no model or network needed):
+**Step 3. Confirm it works** (prints the list of 18 things it can do — no model or network needed):
 
 ```bash
 uv run clio-author capabilities
@@ -198,6 +208,15 @@ CLIO_LLM=claude uv run clio-author describe \
   --blocks-file clio-out/2601.23265/blocks.json --format prose
 ```
 
+### Goal-driven orchestration
+
+```bash
+# Plan and run a sequence of actions from a natural-language goal:
+CLIO_LLM=claude uv run clio-author orchestrate \
+  --goal "Ingest 2601.23265 then produce a peer review." \
+  --inputs-json '{"source":"2601.23265"}' --max-steps 4 --out-dir clio-out/orchestrate
+```
+
 ### Generic escape hatch
 
 ```bash
@@ -205,6 +224,9 @@ CLIO_LLM=claude uv run clio-author describe \
 uv run clio-author run write_review \
   --json '{"outline": {"title": "Methods"}, "source": "...", "max_rounds": 2}'
 ```
+
+**Single-file rule.** Every `--*-file` flag reads exactly **one** file. To supply several files as
+context, concatenate them first or `ingest` each one and pass the resulting `blocks.json`.
 
 **Saving results to a file.** Every action accepts `--out FILE`. A `.json` extension saves the
 full indented JSON result; any other extension (`.md`, `.txt`, …) saves the prose `content` when
@@ -309,7 +331,7 @@ from clio_author.llm.providers import resolve_llm
 # Build the subagent. resolve_llm("claude") | "codex" | "ollama" | None (offline echo).
 sub = ClioAuthorSubagent(llm=resolve_llm("claude"))
 
-# 1) Discover what it can do (17 actions).
+# 1) Discover what it can do (18 actions).
 for a in sub.capabilities()["actions"]:
     print(a["action"], "—", a["description"])
 
@@ -353,27 +375,28 @@ CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper
 
 ---
 
-## 5. The 17 actions at a glance
+## 5. The 18 actions at a glance
 
-| # | Action | What it does | Dedicated subcommand |
-|---|--------|-------------|----------------------|
-| 1 | `ingest` | arXiv id / URL / PDF / title → Markdown + memory blocks | `clio-author ingest <source>` |
-| 2 | `ask` | Answer a question grounded in memory blocks | `clio-author ask` |
-| 3 | `cite` | Verify citation candidates (suggestions only, never edits) | `clio-author cite` |
-| 4 | `review` | Structured peer review of a paper | `clio-author review` |
-| 5 | `meta_review` | Aggregate several reviews into one area-chair meta-review | `clio-author run meta_review` |
-| 6 | `plan` | Turn an idea or outline into per-section writing plans (tasks, claims, sources, word budgets) | `clio-author plan` |
-| 7 | `write` | Draft a single section from an outline + source | `clio-author write` |
-| 8 | `edit` | Revise a draft to address reviewer feedback | `clio-author run edit` |
-| 9 | `polish` | Improve prose clarity, flow, and academic voice | `clio-author polish` |
-| 10 | `coherence` | Check cross-section consistency of a manuscript | `clio-author coherence` |
-| 11 | `kg` | Content knowledge graph: claims/methods/datasets/results + relations (from memory blocks) | `clio-author kg` |
-| 12 | `describe_figures` | Fill figure descriptions / captions in memory blocks | `clio-author describe` |
-| 13 | `plot` | Generate matplotlib plot code (code text only) | `clio-author run plot` |
-| 14 | `compose` | Whole-paper orchestration: idea → outline → cite → plan → write → assemble | `clio-author compose` |
-| 15 | `export` | Markdown manuscript → standalone LaTeX (`paper.tex` + `references.bib`) | `clio-author export` |
-| 16 | `write_review` | Writer ↔ reviewer critic-refine loop | `clio-author run write_review` |
-| 17 | `figure_refine` | Figure visualizer ↔ critic refine loop | `clio-author run figure_refine` |
+| # | Action | What it's for — use it to… | Subcommand |
+|---|--------|-----------------------------|------------|
+| 1 | `ingest` | **Read a paper.** Turn an arXiv id / URL / PDF / title into clean Markdown + structured memory blocks + extracted figures — the substrate every other action builds on. | `clio-author ingest <source>` |
+| 2 | `ask` | **Understand a paper.** Get an answer to a question, grounded only in the paper's blocks, with the blocks it used cited. | `clio-author ask` |
+| 3 | `cite` | **Check the scholarship.** Verify citation candidates against scholarly databases and get BibTeX *suggestions* — never edits your refs; fights fabricated citations. | `clio-author cite` |
+| 4 | `review` | **Judge a paper.** Produce a peer review: an Accept/Reject decision, 1–10 + per-axis scores, and a structured critique (add `--ground` to cite real related work). | `clio-author review` |
+| 5 | `meta_review` | **Decide as a panel.** Aggregate several reviews into one area-chair decision (offline, no model). | `clio-author run meta_review` |
+| 6 | `plan` | **Blueprint a section.** Turn an idea/outline into per-section writing plans — tasks, claims, sources, word budgets — before any prose is written. | `clio-author plan` |
+| 7 | `write` | **Draft a section.** Write one section grounded strictly in supplied source material (optionally following a `plan`). | `clio-author write` |
+| 8 | `edit` | **Revise to feedback.** Rewrite existing prose to address specific reviewer weaknesses, preserving citations/claims. | `clio-author run edit` |
+| 9 | `polish` | **Improve the prose.** Tighten clarity, flow, and academic voice (optional target voice) without changing meaning. | `clio-author polish` |
+| 10 | `coherence` | **Catch contradictions.** Check a manuscript's sections for terminology drift, contradictions, undefined terms, and broken flow. | `clio-author coherence` |
+| 11 | `kg` | **Map a paper's content.** Extract a knowledge graph of claims/methods/datasets/results + relations (distinct from a citation graph). | `clio-author kg` |
+| 12 | `describe_figures` | **Caption figures.** Fill in figure descriptions (Gemini vision *looks at* the image when enabled) for context injection. | `clio-author describe` |
+| 13 | `plot` | **Make a plot/diagram.** Generate matplotlib code (or, with vision, a real diagram image). | `clio-author run plot` |
+| 14 | `compose` | **Write a whole paper.** One call: idea → outline → cite → (plan) → write each section → (review) → assemble. | `clio-author compose` |
+| 15 | `export` | **Ship LaTeX.** Convert a Markdown manuscript into a compilable `paper.tex` (+ `references.bib`). | `clio-author export` |
+| 16 | `write_review` | **Self-improve a draft.** Writer↔reviewer loop: draft → critique → revise, to better prose. | `clio-author run write_review` |
+| 17 | `figure_refine` | **Self-improve a figure.** Visualizer↔critic loop on a figure spec. | `clio-author run figure_refine` |
+| 18 | `orchestrate` | **Hand it a goal.** Plan and run a sequence of the above actions to achieve a natural-language goal (dynamic multi-step). | `clio-author orchestrate` |
 
 Actions without a dedicated subcommand are reachable via `clio-author run <action> --json '...'`.
 

@@ -6,9 +6,15 @@ sources → judge → write → refine → illustrate → ship.**
 
 - Every command prints a JSON result on **stdout** (logs → stderr; add `2>/dev/null` for clean JSON).
   Exit code `0` = ok, `1` = error.
-- **Every** subcommand accepts `--json '{...}'` (merge extra payload keys) and `--out FILE`
-  (also save the result — prose for `.md`/`.txt`, full JSON for `.json`).
+- **Every** subcommand accepts `--out FILE` (also save the result — prose for `.md`/`.txt`, full
+  JSON for `.json`). Text actions and most file-reading subcommands also accept `--json '{...}'`
+  (merge extra payload keys) — see the per-subcommand tables below for which flags each one takes.
 - Text actions need a model (`CLIO_LLM=…`); without one they return an offline **echo** placeholder.
+
+> **Single-file rule.** Every `--*-file` flag reads exactly **one** file (internally `_read_file`
+> in `cli.py`; no `nargs`, `append`, or glob). To supply several files as context, concatenate them
+> into one file first, or `ingest` each one and pass the resulting `blocks.json`. This applies to
+> every file-taking flag listed in this document.
 
 ---
 
@@ -45,8 +51,8 @@ GEMINI_API_KEY=...
 
 | Flag | Meaning |
 |---|---|
-| `--json '{...}'` | merge a JSON object into the action payload (reach any payload key) |
 | `--out FILE` | also write the result — prose `content` for `.md`/`.txt`, full JSON for `.json` |
+| `--json '{...}'` | merge a JSON object into the action payload (available on all subcommands except `capabilities`) |
 | `-h` / `--help` | show that subcommand's exact flags |
 
 ## 3. Health check
@@ -55,13 +61,14 @@ GEMINI_API_KEY=...
 uv run ruff check clio_author tests        # -> All checks passed!
 uv run mypy clio_author                    # -> Success: no issues found in 55 source files
 uv run pytest -q                           # -> 434 passed, 3 skipped, 10 deselected
-uv run clio-author capabilities            # -> name=clio-author, version 0.3.0, 17 actions
+uv run clio-author capabilities            # -> name=clio-author, version 0.3.0, 18 actions
 ```
 
-> **14 subcommands** have dedicated flags: `capabilities, ingest, ask, review, cite, plan, write,
-> compose, export, polish, coherence, kg, describe, run`. The other **5 actions** (`edit`,
-> `meta_review`, `plot`, `write_review`, `figure_refine`) have **no dedicated subcommand** — reach
-> them with `clio-author run <action> --json '{...}'`. `run <action>` works for *any* of the 17 actions.
+> **15 subcommands** have dedicated flags: `capabilities, ingest, ask, review, cite, plan, write,
+> compose, export, polish, coherence, kg, describe, orchestrate, run`. The other **5 actions**
+> (`edit`, `meta_review`, `plot`, `write_review`, `figure_refine`) have **no dedicated subcommand**
+> — reach them with `clio-author run <action> --json '{...}'`. `run <action>` works for *any* of
+> the 18 actions.
 
 ---
 
@@ -69,8 +76,14 @@ uv run clio-author capabilities            # -> name=clio-author, version 0.3.0,
 
 ## Act I · Read → clean Markdown + memory blocks  *(run first; later acts reuse this)*
 
-**`ingest`** — `clio-author ingest SOURCE [--json] [--out]`. SOURCE = arXiv id / arXiv-or-HTTP URL /
-paper title / topic / local PDF path. Payload keys: `source`, `out_dir` (via `--json`). Needs `--extra pdf`.
+**`ingest`** — convert an arXiv id / URL / PDF / paper title into Markdown + memory blocks.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `source` (positional) | string | arXiv id, arXiv-or-HTTP URL, local PDF path, or paper title/topic. **One source only.** |
+| `--json` | JSON object | merge any payload key (e.g. `{"out_dir":"..."}`) |
+| `--out` | file path | save result |
+
 ```bash
 # arXiv id, persist to a folder (paper.md + blocks.json + img/ + the pdf):
 uv run --extra pdf clio-author ingest 2601.23265 --json '{"out_dir":"runbook-out/ingest"}'
@@ -85,8 +98,17 @@ uv run --extra pdf clio-author ingest ./mypaper.pdf                      # local
 
 ## Act II · Understand it
 
-**`ask`** — `clio-author ask --question Q [--blocks-json | --blocks-file] [--format] [--json] [--out]`.
-Payload keys: `question`, `blocks`.
+**`ask`** — answer a question grounded in memory blocks.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--question` | string (required) | the question to answer |
+| `--blocks-json` | JSON string | inline MemoryBlocks dump; prefer `--blocks-file` for real papers |
+| `--blocks-file` | one file | path to a JSON MemoryBlocks file (avoids arg-length limits) |
+| `--format` | `structured`\|`prose` | default `structured` (JSON); `prose` for human-readable text |
+| `--json` | JSON object | merge any additional payload key |
+| `--out` | file path | save result |
+
 ```bash
 CLIO_LLM=claude uv run clio-author ask \
   --question "What problem does this paper solve?" \
@@ -96,9 +118,16 @@ CLIO_LLM=claude uv run clio-author ask \
 # inline blocks instead of a file: --blocks-json '{"sections":[...]}'
 ```
 
-**`kg`** — `clio-author kg [--blocks-json | --blocks-file] [--format] [--json] [--out]`. Content
-knowledge graph (claims/methods/datasets/results/metrics/concepts/tasks + relations). Payload keys:
-`blocks`, `out_dir` (via `--json`).
+**`kg`** — extract a content knowledge graph (claims/methods/datasets/results/metrics/concepts/tasks + relations).
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--blocks-json` | JSON string | inline MemoryBlocks dump |
+| `--blocks-file` | one file | path to a JSON MemoryBlocks file |
+| `--format` | `structured`\|`prose` | `prose` emits a Mermaid `graph TD` rendering |
+| `--json` | JSON object | merge payload keys, e.g. `{"out_dir":"..."}` to write `kg.json`/`kg.mmd` |
+| `--out` | file path | save result |
+
 ```bash
 CLIO_LLM=claude uv run clio-author kg \
   --blocks-file runbook-out/ingest/blocks.json \
@@ -111,8 +140,16 @@ CLIO_LLM=claude uv run clio-author kg \
 
 ## Act III · Verify the scholarship
 
-**`cite`** — `clio-author cite [--candidates-json | --candidates-file] [--format] [--json] [--out]`.
-Verifies refs, emits **suggestions only**. Payload keys: `candidates`, `out_dir` (via `--json`).
+**`cite`** — verify citation candidates; emits **suggestions only**, never overwrites.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--candidates-json` | JSON string | inline list of `{title, year?, reason?}` |
+| `--candidates-file` | one file | same format, as a JSON file |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys, e.g. `{"out_dir":"..."}` to persist `suggested.bib` |
+| `--out` | file path | save result |
+
 Backend via `CLIO_SCHOLAR` (see §1). Needs `--extra scholar` only for the Semantic-Scholar path
 (arxiv/openalex/crossref are stdlib).
 ```bash
@@ -129,10 +166,20 @@ CLIO_SCHOLAR=openalex uv run clio-author cite --candidates-json '[{"title":"Atte
 
 ## Act IV · Judge it
 
-**`review`** — `clio-author review [--paper | --paper-file] [--ground] [--format] [--json] [--out]`.
-Payload keys: `paper`, `persona`, `ground`. Output: **decision = Accept | Reject**, **overall 1–10**,
-**7 axes 1–4** (originality, quality, clarity, significance, soundness, presentation, contribution),
-**confidence 1–5**, + summary/strengths/weaknesses/questions/limitations.
+**`review`** — produce a structured peer review of a paper.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--paper` | string | paper Markdown text (inline) |
+| `--paper-file` | one file | path to a paper Markdown file (e.g. `paper.md`) |
+| `--ground` | flag | retrieve related prior work via `CLIO_SCHOLAR` and ground the review in it |
+| `--format` | `structured`\|`prose` | default `structured`; `prose` = narrative text |
+| `--json` | JSON object | merge payload keys; use `{"persona":{"label":"..."}}` for reviewer persona |
+| `--out` | file path | save result |
+
+Output: **decision = Accept \| Reject**, **overall 1–10**, **7 axes 1–4** (originality, quality,
+clarity, significance, soundness, presentation, contribution), **confidence 1–5**, + summary/
+strengths/weaknesses/questions/limitations.
 ```bash
 # (a) prose review (narrative):
 CLIO_LLM=claude uv run clio-author review --paper-file runbook-out/ingest/paper.md \
@@ -152,14 +199,26 @@ CLIO_LLM=claude uv run clio-author review --paper-file runbook-out/ingest/paper.
 ```
 **Expect:** in (b) `metadata.decision` ∈ {Accept, Reject}, `metadata.overall` 1–10; (c) adds `metadata.related_work`.
 
-**`meta_review`** *(run-only)* — aggregate reviews → one area-chair decision (offline). Payload key: `reviews`.
+**`meta_review`** *(run-only)* — aggregate reviews → one area-chair decision (offline).
+
+Payload keys: `reviews` (list of review dicts).
 ```bash
 uv run clio-author run meta_review \
   --json '{"reviews":[{"Overall":7,"Decision":"Accept"},{"Overall":5,"Decision":"Reject"}]}'
 ```
 
-**`coherence`** — `clio-author coherence [--sections-json | --sections-file | --markdown-file | --text] [--format] [--json] [--out]`.
-Cross-section consistency (terminology, contradictions, undefined terms, duplication, flow). Payload keys: `sections`, `markdown`, `text`.
+**`coherence`** — check cross-section consistency (terminology, contradictions, undefined terms, duplication, flow).
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--sections-json` | JSON string | inline list of `{title, draft}` |
+| `--sections-file` | one file | same format, as a JSON file |
+| `--markdown-file` | one file | a full Markdown manuscript to split into sections |
+| `--text` | string | single passage to check (inline fallback) |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge any additional payload key |
+| `--out` | file path | save result |
+
 ```bash
 CLIO_LLM=claude uv run clio-author coherence \
   --sections-json '[{"title":"Introduction","draft":"X improves accuracy by 5%."},{"title":"Results","draft":"X achieves a 12% gain."}]' \
@@ -171,11 +230,27 @@ CLIO_LLM=claude uv run clio-author coherence \
 
 ## Act V · Plan, then write a new paper
 
-**`plan`** — `clio-author plan [--idea | --idea-file] [--log | --log-file] [--outline-json | --outline-file] [--blocks-file] [--candidates-file] [--out-dir] [--format] [--json] [--out]`.
-Turn an idea (or a given outline) into per-section **writing plans** — ordered **tasks**, **claims**,
-**sources**, word budgets, citation hints. Payload keys: `idea`, `experimental_log`, `outline`,
-`blocks`, `candidates`, `out_dir`. The output `plans` feed `write` (`--json '{"section_plan":{...}}'`)
-or `compose --plan`.
+**`plan`** — turn an idea or outline into per-section writing plans (tasks, claims, sources, word budgets).
+
+> `plan` has **no** `--source`/`--source-file` flags (unlike `write`). Ground it via
+> `--blocks-file` or `--log`/`--log-file`.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--idea` | string | research idea / thesis (inline) |
+| `--idea-file` | one file | file holding the idea text |
+| `--log` | string | experimental log / results notes (inline) |
+| `--log-file` | one file | file holding the experimental log |
+| `--outline-json` | JSON string | a `PaperOutline` to plan against instead of generating one |
+| `--outline-file` | one file | same format, as a JSON file |
+| `--blocks-file` | one file | JSON MemoryBlocks file for grounding |
+| `--candidates-file` | one file | JSON citation candidates to fold into citation hints |
+| `--out-dir` | directory | persist `plan.json` |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge any additional payload key |
+| `--out` | file path | save result |
+
+The output `plans` feed `write` (`--json '{"section_plan":{...}}'`) or `compose --plan`.
 ```bash
 CLIO_LLM=claude uv run clio-author plan \
   --idea "AUTHOR: a multi-agent system that reads, reviews, and writes scientific papers." \
@@ -187,25 +262,50 @@ CLIO_LLM=claude uv run clio-author plan --idea "cooperating agents for the paper
 **Expect:** `num_sections`, `num_tasks`, `plan_errors=0`; each plan has tasks/claims/sources + a word budget.
 **Artifacts:** `runbook-out/plan-out/plan.json`.
 
-**`write`** — `clio-author write [--source | --source-file] [--outline] [--format] [--json] [--out]`.
-Drafts one section, grounded in the source; pass a plan via `--json '{"section_plan":{...}}'` to follow it.
-Payload keys: `outline`, `section_plan`, `blocks`, `source`, `vision`, `out_path`.
+**`write`** — draft one paper section from an outline and source material.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--source` | string | source material (inline) |
+| `--source-file` | one file | source-material file (e.g. `paper.md`) — single file only |
+| `--outline` | string | the section title; richer outlines (with `goal`, etc.) via `--json '{"outline":{...}}'` |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys; use for `section_plan`, `blocks`, `vision`, `out_path` |
+| `--out` | file path | save result |
+
 ```bash
 CLIO_LLM=claude uv run clio-author write \
   --outline "Introduction" --source-file runbook-out/ingest/paper.md --format prose
 ```
 
-**`write_review`** *(run-only)* — writer ↔ reviewer refine loop. Payload keys: `outline`, `section_plan`, `blocks`, `source`, `max_rounds`.
+**`write_review`** *(run-only)* — writer ↔ reviewer critic-refine loop.
+
+Payload keys: `outline`, `section_plan`, `blocks`, `source`, `max_rounds`.
 ```bash
 CLIO_LLM=claude uv run clio-author run write_review \
   --json '{"outline":{"title":"Introduction","goal":"introduce AUTHOR"},"source":"AUTHOR reads, reviews, and writes papers.","max_rounds":1}'
 ```
 
-**`compose`** — the whole paper. Full flag set:
-`--idea | --idea-file`, `--log | --log-file`, `--outline-json | --outline-file`, `--candidates-file`,
-`--plan`, `--review`, `--max-rounds N`, `--out-dir DIR`, `--latex`, `--format`, `--json`, `--out`.
-Payload keys: `idea`, `experimental_log`, `outline`, `candidates`, `blocks`, `plan`, `review`, `max_rounds`, `out_dir`.
-(`--plan` runs the planner per section before writing, so each section follows a tasks/claims plan.)
+**`compose`** — draft a whole multi-section manuscript (outline → cite → write per section → assemble).
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--idea` | string | research idea / thesis (inline) |
+| `--idea-file` | one file | file holding the idea text |
+| `--log` | string | experimental log / results notes (inline) |
+| `--log-file` | one file | file holding the experimental log |
+| `--outline-json` | JSON string | a `PaperOutline` to use instead of generating one |
+| `--outline-file` | one file | same format, as a JSON file |
+| `--candidates-file` | one file | JSON citation candidates to verify and cite |
+| `--review` | flag | run a per-section writer/reviewer refine loop |
+| `--max-rounds` | int (default 3) | max writer/reviewer rounds per section when `--review` is set |
+| `--out-dir` | directory | persist `paper.md` + per-section files |
+| `--latex` | flag | also export `paper.tex` (+`references.bib`) when `--out-dir` is set |
+| `--plan` | flag | plan each section (tasks/claims/sources) before drafting |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys; use for `blocks` and other advanced keys |
+| `--out` | file path | save result |
+
 ```bash
 # provided outline, no review:
 CLIO_LLM=claude uv run clio-author compose \
@@ -225,14 +325,26 @@ CLIO_LLM=claude uv run clio-author compose \
 
 ## Act VI · Refine the prose
 
-**`edit`** *(run-only)* — revise prose to address feedback (preserves citations). Payload keys: `draft`, `review`, `critic_notes`, `target`.
+**`edit`** *(run-only)* — revise prose to address reviewer feedback (preserves citations).
+
+Payload keys: `draft`, `review`, `critic_notes`, `target`.
 ```bash
 CLIO_LLM=claude uv run clio-author run edit \
   --json '{"draft":"We propose a system. It is good.","review":{"weaknesses":["no baseline comparison","unclear evaluation"]}}'
 ```
 
-**`polish`** — `clio-author polish [--text | --text-file] [--voice V] [--target FILE] [--format] [--json] [--out]`.
-Payload keys: `text`, `draft`, `voice`, `target`.
+**`polish`** — polish prose for clarity, flow, and academic voice.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--text` | string | prose to polish (inline) |
+| `--text-file` | one file | file holding the prose to polish |
+| `--voice` | string | target voice, e.g. `concise` or `formal` |
+| `--target` | one file | file (under harness root) to apply the polished text to |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys; also reads `draft` via `--json` |
+| `--out` | file path | save result |
+
 ```bash
 CLIO_LLM=claude uv run clio-author polish \
   --text "We propose a method. It is good. It does many useful things." \
@@ -245,6 +357,7 @@ CLIO_LLM=claude uv run clio-author polish \
 ## Act VII · Illustrate
 
 **`plot`** *(run-only)* — generate matplotlib code (or a Gemini image with `kind="diagram"` + `CLIO_VISION=gemini`).
+
 Payload keys: `spec`, `out_path`.
 ```bash
 CLIO_LLM=claude uv run clio-author run plot \
@@ -254,8 +367,17 @@ CLIO_VISION=gemini CLIO_LLM=claude uv run clio-author run plot \
   --json '{"spec":{"kind":"diagram","intent":"flowchart: ingest -> review -> write"},"out_path":"runbook-out/diagram.png"}'
 ```
 
-**`describe`** (action `describe_figures`) — `clio-author describe [--blocks-json | --blocks-file] [--format] [--json] [--out]`.
-Caption figures (Gemini vision *looks at* the image when `CLIO_VISION=gemini`). Payload keys: `blocks`, `figures`, `context`.
+**`describe`** (action `describe_figures`) — caption figures using vision.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--blocks-json` | JSON string | inline MemoryBlocks dump whose figures to describe |
+| `--blocks-file` | one file | path to a JSON MemoryBlocks file |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys; also reads `figures` and `context` |
+| `--out` | file path | save result |
+
+Caption figures (Gemini vision *looks at* the image when `CLIO_VISION=gemini`).
 ```bash
 CLIO_VISION=gemini uv run clio-author describe \
   --blocks-json '{"figures":[{"figure_id":1,"image_path":"'"$PWD"'/runbook-out/ingest/img/figure1.png"}]}' \
@@ -263,7 +385,9 @@ CLIO_VISION=gemini uv run clio-author describe \
 ```
 **Expect:** `vision_described:[1]` + a real description.
 
-**`figure_refine`** *(run-only)* — visualizer ↔ critic loop. Payload keys: `spec`, `out_path`, `max_rounds`.
+**`figure_refine`** *(run-only)* — figure visualizer ↔ critic refine loop.
+
+Payload keys: `spec`, `out_path`, `max_rounds`.
 ```bash
 CLIO_LLM=claude uv run clio-author run figure_refine \
   --json '{"spec":{"kind":"plot","intent":"line chart of loss vs epochs; save to figure.png"},"max_rounds":1}' \
@@ -279,8 +403,21 @@ print('rendered:', render_plot_code(code, Path('runbook-out/figure.png'), timeou
 
 ## Act VIII · Ship it — LaTeX
 
-**`export`** — `clio-author export [--title T] [--sections-json | --sections-file | --markdown-file] [--bibtex-file F] [--out-dir DIR] [--json] [--out]`.
-Markdown → compilable `paper.tex` (+ `references.bib`). Payload keys: `title`, `sections`, `markdown`, `outline`, `bibtex`, `out_dir`.
+**`export`** — convert Markdown to compilable `paper.tex` (+ `references.bib`).
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--title` | string | manuscript title (optional) |
+| `--sections-json` | JSON string | inline list of `{title, draft}` |
+| `--sections-file` | one file | same format, as a JSON file |
+| `--markdown-file` | one file | a full Markdown manuscript to split and export |
+| `--bibtex-file` | one file | BibTeX file to emit as `references.bib` |
+| `--out-dir` | directory | persist `paper.tex` (+ `references.bib`) |
+| `--json` | JSON object | merge payload keys (`title`, `sections`, `markdown`, `outline`, `bibtex`, `out_dir`) |
+| `--out` | file path | save result |
+
+Note: `export` has no `--format` flag.
+
 ```bash
 uv run clio-author export --title "Demo Paper" \
   --sections-json '[{"title":"Introduction","draft":"We present **AUTHOR**."},{"title":"Method","draft":"It uses a multi-agent pipeline."}]' \
@@ -300,23 +437,94 @@ CLIO_LLM=claude uv run clio-author compose \
 
 ---
 
+## Act IX · Drive it with a goal
+
+**`orchestrate`** — plan and run a sequence of actions to achieve a natural-language goal.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--goal` | string | the goal to achieve (inline) |
+| `--goal-file` | one file | file holding the goal text |
+| `--inputs-json` | JSON object | named inputs dict (inline), e.g. `{"source":"2601.23265"}`; referenced as `@name` in the plan |
+| `--inputs-file` | one file | same format, as a JSON file |
+| `--max-steps` | int (default 6) | maximum number of planned steps to execute |
+| `--out-dir` | directory | persist `orchestrate.json` |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge any additional payload key |
+| `--out` | file path | save result |
+
+```bash
+# ingest a paper and review it in one goal-driven run:
+CLIO_LLM=claude uv run clio-author orchestrate \
+  --goal "Ingest the paper 2601.23265, then produce a structured peer review." \
+  --inputs-json '{"source":"2601.23265"}' \
+  --max-steps 4 --out-dir runbook-out/orchestrate-out
+
+# goal from a file, inputs from a file:
+CLIO_LLM=claude uv run clio-author orchestrate \
+  --goal-file runbook-out/goal.txt \
+  --inputs-file runbook-out/inputs.json \
+  --out-dir runbook-out/orchestrate-out
+```
+**Artifacts:** `runbook-out/orchestrate-out/orchestrate.json`.
+
+---
+
+## The 5 run-only actions — payload key reference
+
+These actions have no dedicated subcommand. Reach them with `clio-author run <action> --json '{...}'`.
+
+| Action | Payload keys | Purpose |
+|---|---|---|
+| `edit` | `draft`, `review`, `critic_notes`, `target` | revise prose to address reviewer feedback |
+| `meta_review` | `reviews` | aggregate several reviews into one area-chair meta-review |
+| `plot` | `spec`, `out_path` | generate matplotlib code or a Gemini diagram image |
+| `write_review` | `outline`, `section_plan`, `blocks`, `source`, `max_rounds` | writer ↔ reviewer critic-refine loop |
+| `figure_refine` | `spec`, `out_path`, `max_rounds` | figure visualizer ↔ critic refine loop |
+
+---
+
 ## 4. Where outputs go
 - **stdout** always (the JSON result); **`--out FILE`** to also save it.
 - **`out_dir` / `out_path`** (payload keys / `--out-dir`) persist structured artifacts:
   ingest → `paper.md`+`blocks.json`+`img/`; cite → `suggested.bib`; kg → `kg.json`+`kg.mmd`;
   compose → `paper.md`+`sections/`(+`paper.tex` with `--latex`); export → `paper.tex`+`references.bib`;
-  write/plot/figure_refine → `out_path`.
+  orchestrate → `orchestrate.json`; write/plot/figure_refine → `out_path`.
 - Print-only otherwise (ask, review, edit, polish, coherence, meta_review) — use `--out` to capture.
 
 ## 5. Tips
 - Pretty-print JSON: `… 2>/dev/null | python3 -m json.tool`.
 - Any action: `clio-author run <action> --json '{...}'` (the universal escape hatch).
-- Big inputs → use the `--*-file` flags (inline JSON can exceed the shell arg limit).
+- Big inputs → use the `--*-file` flags (inline JSON can exceed the shell arg limit). Each
+  `--*-file` flag reads exactly **one** file — concatenate multiple inputs before passing.
 - In-process: `from clio_author.integration.clio_adapter import ClioAuthorSubagent`;
   `ClioAuthorSubagent(llm=…).run("review", {"paper": "..."})`.
 - See a subcommand's exact flags anytime: `clio-author <cmd> --help`.
 
-## Appendix — each action's LLM prompt source (to read/tune)
+## Appendix A — all 18 actions at a glance
+
+| # | Action | Dedicated subcommand |
+|---|---|---|
+| 1 | `ingest` | `clio-author ingest <source>` |
+| 2 | `ask` | `clio-author ask` |
+| 3 | `review` | `clio-author review` |
+| 4 | `meta_review` | `clio-author run meta_review` |
+| 5 | `cite` | `clio-author cite` |
+| 6 | `write` | `clio-author write` |
+| 7 | `edit` | `clio-author run edit` |
+| 8 | `polish` | `clio-author polish` |
+| 9 | `coherence` | `clio-author coherence` |
+| 10 | `kg` | `clio-author kg` |
+| 11 | `plan` | `clio-author plan` |
+| 12 | `describe_figures` | `clio-author describe` |
+| 13 | `plot` | `clio-author run plot` |
+| 14 | `compose` | `clio-author compose` |
+| 15 | `export` | `clio-author export` |
+| 16 | `write_review` | `clio-author run write_review` |
+| 17 | `figure_refine` | `clio-author run figure_refine` |
+| 18 | `orchestrate` | `clio-author orchestrate` |
+
+## Appendix B — each action's LLM prompt source (to read/tune)
 | Action | Prompt constant | File |
 |---|---|---|
 | ask | `PAPER_QA_SYSTEM_PROMPT` | `clio_author/experts/paper_qa.py` |
@@ -330,5 +538,6 @@ CLIO_LLM=claude uv run clio-author compose \
 | kg | `KG_SYSTEM_PROMPT` + `KG_PROMPT` | `clio_author/experts/kg.py`, `clio_author/retrieval/kg.py` |
 | plot / describe / figure_refine | figure prompts | `clio_author/experts/figure_agent.py` |
 | compose | outline-gen prompt | `clio_author/experts/compose.py` |
+| orchestrate | orchestrate prompt | `clio_author/experts/orchestrate.py` |
 | cite | (deterministic verify) | `clio_author/retrieval/scholar.py` |
 | export | (deterministic Markdown→LaTeX) | `clio_author/export/latex.py` |
