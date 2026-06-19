@@ -1,4 +1,4 @@
-# Adapted from the paper-to-md project (MIT, (c) 2025 Jaime Cernuda): https://github.com/JaimeCernuda/paper-to-md
+# Adapted from the paper-to-md project (MIT): https://github.com/JaimeCernuda/paper-to-md
 """Section processing: reconstruct heading hierarchy from numbering depth.
 
 Academic PDFs lose their heading structure during extraction. This pass rebuilds

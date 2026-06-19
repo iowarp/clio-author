@@ -1,4 +1,4 @@
-# Adapted from the paper-to-md project (MIT, (c) 2025 Jaime Cernuda): https://github.com/JaimeCernuda/paper-to-md
+# Adapted from the paper-to-md project (MIT): https://github.com/JaimeCernuda/paper-to-md
 """Deterministic regex-only post-processing for extracted scientific Markdown.
 
 This package layers an academic clean-up pass on top of raw (Docling/OCR)

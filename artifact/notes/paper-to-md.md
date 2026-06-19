@@ -9,7 +9,7 @@ Studied: 2026-06-15. Read-only. This is the PDF→Markdown conversion core for c
 
 **Purpose.** Convert academic PDF papers into clean, RAG-ready Markdown with linked citations, embedded figures, structured author metadata, and machine-readable enrichment JSON (figures/equations/code). Distributed as a CLI tool `pdf2md`, plus an optional Dockerized FastAPI microservice and a Claude Code MCP integration.
 
-**Package name / version / license.** `paper-to-md` v`0.2.1`, MIT (`LICENSE`, © 2025 Jaime Cernuda). Author email in `pyproject.toml`: `jcernudagarcia@hawk.iilinoistech.edu` (Illinois Tech). Homepage: `github.com/JaimeCernuda/paper-to-md`.
+**Package name / version / license.** `paper-to-md` v`0.2.1`, MIT (see the repo LICENSE). Homepage: `github.com/JaimeCernuda/paper-to-md`.
 
 **Language / build.** Python `>=3.10,<3.13`. Build backend `hatchling`. Console entry point `pdf2md = "pdf2md.cli:app"` (`pyproject.toml` line 60). Wheel packages: `pdf2md` and `service`.
 
