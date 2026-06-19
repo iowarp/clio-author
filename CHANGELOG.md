@@ -7,6 +7,7 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **MCP bridge (`mcp` extra) + host-integration proof.** `clio_author/integration/mcp_bridge.py` exposes the subagent over MCP (FastMCP, stdio) so MCP-only hosts can invoke it; the harness itself stays non-MCP. Verified end-to-end that **Claude (CLI), Codex (CLI), and CLIO (its tool gateway)** each invoke clio-author and get the identical result — see `docs/INTEGRATION.md`.
 - **Multimodal review.** `review` now *looks at* figures when a vision client is enabled (`CLIO_VISION=gemini` + `--figures-json`/`--figures-file` or `blocks`): each figure is described and folded into the reviewed text, so the critique is vision-grounded. Backward compatible (no vision / no figures -> unchanged); records `vision_review` / `figures_seen`.
 - **`rebuttal` action** (19th) + `RebuttalExpert` — draft an author response addressing a review point by point (concede/clarify/propose revisions), grounded in the paper, inventing no new claims or citations. CLI: `clio-author rebuttal --paper-file P --review-json '{...}'`.
 - **`plan` action + `PlannerExpert`** (17th action) — turn an idea or a `PaperOutline` into per-section

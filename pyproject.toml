@@ -32,6 +32,7 @@ scholar = ["thefuzz", "httpx"]
 # actual rendering is gated behind `render_plot_code` (subprocess + `live`
 # marker). Install with `uv sync --extra viz` to run the gated render tests.
 viz = ["matplotlib"]
+mcp = ["fastmcp"]
 
 [dependency-groups]
 dev = ["pytest", "ruff", "mypy"]
