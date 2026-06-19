@@ -36,3 +36,6 @@ dist/
 
 # subagent-demo scratch
 /demo-out/
+
+# extra audit scratch
+/audit-out2/
