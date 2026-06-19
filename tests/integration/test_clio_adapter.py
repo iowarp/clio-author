@@ -30,6 +30,7 @@ _ROUTED_ACTIONS = {
     "coherence",
     "kg",
     "plan",
+    "orchestrate",
 }
 
 
@@ -39,8 +40,8 @@ def test_capabilities_shape_lists_all_actions() -> None:
     assert isinstance(caps["version"], str) and caps["version"]
     actions = {entry["action"] for entry in caps["actions"]}
     assert actions == _ROUTED_ACTIONS
-    assert {"polish", "coherence", "kg"} <= actions
-    assert len(caps["actions"]) == 17
+    assert {"polish", "coherence", "kg", "orchestrate"} <= actions
+    assert len(caps["actions"]) == 18
     for entry in caps["actions"]:
         assert {"action", "description", "payload_keys"} <= entry.keys()
         assert isinstance(entry["payload_keys"], list)
@@ -75,3 +76,13 @@ def test_run_none_payload_does_not_raise() -> None:
     result = ClioAuthorSubagent().run("ingest", None)
     assert result["action"] == "ingest"
     json.dumps(result)
+
+
+def test_run_orchestrate_is_json_serializable() -> None:
+    # Under the default echo planner the plan does not parse -> error-flagged,
+    # but the result still round-trips through json.
+    result = ClioAuthorSubagent().run("orchestrate", {"goal": "ingest then review"})
+    assert result["action"] == "orchestrate"
+    assert set(result) == {"action", "content", "structured", "metadata"}
+    assert "error" in result["metadata"]
+    assert json.loads(json.dumps(result)) == result

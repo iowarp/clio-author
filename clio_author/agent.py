@@ -33,6 +33,7 @@ from clio_author.experts.figure_agent import FigureAgentExpert, run_figure_refin
 from clio_author.experts.ingestor import IngestorExpert
 from clio_author.experts.kg import KGExpert
 from clio_author.experts.meta_reviewer import MetaReviewerExpert
+from clio_author.experts.orchestrate import run_orchestrate
 from clio_author.experts.paper_qa import PaperQAExpert
 from clio_author.experts.planner import PlannerExpert
 from clio_author.experts.polish import PolishExpert
@@ -204,10 +205,52 @@ class ClioAuthorAgent:
                 session=session,
             )
             return outputs[-1]
+        if action == "orchestrate":
+            # Local import of the capability manifest: it lives in the
+            # integration package whose __init__ imports this module's
+            # ClioAuthorAgent, so a top-level import would be circular.
+            from clio_author.integration.manifest import ACTIONS
+
+            return run_orchestrate(
+                task,
+                execute=self._execute_step,
+                manifest=ACTIONS,
+                llm=self.llm,
+                files=self.files,
+                session=session,
+            )
 
         # Unknown / None action -> echo fallthrough (M0 back-compat).
         outputs = self.engine.run([self.echo_expert], self.pattern, task, session)
         return outputs[-1]
+
+    def _execute_step(self, action: str, payload: dict[str, Any]) -> AgentOutput:
+        """Run ONE routed action for the orchestrator and return its output.
+
+        Builds a routed :class:`Task` and dispatches it through :meth:`_route`
+        (a single action against a fresh session), guarding the call so a failure
+        becomes an error-flagged output rather than propagating. ``orchestrate``
+        is refused here so the orchestrator cannot recurse into itself.
+        """
+        if action == "orchestrate":
+            return AgentOutput(
+                agent="clio-author",
+                content="",
+                metadata={"error": "orchestrate cannot call itself", "action": action},
+            )
+        step_task = Task(
+            id=uuid4().hex,
+            description=action,
+            payload={**payload, "action": action},
+        )
+        try:
+            return self._route(action, step_task)
+        except Exception as exc:  # noqa: BLE001 - never raise into the orchestrator
+            return AgentOutput(
+                agent="clio-author",
+                content="",
+                metadata={"error": str(exc), "action": action},
+            )
 
     # --- typed convenience methods ------------------------------------------ #
     def _invoke(self, action: str, payload: dict[str, Any]) -> AgentOutput:
