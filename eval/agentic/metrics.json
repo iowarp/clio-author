@@ -53,6 +53,21 @@
       "arm": "with_author_FAILED",
       "note": "first attempt with CLIO_LLM=codex -> clio-author review spawned codex-inside-codex -> deadlock/timeout (460s). Integration lesson: never nest a host in itself; use a no-LLM action (cite) or a different model for nested calls.",
       "errors": 1
+    },
+    {
+      "arm": "multimodal_figure_understanding",
+      "claude_without": "saw figure (Claude Code Read is multimodal)",
+      "codex_without": {
+        "saw": true,
+        "tokens": 36388
+      },
+      "author_with": {
+        "vision_described": [
+          1
+        ],
+        "saw": true
+      },
+      "finding": "all three saw the figure; AUTHOR vision redundant for already-multimodal hosts; value is for non-multimodal hosts + structured pipeline blocks"
     }
   ]
 }

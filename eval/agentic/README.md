@@ -46,3 +46,27 @@ See `prompts.md` for the exact task strings. `run.sh` runs all four arms and wri
 `reviews/*.md` + `metrics.json`. Requires the `claude` and `codex` CLIs on PATH and (for the WITH
 arms) `SEMANTIC_SCHOLAR_API_KEY` in `.env.local`. Full-access flags are intentional — the test is
 "give the agent everything and see if AUTHOR still helps."
+
+---
+
+## Multimodal arm (figure understanding) — an honest negative result
+
+Task: *describe what `figure/figure1.png` actually depicts.*
+
+| Host | Arm | Saw the figure? | Notes |
+|---|---|---|---|
+| Claude (haiku) | without AUTHOR | **Yes** | Claude Code's `Read` tool is itself multimodal — it rendered the PNG and described it correctly |
+| Codex | without AUTHOR | **Yes** | `codex exec` inspected the image directly (~36K tokens) and described it correctly |
+| AUTHOR (`describe`, Gemini vision) | with | **Yes** | `vision_described=[1]` — accurate description (the most detailed: 9 named sub-diagrams) |
+
+**Finding (reported honestly): this arm does *not* favor AUTHOR.** Modern coding-agent hosts
+(Claude Code, Codex) are already multimodal, so AUTHOR's figure-vision is **redundant for ad-hoc
+"look at this image"** with these hosts. AUTHOR's vision is still valuable for (a) **non-multimodal
+hosts/models**, and (b) producing **structured figure descriptions folded into the ingestion memory
+blocks** deterministically (consistent, reusable across the pipeline) — not as a vision the host lacks.
+
+### What this means for AUTHOR's value proposition
+The defensible differentiators are **grounding/verification** (the citation arm — a clear, repeatable
+win the host *cannot* match) and **determinism + structured, auditable output + the unified
+pipeline**, *not* "vision the host doesn't have." Stating this plainly is more credible than claiming
+a multimodal edge that modern hosts already cover.

@@ -1,0 +1,4 @@
+The figure is a collage split into two main columns: a large “Methodology Diagrams” section with multiple model/workflow schematics for vision-language reasoning, segmentation, sample selection, synthesis, and training pipelines, and a narrower “Statistical Plots” section. The statistical side contains small charts including bar plots, scatter/dot matrices, an energy-method evaluation bar chart, a donut chart of image categories, and a stacked distribution plot.
+tokens used
+36,388
+The figure is a collage split into two main columns: a large “Methodology Diagrams” section with multiple model/workflow schematics for vision-language reasoning, segmentation, sample selection, synthesis, and training pipelines, and a narrower “Statistical Plots” section. The statistical side contains small charts including bar plots, scatter/dot matrices, an energy-method evaluation bar chart, a donut chart of image categories, and a stacked distribution plot.
