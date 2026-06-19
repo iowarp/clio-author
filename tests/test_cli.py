@@ -51,6 +51,15 @@ def test_ingest_empty_source_is_error_json(capsys: pytest.CaptureFixture[str]) -
     assert "error" in result["metadata"]
 
 
+def test_orchestrate_action_prints_json_result(capsys: pytest.CaptureFixture[str]) -> None:
+    # The echo planner does not parse -> error-flagged "could not plan" (exit 1),
+    # but the command runs cleanly and prints a JSON result dict.
+    code, result = _run(capsys, ["orchestrate", "--goal", "ingest then review"])
+    assert code == 1
+    assert result["action"] == "orchestrate"
+    assert result["metadata"]["error"] == "could not plan for goal"
+
+
 def test_bad_json_payload_degrades_to_error_json(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -143,7 +152,7 @@ def test_cli_clio_llm_env_accepted_for_capabilities(
     monkeypatch.setenv("CLIO_LLM", "claude")
     code, result = _run(capsys, ["capabilities"])
     assert code == 0
-    assert len(result["actions"]) == 17
+    assert len(result["actions"]) == 18
 
 
 def test_cli_invalid_clio_llm_degrades_to_error(

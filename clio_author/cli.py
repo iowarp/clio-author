@@ -380,6 +380,45 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_kg)
     _add_json(p_kg)
 
+    p_orchestrate = sub.add_parser(
+        "orchestrate",
+        help="Plan and run a sequence of actions to achieve a natural-language goal.",
+    )
+    p_orchestrate.add_argument("--goal", default=None, help="The goal to achieve (inline).")
+    p_orchestrate.add_argument(
+        "--goal-file",
+        dest="goal_file",
+        default=None,
+        help="Path to a file holding the goal text.",
+    )
+    p_orchestrate.add_argument(
+        "--inputs-json",
+        dest="inputs_json",
+        default=None,
+        help='A JSON object of named inputs (inline), e.g. {"source": "2601.23265"}.',
+    )
+    p_orchestrate.add_argument(
+        "--inputs-file",
+        dest="inputs_file",
+        default=None,
+        help="Path to a JSON file of named inputs.",
+    )
+    p_orchestrate.add_argument(
+        "--max-steps",
+        dest="max_steps",
+        type=int,
+        default=6,
+        help="Maximum number of planned steps to execute (default 6).",
+    )
+    p_orchestrate.add_argument(
+        "--out-dir",
+        dest="out_dir",
+        default=None,
+        help="Directory to persist orchestrate.json (optional).",
+    )
+    _add_format(p_orchestrate)
+    _add_json(p_orchestrate)
+
     p_run = sub.add_parser(
         "run",
         help="Dispatch any adapter action by name (generic escape hatch).",
@@ -634,6 +673,21 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
             payload["blocks"] = blocks
         payload["format"] = args.fmt
         return "kg", payload
+    elif command == "orchestrate":
+        if args.goal_file is not None:
+            payload["goal"] = _read_file(args.goal_file, field="--goal-file")
+        elif args.goal is not None:
+            payload["goal"] = args.goal
+        inputs = _json_input(
+            args.inputs_file, args.inputs_json, field="inputs (--inputs-json/--inputs-file)"
+        )
+        if inputs is not None:
+            payload["inputs"] = inputs
+        payload["max_steps"] = args.max_steps
+        if args.out_dir is not None:
+            payload["out_dir"] = args.out_dir
+        payload["format"] = args.fmt
+        return "orchestrate", payload
     elif command == "run":
         return args.action, payload
     elif command == "describe":
