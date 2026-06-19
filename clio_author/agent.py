@@ -37,6 +37,7 @@ from clio_author.experts.orchestrate import run_orchestrate
 from clio_author.experts.paper_qa import PaperQAExpert
 from clio_author.experts.planner import PlannerExpert
 from clio_author.experts.polish import PolishExpert
+from clio_author.experts.rebuttal import RebuttalExpert
 from clio_author.experts.reviewer import ReviewerExpert
 from clio_author.experts.write_loop import run_write_review_loop
 from clio_author.experts.writer import WriterExpert
@@ -87,8 +88,9 @@ class ClioAuthorAgent:
         self.echo_expert = EchoExpert(self.llm)
         self.ingestor = IngestorExpert(self.llm, out_dir=files.root if files else None)
         self.paper_qa = PaperQAExpert(self.llm)
-        self.reviewer = ReviewerExpert(self.llm, scholar_client=scholar_client)
+        self.reviewer = ReviewerExpert(self.llm, scholar_client=scholar_client, vision=vision)
         self.meta_reviewer = MetaReviewerExpert(self.llm)
+        self.rebuttal = RebuttalExpert(self.llm, files=files)
         self.citation = CitationExpert(self.llm, client=scholar_client)
         self.writer = WriterExpert(self.llm, files=files)
         self.editor = EditorExpert(self.llm, files=files)
@@ -149,6 +151,8 @@ class ClioAuthorAgent:
             return self.reviewer.run(task, session)
         if action == "meta_review":
             return self.meta_reviewer.run(task, session)
+        if action == "rebuttal":
+            return self.rebuttal.run(task, session)
         if action == "cite":
             return self.citation.run(task, session)
         if action == "write":

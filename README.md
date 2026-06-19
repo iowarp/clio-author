@@ -36,7 +36,7 @@ cd clio-author
 uv sync
 ```
 
-**Step 3. Confirm it works** (prints the list of 18 things it can do — no model or network needed):
+**Step 3. Confirm it works** (prints the list of 19 things it can do — no model or network needed):
 
 ```bash
 uv run clio-author capabilities
@@ -137,6 +137,18 @@ uv run clio-author kg --blocks-file clio-out/<id>/blocks.json
 # Peer-review a paper (structured JSON, or --format prose):
 CLIO_LLM=claude uv run clio-author review \
   --paper-file clio-out/2601.23265/paper.md --format prose
+
+# Multimodal review — reviewer also looks at figures (needs CLIO_VISION=gemini):
+CLIO_VISION=gemini GEMINI_API_KEY=... CLIO_LLM=claude uv run clio-author review \
+  --paper-file clio-out/2601.23265/paper.md \
+  --figures-json '[{"figure_id":1,"image_path":"clio-out/2601.23265/img/figure1.png","caption":"Overview diagram"}]' \
+  --format prose
+
+# Draft an author rebuttal to a review, point by point:
+CLIO_LLM=claude uv run clio-author rebuttal \
+  --paper-file clio-out/2601.23265/paper.md \
+  --review-json '{"weaknesses":["no baseline comparison"],"questions":["how is X measured?"]}' \
+  --format prose
 
 # Aggregate several reviews into a single meta-review (no model needed):
 uv run clio-author run meta_review \
@@ -272,7 +284,7 @@ Other useful variables:
 |---|---|---|
 | `CLIO_LLM_MODEL` | Override the model name for the selected provider | provider default |
 | `CLIO_OLLAMA_URL` | Ollama server address | `http://localhost:11434` |
-| `CLIO_VISION` | Gemini vision for `describe_figures` / diagram generation | `off` |
+| `CLIO_VISION` | Gemini vision for `describe_figures`, `review` (with figures), and diagram generation | `off` |
 | `CLIO_VISION_MODEL` | Gemini describe model | `gemini-2.5-flash` |
 | `CLIO_IMAGE_MODEL` | Gemini image generation model | `gemini-2.5-flash-image` |
 
@@ -331,7 +343,7 @@ from clio_author.llm.providers import resolve_llm
 # Build the subagent. resolve_llm("claude") | "codex" | "ollama" | None (offline echo).
 sub = ClioAuthorSubagent(llm=resolve_llm("claude"))
 
-# 1) Discover what it can do (18 actions).
+# 1) Discover what it can do (19 actions).
 for a in sub.capabilities()["actions"]:
     print(a["action"], "—", a["description"])
 
@@ -375,28 +387,29 @@ CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper
 
 ---
 
-## 5. The 18 actions at a glance
+## 5. The 19 actions at a glance
 
 | # | Action | What it's for — use it to… | Subcommand |
 |---|--------|-----------------------------|------------|
 | 1 | `ingest` | **Read a paper.** Turn an arXiv id / URL / PDF / title into clean Markdown + structured memory blocks + extracted figures — the substrate every other action builds on. | `clio-author ingest <source>` |
 | 2 | `ask` | **Understand a paper.** Get an answer to a question, grounded only in the paper's blocks, with the blocks it used cited. | `clio-author ask` |
 | 3 | `cite` | **Check the scholarship.** Verify citation candidates against scholarly databases and get BibTeX *suggestions* — never edits your refs; fights fabricated citations. | `clio-author cite` |
-| 4 | `review` | **Judge a paper.** Produce a peer review: an Accept/Reject decision, 1–10 + per-axis scores, and a structured critique (add `--ground` to cite real related work). | `clio-author review` |
+| 4 | `review` | **Judge a paper.** Produce a peer review: an Accept/Reject decision, 1–10 + per-axis scores, and a structured critique (add `--ground` to cite real related work; add `--figures-json`/`--figures-file` with `CLIO_VISION=gemini` for a multimodal review that looks at the actual figure images). | `clio-author review` |
 | 5 | `meta_review` | **Decide as a panel.** Aggregate several reviews into one area-chair decision (offline, no model). | `clio-author run meta_review` |
-| 6 | `plan` | **Blueprint a section.** Turn an idea/outline into per-section writing plans — tasks, claims, sources, word budgets — before any prose is written. | `clio-author plan` |
-| 7 | `write` | **Draft a section.** Write one section grounded strictly in supplied source material (optionally following a `plan`). | `clio-author write` |
-| 8 | `edit` | **Revise to feedback.** Rewrite existing prose to address specific reviewer weaknesses, preserving citations/claims. | `clio-author run edit` |
-| 9 | `polish` | **Improve the prose.** Tighten clarity, flow, and academic voice (optional target voice) without changing meaning. | `clio-author polish` |
-| 10 | `coherence` | **Catch contradictions.** Check a manuscript's sections for terminology drift, contradictions, undefined terms, and broken flow. | `clio-author coherence` |
-| 11 | `kg` | **Map a paper's content.** Extract a knowledge graph of claims/methods/datasets/results + relations (distinct from a citation graph). | `clio-author kg` |
-| 12 | `describe_figures` | **Caption figures.** Fill in figure descriptions (Gemini vision *looks at* the image when enabled) for context injection. | `clio-author describe` |
-| 13 | `plot` | **Make a plot/diagram.** Generate matplotlib code (or, with vision, a real diagram image). | `clio-author run plot` |
-| 14 | `compose` | **Write a whole paper.** One call: idea → outline → cite → (plan) → write each section → (review) → assemble. | `clio-author compose` |
-| 15 | `export` | **Ship LaTeX.** Convert a Markdown manuscript into a compilable `paper.tex` (+ `references.bib`). | `clio-author export` |
-| 16 | `write_review` | **Self-improve a draft.** Writer↔reviewer loop: draft → critique → revise, to better prose. | `clio-author run write_review` |
-| 17 | `figure_refine` | **Self-improve a figure.** Visualizer↔critic loop on a figure spec. | `clio-author run figure_refine` |
-| 18 | `orchestrate` | **Hand it a goal.** Plan and run a sequence of the above actions to achieve a natural-language goal (dynamic multi-step). | `clio-author orchestrate` |
+| 6 | `rebuttal` | **Respond to a review.** Draft an author rebuttal addressing each weakness and question point by point, grounded strictly in the paper, inventing nothing. | `clio-author rebuttal` |
+| 7 | `plan` | **Blueprint a section.** Turn an idea/outline into per-section writing plans — tasks, claims, sources, word budgets — before any prose is written. | `clio-author plan` |
+| 8 | `write` | **Draft a section.** Write one section grounded strictly in supplied source material (optionally following a `plan`). | `clio-author write` |
+| 9 | `edit` | **Revise to feedback.** Rewrite existing prose to address specific reviewer weaknesses, preserving citations/claims. | `clio-author run edit` |
+| 10 | `polish` | **Improve the prose.** Tighten clarity, flow, and academic voice (optional target voice) without changing meaning. | `clio-author polish` |
+| 11 | `coherence` | **Catch contradictions.** Check a manuscript's sections for terminology drift, contradictions, undefined terms, and broken flow. | `clio-author coherence` |
+| 12 | `kg` | **Map a paper's content.** Extract a knowledge graph of claims/methods/datasets/results + relations (distinct from a citation graph). | `clio-author kg` |
+| 13 | `describe_figures` | **Caption figures.** Fill in figure descriptions (Gemini vision *looks at* the image when enabled) for context injection. | `clio-author describe` |
+| 14 | `plot` | **Make a plot/diagram.** Generate matplotlib code (or, with vision, a real diagram image). | `clio-author run plot` |
+| 15 | `compose` | **Write a whole paper.** One call: idea → outline → cite → (plan) → write each section → (review) → assemble. | `clio-author compose` |
+| 16 | `export` | **Ship LaTeX.** Convert a Markdown manuscript into a compilable `paper.tex` (+ `references.bib`). | `clio-author export` |
+| 17 | `write_review` | **Self-improve a draft.** Writer↔reviewer loop: draft → critique → revise, to better prose. | `clio-author run write_review` |
+| 18 | `figure_refine` | **Self-improve a figure.** Visualizer↔critic loop on a figure spec. | `clio-author run figure_refine` |
+| 19 | `orchestrate` | **Hand it a goal.** Plan and run a sequence of the above actions to achieve a natural-language goal (dynamic multi-step). | `clio-author orchestrate` |
 
 Actions without a dedicated subcommand are reachable via `clio-author run <action> --json '...'`.
 
