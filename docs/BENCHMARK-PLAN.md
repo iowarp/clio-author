@@ -57,7 +57,7 @@ Each track: **why we need it · task · dataset · baselines · metrics · proto
 - **Why we need it:** review is a capability several recent systems compete on; to claim it as part of the lifecycle we must show our decisions/scores track ground truth, and that our `--ground` (retrieval-grounded) mode actually helps.
 - **Task:** produce a peer review (decision + scores + critique).
 - **Baselines:** AgentReview, DeepReview, human reviews.
-- **Dataset:** papers with known decisions/scores (e.g. an OpenReview subset).
+- **Dataset:** established peer-review corpora (see §6) — primarily **ASAP-Review** (8.9K papers / 28K reviews, 8 aspects + sentiment) for aspect/score ground truth, **PeerRead** / **ORB** for accept-reject decisions, and **MMReview** for cross-domain + multimodal review.
 - **Metrics:** decision-prediction accuracy + score MAE vs ground truth; review helpfulness (LLM-judge or human); **A/B `--ground` on vs off**.
 - **Protocol:** `review` N papers; compare to ground truth; report grounded-vs-ungrounded delta.
 
@@ -78,7 +78,7 @@ Each track: **why we need it · task · dataset · baselines · metrics · proto
 ## 3. What's needed (decisions to make)
 | Need | Question |
 |---|---|
-| **Datasets** | Are PaperBananaBench (292) and PaperWritingBench (200) public, or do we build subsets? Is there an OpenReview subset for review? |
+| **Datasets** | Figures/writing: are PaperBananaBench (292) and PaperWritingBench (200) public, or do we build subsets? Review: **solved** — established public corpora exist (§6); pick which fit the bar. |
 | **Judge models** | A VLM/LLM judge (Gemini/Claude) for figures + review/writing — API budget? |
 | **Human eval** | The win-rates the baselines report are *human* side-by-side. Do we have annotators / a protocol, or rely on LLM-judge proxies for now? |
 | **Running baselines** | Stand up paper-to-md / Docling / MinerU / PaperBanana / PaperOrchestra (code in `artifact/repos/`) — compute + model deps. |
@@ -99,3 +99,40 @@ Each track: **why we need it · task · dataset · baselines · metrics · proto
 Start **Phase 0** now (no new datasets, no humans), and resolve the dataset / human-eval / bar
 decisions in §3 to scope Phases 1–2. The unification demo (one package doing all tracks, invoked by a
 host agent) is independent and already demonstrable.
+
+---
+
+## 6. Review datasets (verified) — for Track 4 + cross-domain story
+
+Established public peer-review corpora that supply ground truth for the review track. All verified
+against their primary sources; each row notes what AUTHOR capability it exercises.
+
+| Dataset | arXiv | Size | Carries | Domain | Use for AUTHOR |
+|---|---|---|---|---|---|
+| **PeerRead** | 1804.09635 | 14.7K drafts / 10.7K reviews | accept-reject + aspect scores (subset) | CS | decision-prediction accuracy for `review` |
+| **ASAP-Review** | 2102.00176 | 8.9K papers / 28K reviews | **8 aspects + sentiment** (1K human-labeled) + decision | CS | aspect/score fidelity of `review`'s 7 axes |
+| **NLPeer** | 2211.06651 | 5.7K papers / 11.5K reviews | scores, versioned drafts, intertextual graph | NLP + F1000 (partly cross) | score prediction; draft↔camera-ready (write/edit) |
+| **MOPRD** | 2212.04972 | multidisciplinary | review + **rebuttal + meta-review + decision** (full lifecycle) | cross-domain | **`meta_review`** + rebuttal/decision ground truth |
+| **ORB** | 2312.04576 | 36K papers / 89K reviews | decisions + numeric grades | **high-energy physics** | non-CS decision-prediction (generalization) |
+| **AI-Peer-Review-Detection** | 2502.19614 | 789K AI vs human reviews | AI-vs-human authorship label | CS | provenance/honesty check (is our review distinguishable?) |
+| **MMReview** | 2508.14146 | 240 papers / 17 domains / 4 disciplines | decision + soundness/presentation + preference + **multimodal (figures/tables)** + adversarial | **most cross-domain + multimodal** | the flagship fit: cross-domain *and* vision-grounded review (matches our ingest+review breadth) |
+
+**Why these matter to us specifically:**
+- **MMReview** is the strongest external validation of AUTHOR's thesis — it is *multidisciplinary* **and**
+  *multimodal* (the model must reason over figures/tables). That is exactly AUTHOR's edge: vision ingest
+  feeding the *same* substrate that reviews. It directly tests our `review` + `describe_figures` pairing
+  across domains, where text-only reviewers cannot compete.
+- **MOPRD** is the only set with **rebuttals + meta-reviews** → the natural ground truth for `meta_review`
+  (and a future rebuttal capability), and it is cross-domain.
+- **ASAP-Review** gives per-aspect ground truth to validate that `review`'s 7 sub-axis scores are
+  meaningful, not arbitrary.
+- **ORB** (physics) tests that review generalizes **beyond CS** — supporting the "whole lifecycle, any
+  field" claim rather than a CS-only tool.
+- **AI-Peer-Review-Detection** is a useful honesty check: it lets us report whether AUTHOR's reviews are
+  trivially machine-detectable, and frames the ethics (assistive review, not ghost-reviewing).
+
+**Caveats to carry into discussion:** MMReview's reference answers are GPT-4o-*distilled* from human
+reviews and its public release is not advertised (work-in-progress); MOPRD's exact counts were not
+verifiable from the primary PDF. Both should be confirmed before use as held-out human ground truth.
+MMReview's multimodal + cross-domain framing is also a strong design reference for *how* we present
+AUTHOR's review evaluation.
