@@ -68,8 +68,14 @@ example uses the Claude CLI):
 
 ```bash
 CLIO_LLM=claude uv run clio-author review \
-  --paper-file clio-out/2601.23265/paper.md --format prose
+  --paper-file clio-out/2601.23265/paper.md --format prose --out review.md
 ```
+
+The `--out FILE` flag saves the result directly to a file in addition to printing JSON on stdout.
+Use a `.md` or `.txt` extension to get the prose `content`; use `.json` to get the full JSON
+result. This flag is available on every action — it is the convenient alternative to redirecting
+stdout for the print-only actions (`ask`, `review`, `edit`, `polish`, `coherence`, `meta_review`)
+that have no `out_dir`.
 
 That is the whole loop: **ingest → read → review.** Everything below is variations on this.
 
@@ -192,6 +198,22 @@ CLIO_LLM=claude uv run clio-author describe \
 # Any action by name (edit, write_review, figure_refine, …):
 uv run clio-author run write_review \
   --json '{"outline": {"title": "Methods"}, "source": "...", "max_rounds": 2}'
+```
+
+**Saving results to a file.** Every action accepts `--out FILE`. A `.json` extension saves the
+full indented JSON result; any other extension (`.md`, `.txt`, …) saves the prose `content` when
+present, otherwise the full JSON. On success, `[saved to FILE]` is printed to stderr so stdout
+stays clean JSON:
+
+```bash
+# Save a prose review to review.md:
+CLIO_LLM=claude uv run clio-author review \
+  --paper-file clio-out/2601.23265/paper.md --format prose --out review.md
+
+# Save the full JSON result to a .json file:
+CLIO_LLM=claude uv run clio-author ask \
+  --question "What is the main contribution?" \
+  --blocks-file clio-out/2601.23265/blocks.json --out answer.json
 ```
 
 The complete payload reference for every action is in [`docs/USAGE.md`](docs/USAGE.md).

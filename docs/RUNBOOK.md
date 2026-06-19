@@ -64,15 +64,18 @@ uv run --extra pdf clio-author ingest 2601.23265 --json '{"out_dir":"runbook-out
 ```bash
 CLIO_LLM=claude uv run clio-author ask \
   --question "What problem does this paper solve?" \
-  --blocks-file runbook-out/ingest/blocks.json --format prose
+  --blocks-file runbook-out/ingest/blocks.json --format prose --out runbook-out/answer.md
 ```
-**Expect:** a grounded answer; without `--format prose` you get JSON with `cited_block_ids`.
+**Expect:** a grounded answer written to `runbook-out/answer.md`; without `--format prose` you get
+JSON with `cited_block_ids`; without `--out` the result is printed to stdout only.
 
 ---
 
 ### 4) review — structured peer review
 ```bash
 CLIO_LLM=claude uv run clio-author review --paper-file runbook-out/ingest/paper.md --format prose
+# Save the prose review directly to a file (--out works on every action):
+CLIO_LLM=claude uv run clio-author review --paper-file runbook-out/ingest/paper.md --format prose --out runbook-out/review.md
 ```
 **Expect:** a prose review (summary / strengths / weaknesses). Add `--ground` (with `CLIO_SCHOLAR=auto`)
 to ground critiques in retrieved related work.

@@ -41,6 +41,34 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 > these for real papers: a 200 KB+ inline `--blocks-json` hits the shell's argument-list limit.
 > File inputs read UTF-8 text; JSON file inputs are parsed as JSON.
 
+> **Saving results with `--out FILE`.** Every action (including `capabilities`) accepts `--out FILE`
+> as a generic output flag. Behavior depends on the file extension:
+>
+> - **`.json`** — writes the full indented JSON result (`action`, `content`, `structured`,
+>   `metadata`).
+> - **Any other extension** (`.md`, `.txt`, etc.) — writes the prose `content` string when present
+>   and non-empty; falls back to the full JSON when there is no prose (e.g. for
+>   structured-only results).
+>
+> On success, `[saved to FILE]` is printed to stderr; the JSON result is always also printed to
+> stdout so piping is unaffected. If the write fails (e.g. a bad path), a warning is printed to
+> stderr but the CLI does not error.
+>
+> This flag is especially useful for the **print-only** actions that have no `out_dir`/`out_path`
+> of their own: `ask`, `review`, `edit`, `polish`, `coherence`, and `meta_review`. Previously,
+> saving their output required redirecting stdout (`> review.json`); `--out` is simpler and works
+> alongside `--format prose`:
+>
+> ```bash
+> clio-author review --paper-file clio-out/2601.23265/paper.md --format prose --out review.md
+> clio-author ask   --question "..." --blocks-file clio-out/2601.23265/blocks.json --out answer.json
+> clio-author polish --text-file draft.md --voice concise --format prose --out polished.md
+> ```
+>
+> The structured-artifact actions (`ingest`, `cite`, `kg`, `compose`, `export`) still write their
+> primary artifacts via `out_dir`/`out_path` payload keys (see individual action entries). `--out`
+> complements those — it is the one place to capture the adapter result dict itself.
+
 ---
 
 ## Action catalog (16 actions)
@@ -288,8 +316,9 @@ paper's *content* graph, distinct from any citation / literature graph.
   section_path}`; each edge `{source, target, relation}`; edges whose endpoints are not nodes are
   dropped); `metadata` = `{num_nodes, num_entities, num_edges, wrote}`. An unparseable LLM response
   flags `metadata["parse_error"]` and returns an empty graph (never raises).
-- **Writes:** with a configured `SafeFiles` and `out_dir`, writes `<out_dir>/kg.json` and
-  `<out_dir>/kg.mmd` (Mermaid).
+- **Writes:** when `out_dir` is set (via CLI `--json '{"out_dir":"..."}'` or payload key), writes
+  `<out_dir>/kg.json` and `<out_dir>/kg.mmd` (Mermaid). The CLI and adapter derive a `SafeFiles`
+  from `out_dir` automatically; an in-process `SafeFiles` root is respected when provided.
 
 ```bash
 clio-author kg --blocks-file clio-out/2601.23265/blocks.json --format prose

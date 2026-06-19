@@ -3,7 +3,9 @@
 Each subcommand builds a payload (from a ``--json`` blob and/or specific flags),
 calls :meth:`~clio_author.integration.clio_adapter.ClioAuthorSubagent.run` (or
 ``capabilities``), prints the result as indented JSON, and returns an exit code
-(``0`` on success, ``1`` when the result carries an ``error``).
+(``0`` on success, ``1`` when the result carries an ``error``). Every subcommand
+also accepts ``--out FILE`` to save the result (prose ``content`` for
+``.md``/``.txt``, full JSON for ``.json``) in addition to printing it.
 
 A generic ``run <action>`` subcommand dispatches *any* adapter action by name
 (including those without a dedicated subcommand, e.g. ``meta_review``, ``edit``,
@@ -574,6 +576,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the CLI. Returns ``0`` on success, ``1`` when the result has an error.
 
     Never raises a traceback: parse/runtime failures are printed as error JSON.
+    The result is always printed as JSON on stdout; ``--out FILE`` additionally
+    saves it (prose ``content`` for ``.md``/``.txt``, full JSON for ``.json``).
     """
     parser = _build_parser()
     args = parser.parse_args(argv)
