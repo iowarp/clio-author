@@ -55,13 +55,13 @@ GEMINI_API_KEY=...
 uv run ruff check clio_author tests        # -> All checks passed!
 uv run mypy clio_author                    # -> Success: no issues found in 55 source files
 uv run pytest -q                           # -> 434 passed, 3 skipped, 10 deselected
-uv run clio-author capabilities            # -> name=clio-author, version 0.3.0, 16 actions
+uv run clio-author capabilities            # -> name=clio-author, version 0.3.0, 17 actions
 ```
 
-> **13 subcommands** have dedicated flags: `capabilities, ingest, ask, review, cite, write, compose,
-> export, polish, coherence, kg, describe, run`. The other **5 actions** (`edit`, `meta_review`,
-> `plot`, `write_review`, `figure_refine`) have **no dedicated subcommand** — reach them with
-> `clio-author run <action> --json '{...}'`. `run <action>` works for *any* of the 16 actions.
+> **14 subcommands** have dedicated flags: `capabilities, ingest, ask, review, cite, plan, write,
+> compose, export, polish, coherence, kg, describe, run`. The other **5 actions** (`edit`,
+> `meta_review`, `plot`, `write_review`, `figure_refine`) have **no dedicated subcommand** — reach
+> them with `clio-author run <action> --json '{...}'`. `run <action>` works for *any* of the 17 actions.
 
 ---
 
@@ -169,10 +169,27 @@ CLIO_LLM=claude uv run clio-author coherence \
 
 ---
 
-## Act V · Write a new paper
+## Act V · Plan, then write a new paper
+
+**`plan`** — `clio-author plan [--idea | --idea-file] [--log | --log-file] [--outline-json | --outline-file] [--blocks-file] [--candidates-file] [--out-dir] [--format] [--json] [--out]`.
+Turn an idea (or a given outline) into per-section **writing plans** — ordered **tasks**, **claims**,
+**sources**, word budgets, citation hints. Payload keys: `idea`, `experimental_log`, `outline`,
+`blocks`, `candidates`, `out_dir`. The output `plans` feed `write` (`--json '{"section_plan":{...}}'`)
+or `compose --plan`.
+```bash
+CLIO_LLM=claude uv run clio-author plan \
+  --idea "AUTHOR: a multi-agent system that reads, reviews, and writes scientific papers." \
+  --outline-json '{"title":"AUTHOR","sections":[{"title":"Introduction","goal":"motivate + state the contribution"},{"title":"Method","goal":"the multi-agent pipeline"}]}' \
+  --json '{"out_dir":"runbook-out/plan-out"}'
+# or plan straight from an idea (it generates the outline first):
+CLIO_LLM=claude uv run clio-author plan --idea "cooperating agents for the paper lifecycle" --out runbook-out/plan.json
+```
+**Expect:** `num_sections`, `num_tasks`, `plan_errors=0`; each plan has tasks/claims/sources + a word budget.
+**Artifacts:** `runbook-out/plan-out/plan.json`.
 
 **`write`** — `clio-author write [--source | --source-file] [--outline] [--format] [--json] [--out]`.
-Drafts one section, grounded in the source. Payload keys: `outline`, `section_plan`, `blocks`, `source`, `vision`, `out_path`.
+Drafts one section, grounded in the source; pass a plan via `--json '{"section_plan":{...}}'` to follow it.
+Payload keys: `outline`, `section_plan`, `blocks`, `source`, `vision`, `out_path`.
 ```bash
 CLIO_LLM=claude uv run clio-author write \
   --outline "Introduction" --source-file runbook-out/ingest/paper.md --format prose
@@ -186,8 +203,9 @@ CLIO_LLM=claude uv run clio-author run write_review \
 
 **`compose`** — the whole paper. Full flag set:
 `--idea | --idea-file`, `--log | --log-file`, `--outline-json | --outline-file`, `--candidates-file`,
-`--review`, `--max-rounds N`, `--out-dir DIR`, `--latex`, `--format`, `--json`, `--out`.
-Payload keys: `idea`, `experimental_log`, `outline`, `candidates`, `blocks`, `review`, `max_rounds`, `out_dir`.
+`--plan`, `--review`, `--max-rounds N`, `--out-dir DIR`, `--latex`, `--format`, `--json`, `--out`.
+Payload keys: `idea`, `experimental_log`, `outline`, `candidates`, `blocks`, `plan`, `review`, `max_rounds`, `out_dir`.
+(`--plan` runs the planner per section before writing, so each section follows a tasks/claims plan.)
 ```bash
 # provided outline, no review:
 CLIO_LLM=claude uv run clio-author compose \
@@ -304,6 +322,7 @@ CLIO_LLM=claude uv run clio-author compose \
 | ask | `PAPER_QA_SYSTEM_PROMPT` | `clio_author/experts/paper_qa.py` |
 | review | `REVIEWER_SYSTEM_PROMPT` | `clio_author/experts/reviewer.py` |
 | meta_review | (deterministic, no prompt) | `clio_author/experts/meta_reviewer.py` |
+| plan | `PLANNER_SYSTEM_PROMPT` | `clio_author/experts/planner.py` |
 | write / write_review | `WRITER_SYSTEM_PROMPT` | `clio_author/experts/writer.py`, `write_loop.py` |
 | edit | `EDITOR_SYSTEM_PROMPT` | `clio_author/experts/editor.py` |
 | polish | `POLISH_SYSTEM_PROMPT` | `clio_author/experts/polish.py` |

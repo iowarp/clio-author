@@ -26,7 +26,7 @@ cd clio-author
 uv sync
 ```
 
-**Step 3. Confirm it works** (prints the list of 16 things it can do — no model or network needed):
+**Step 3. Confirm it works** (prints the list of 17 things it can do — no model or network needed):
 
 ```bash
 uv run clio-author capabilities
@@ -136,6 +136,12 @@ uv run clio-author run meta_review \
 ### Writing, composing, and exporting
 
 ```bash
+# Turn an idea into per-section writing plans (tasks, claims, sources, word budgets):
+CLIO_LLM=claude uv run clio-author plan \
+  --idea "Propose a new attention mechanism for long-range dependencies." \
+  --outline-json '{"title":"Attention++","sections":[{"title":"Introduction","goal":"Motivate the problem."}]}' \
+  --out-dir clio-out/mypaper
+
 # Draft one section from an outline + source material:
 CLIO_LLM=claude uv run clio-author write \
   --outline "Introduction" --source-file clio-out/2601.23265/paper.md --format prose
@@ -303,7 +309,7 @@ from clio_author.llm.providers import resolve_llm
 # Build the subagent. resolve_llm("claude") | "codex" | "ollama" | None (offline echo).
 sub = ClioAuthorSubagent(llm=resolve_llm("claude"))
 
-# 1) Discover what it can do (16 actions).
+# 1) Discover what it can do (17 actions).
 for a in sub.capabilities()["actions"]:
     print(a["action"], "—", a["description"])
 
@@ -347,7 +353,7 @@ CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper
 
 ---
 
-## 5. The 16 actions at a glance
+## 5. The 17 actions at a glance
 
 | # | Action | What it does | Dedicated subcommand |
 |---|--------|-------------|----------------------|
@@ -356,17 +362,18 @@ CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper
 | 3 | `cite` | Verify citation candidates (suggestions only, never edits) | `clio-author cite` |
 | 4 | `review` | Structured peer review of a paper | `clio-author review` |
 | 5 | `meta_review` | Aggregate several reviews into one area-chair meta-review | `clio-author run meta_review` |
-| 6 | `write` | Draft a single section from an outline + source | `clio-author write` |
-| 7 | `edit` | Revise a draft to address reviewer feedback | `clio-author run edit` |
-| 8 | `polish` | Improve prose clarity, flow, and academic voice | `clio-author polish` |
-| 9 | `coherence` | Check cross-section consistency of a manuscript | `clio-author coherence` |
-| 10 | `kg` | Content knowledge graph: claims/methods/datasets/results + relations (from memory blocks) | `clio-author kg` |
-| 11 | `describe_figures` | Fill figure descriptions / captions in memory blocks | `clio-author describe` |
-| 12 | `plot` | Generate matplotlib plot code (code text only) | `clio-author run plot` |
-| 13 | `compose` | Whole-paper orchestration: idea → outline → cite → write → assemble | `clio-author compose` |
-| 14 | `export` | Markdown manuscript → standalone LaTeX (`paper.tex` + `references.bib`) | `clio-author export` |
-| 15 | `write_review` | Writer ↔ reviewer critic-refine loop | `clio-author run write_review` |
-| 16 | `figure_refine` | Figure visualizer ↔ critic refine loop | `clio-author run figure_refine` |
+| 6 | `plan` | Turn an idea or outline into per-section writing plans (tasks, claims, sources, word budgets) | `clio-author plan` |
+| 7 | `write` | Draft a single section from an outline + source | `clio-author write` |
+| 8 | `edit` | Revise a draft to address reviewer feedback | `clio-author run edit` |
+| 9 | `polish` | Improve prose clarity, flow, and academic voice | `clio-author polish` |
+| 10 | `coherence` | Check cross-section consistency of a manuscript | `clio-author coherence` |
+| 11 | `kg` | Content knowledge graph: claims/methods/datasets/results + relations (from memory blocks) | `clio-author kg` |
+| 12 | `describe_figures` | Fill figure descriptions / captions in memory blocks | `clio-author describe` |
+| 13 | `plot` | Generate matplotlib plot code (code text only) | `clio-author run plot` |
+| 14 | `compose` | Whole-paper orchestration: idea → outline → cite → plan → write → assemble | `clio-author compose` |
+| 15 | `export` | Markdown manuscript → standalone LaTeX (`paper.tex` + `references.bib`) | `clio-author export` |
+| 16 | `write_review` | Writer ↔ reviewer critic-refine loop | `clio-author run write_review` |
+| 17 | `figure_refine` | Figure visualizer ↔ critic refine loop | `clio-author run figure_refine` |
 
 Actions without a dedicated subcommand are reachable via `clio-author run <action> --json '...'`.
 

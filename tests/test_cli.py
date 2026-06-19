@@ -143,7 +143,7 @@ def test_cli_clio_llm_env_accepted_for_capabilities(
     monkeypatch.setenv("CLIO_LLM", "claude")
     code, result = _run(capsys, ["capabilities"])
     assert code == 0
-    assert len(result["actions"]) == 16
+    assert len(result["actions"]) == 17
 
 
 def test_cli_invalid_clio_llm_degrades_to_error(
@@ -289,3 +289,20 @@ def test_out_flag_available_on_ask(capsys: pytest.CaptureFixture[str], tmp_path)
         ],
     )
     assert p.exists()
+
+
+def test_plan_action_with_outline_prints_json(capsys: pytest.CaptureFixture[str]) -> None:
+    code, result = _run(
+        capsys,
+        [
+            "plan",
+            "--idea",
+            "study things",
+            "--outline-json",
+            '{"title":"T","sections":[{"title":"A","goal":"g"}]}',
+        ],
+    )
+    assert code == 0
+    assert result["action"] == "plan"
+    assert result["structured"]["plans"]
+    assert result["metadata"]["num_sections"] == 1

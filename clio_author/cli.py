@@ -224,8 +224,60 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Also export paper.tex (+ references.bib) when --out-dir is reachable.",
     )
+    p_compose.add_argument(
+        "--plan",
+        action="store_true",
+        help="Plan each section (tasks/claims/sources) before drafting it.",
+    )
     _add_format(p_compose)
     _add_json(p_compose)
+
+    p_plan = sub.add_parser("plan", help="Turn an idea or outline into per-section writing plans.")
+    p_plan.add_argument("--idea", default=None, help="The research idea / thesis (inline).")
+    p_plan.add_argument(
+        "--idea-file", dest="idea_file", default=None, help="Path to a file holding the idea text."
+    )
+    p_plan.add_argument(
+        "--log", default=None, help="The experimental log / results notes (inline)."
+    )
+    p_plan.add_argument(
+        "--log-file",
+        dest="log_file",
+        default=None,
+        help="Path to a file holding the experimental log.",
+    )
+    p_plan.add_argument(
+        "--outline-json",
+        dest="outline_json",
+        default=None,
+        help="A JSON PaperOutline (inline) to plan against instead of generating one.",
+    )
+    p_plan.add_argument(
+        "--outline-file",
+        dest="outline_file",
+        default=None,
+        help="Path to a JSON PaperOutline file.",
+    )
+    p_plan.add_argument(
+        "--blocks-file",
+        dest="blocks_file",
+        default=None,
+        help="Path to a JSON MemoryBlocks file for grounding (e.g. clio-out/<id>/blocks.json).",
+    )
+    p_plan.add_argument(
+        "--candidates-file",
+        dest="candidates_file",
+        default=None,
+        help="Path to a JSON file of citation candidates to fold into citation hints.",
+    )
+    p_plan.add_argument(
+        "--out-dir",
+        dest="out_dir",
+        default=None,
+        help="Directory to persist plan.json (optional).",
+    )
+    _add_format(p_plan)
+    _add_json(p_plan)
 
     p_export = sub.add_parser(
         "export", help="Export a composed manuscript to LaTeX (paper.tex + references.bib)."
@@ -510,6 +562,30 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         if args.out_dir is not None:
             payload["out_dir"] = args.out_dir
         payload["latex"] = args.latex
+        payload["plan"] = args.plan
+        payload["format"] = args.fmt
+    elif command == "plan":
+        if args.idea_file is not None:
+            payload["idea"] = _read_file(args.idea_file, field="--idea-file")
+        elif args.idea is not None:
+            payload["idea"] = args.idea
+        if args.log_file is not None:
+            payload["experimental_log"] = _read_file(args.log_file, field="--log-file")
+        elif args.log is not None:
+            payload["experimental_log"] = args.log
+        outline = _json_input(
+            args.outline_file, args.outline_json, field="outline (--outline-json/--outline-file)"
+        )
+        if outline is not None:
+            payload["outline"] = outline
+        blocks = _json_input(args.blocks_file, None, field="blocks (--blocks-file)")
+        if blocks is not None:
+            payload["blocks"] = blocks
+        candidates = _json_input(args.candidates_file, None, field="candidates (--candidates-file)")
+        if candidates is not None:
+            payload["candidates"] = candidates
+        if args.out_dir is not None:
+            payload["out_dir"] = args.out_dir
         payload["format"] = args.fmt
     elif command == "export":
         if args.title is not None:

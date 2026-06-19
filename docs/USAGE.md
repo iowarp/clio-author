@@ -71,7 +71,7 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 
 ---
 
-## Action catalog (16 actions)
+## Action catalog (17 actions)
 
 Payload keys below are exactly the keys each expert reads. Keys marked *(optional)* have a fallback.
 
@@ -205,7 +205,56 @@ agent.cite([{"title": "Attention Is All You Need", "year": 2017}], out_dir="/tmp
 
 ---
 
-### 6. `write`
+### 6. `plan`
+
+Turn an idea (or a provided `PaperOutline`) into per-section **writing plans**: ordered tasks,
+claims, sources/evidence, refined word budgets, and citation hints — one `SectionPlan` per section.
+These plans are exactly what `write` / `compose` consume via the `section_plan` payload key.
+
+- **Reads:**
+  - `idea` *(optional)* — research idea / thesis text; used to generate an outline when none is
+    provided.
+  - `experimental_log` *(optional)* — results notes folded into the per-section prompts.
+  - `outline` *(optional)* — a `PaperOutline` / loose dict; when supplied the outline step is
+    skipped and only the per-section plans are generated.
+  - `blocks` *(optional)* — `MemoryBlocks` for grounding the plans.
+  - `candidates` *(optional)* — citation candidates `[{title, year?}]` folded into citation hints.
+  - `out_dir` *(optional)* — when set, writes `plan.json` there.
+- **Returns:** `content` = a one-line summary; `structured` = a list of `SectionPlan` dicts
+  (each with `tasks`, `claims`, `sources`, `word_budget`, `citation_hints`); `metadata` =
+  `{num_sections, plan_errors, wrote}`. A section whose plan JSON fails to parse falls back to a
+  `SectionPlan` wrapping the bare outline with empty tasks (counted in `plan_errors`) rather than
+  aborting.
+- **Extra:** none; needs a real `LLMClient` for useful plans. Degrades gracefully to echo-path
+  fallbacks offline.
+- **File inputs:** `--idea-file`, `--log-file`, `--outline-file`, `--blocks-file`,
+  `--candidates-file`.
+
+```bash
+clio-author plan \
+  --idea "Propose a new attention mechanism for long-range dependencies." \
+  --outline-json '{"title":"Attention++","sections":[{"title":"Introduction","goal":"Motivate the problem."}]}' \
+  --out-dir clio-out/mypaper
+
+# From files:
+clio-author plan --idea-file idea.txt --log-file log.txt \
+  --outline-file outline.json --blocks-file clio-out/2601.23265/blocks.json \
+  --out-dir clio-out/mypaper
+```
+```python
+result = sub.run("plan", {
+    "idea": "Propose a new attention mechanism for long-range dependencies.",
+    "outline": {"title": "Attention++", "sections": [{"title": "Introduction", "goal": "..."}]},
+    "out_dir": "clio-out/mypaper",
+})
+# Pass the returned plans directly to write:
+plans = result["structured"]   # list of SectionPlan dicts
+sub.run("write", {"section_plan": plans[0], "source": "..."})
+```
+
+---
+
+### 7. `write`
 
 Draft a single paper section grounded in scoped source material.
 
@@ -230,7 +279,7 @@ agent.write(outline={"title": "Methods"}, source="...")
 
 ---
 
-### 7. `edit`
+### 8. `edit`
 
 Revise existing prose to address reviewer feedback (one-shot).
 
@@ -249,7 +298,7 @@ agent.edit("...", review_dump)
 
 ---
 
-### 8. `polish`
+### 9. `polish`
 
 Polish existing prose for clarity, flow, and academic voice **without changing meaning or removing
 citations**.
@@ -276,7 +325,7 @@ sub.run("polish", {"text": "...", "target": "sections/01-introduction.md"})
 
 ---
 
-### 9. `coherence`
+### 10. `coherence`
 
 Check **cross-section consistency** of a manuscript — terminology drift, contradictions, undefined
 terms, duplication, and broken narrative flow.
@@ -303,7 +352,7 @@ sub.run("coherence", {"sections": [{"title": "Introduction", "draft": "..."}, ..
 
 ---
 
-### 10. `kg`
+### 11. `kg`
 
 Extract a content knowledge graph of a paper -- its claims, methods, datasets, results, metrics,
 concepts, and tasks plus the relations between them -- from the paper's memory blocks. This is the
@@ -329,7 +378,7 @@ sub.run("kg", {"blocks": blocks_dump, "out_dir": "clio-out/2601.23265"})
 
 ---
 
-### 11. `describe_figures`
+### 12. `describe_figures`
 
 Fill in descriptions/captions for figures in memory blocks.
 
@@ -355,7 +404,7 @@ agent.describe_figures(blocks_dump)
 
 ---
 
-### 12. `plot`
+### 13. `plot`
 
 Generate matplotlib plot **code** (text only; never executed on this path).
 
@@ -381,7 +430,7 @@ agent.plot({"kind": "plot", "intent": "bar chart of accuracy by model"})
 
 ---
 
-### 13. `compose`
+### 14. `compose`
 
 **Whole-paper orchestration.** Drafts a full multi-section manuscript from an idea and optional
 experimental log, chaining the existing experts in sequence.
@@ -398,6 +447,8 @@ LaTeX. Each section is written in a fresh `SessionContext` so state does not lea
   - `blocks` *(optional)* — `MemoryBlocks` for grounding section drafts.
   - `review` *(optional, bool)* — run a per-section writer/reviewer refine loop.
   - `max_rounds` *(optional, int, default 3)* — max refine rounds per section.
+  - `plan` *(optional, bool)* — run the planner per section before drafting (generates
+    `SectionPlan` tasks/claims/sources to guide the writer).
   - `out_dir` *(optional)* — when set, persists `paper.md` + `sections/NN-slug.md`.
   - `latex` *(optional, bool)* — also emit `paper.tex` + `references.bib` alongside the Markdown.
 - **Returns:** `content` = the assembled Markdown manuscript; `structured` = `{outline, sections,
@@ -445,7 +496,7 @@ print("section errors:", result["metadata"]["section_errors"])
 
 ---
 
-### 14. `export`
+### 15. `export`
 
 Export a composed Markdown manuscript to a standalone LaTeX document (`paper.tex` + optional
 `references.bib`).
@@ -495,7 +546,7 @@ print(result["metadata"]["wrote"])
 
 ---
 
-### 15. `write_review`
+### 16. `write_review`
 
 Run a writer ↔ reviewer **critic-refine** loop and return the final output.
 
@@ -517,7 +568,7 @@ sub.run("write_review", {"outline": {"title": "Methods"}, "source": "...", "max_
 
 ---
 
-### 16. `figure_refine`
+### 17. `figure_refine`
 
 Run a figure visualizer ↔ critic **critic-refine** loop and return the final output.
 
