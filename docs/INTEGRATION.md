@@ -74,6 +74,31 @@ uv run --extra mcp python -m clio_author.integration.mcp_bridge        # stdio M
 
 ---
 
+## More ergonomic host options
+
+Beyond per-call stdio, two lower-friction ways to use AUTHOR from Claude Code / Codex:
+
+### MCP over HTTP (one long-lived server, shared across sessions)
+Run the bridge once as a persistent HTTP server instead of spawning it per call:
+```bash
+CLIO_MCP_TRANSPORT=http CLIO_MCP_PORT=8000 uv run --extra mcp python -m clio_author.integration.mcp_bridge
+# then register the running server with the host:
+claude mcp add --transport http clioauthor http://127.0.0.1:8000/mcp
+codex  mcp add --transport http clioauthor http://127.0.0.1:8000/mcp   # codex MCP client
+```
+`CLIO_MCP_TRANSPORT` (`stdio` default | `http`), `CLIO_MCP_HOST` (`127.0.0.1`), `CLIO_MCP_PORT`
+(`8000`) configure it. Benefit over stdio: a single process reused by every session/host (no
+per-call subprocess spawn); env (`CLIO_LLM`/`CLIO_SCHOLAR`/`CLIO_VISION`) is set once at launch.
+
+### Slash command (no MCP, no per-call instructions)
+A project command ships in `.claude/commands/author.md` — in Claude Code just type:
+```
+/author review arXiv 2601.23265 and verify its citations
+```
+It is pre-instructed to drive the `clio-author` CLI (grounded, no nesting). The Codex equivalent
+prompt is `integration/codex/author.md` — copy it to `~/.codex/prompts/author.md` to get `/author`
+in Codex.
+
 ## Status & the CLIO note
 
 - **Subprocess + in-process: fully working** for any host (proven with Claude and Codex).

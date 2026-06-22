@@ -67,8 +67,23 @@ def build_server() -> Any:
 
 
 def main() -> None:
-    """Entry point: serve over stdio (the transport CLIO's gateway spawns)."""
-    build_server().run()  # default stdio transport
+    """Entry point: serve the bridge.
+
+    Transport is chosen by ``CLIO_MCP_TRANSPORT`` (default ``stdio`` — what a
+    gateway like CLIO's spawns per call). Set it to ``http`` to run one
+    long-lived server shared across sessions/hosts; ``CLIO_MCP_HOST`` (default
+    ``127.0.0.1``) and ``CLIO_MCP_PORT`` (default ``8000``) configure the
+    listener. Register an HTTP bridge with, e.g.,
+    ``claude mcp add --transport http clioauthor http://127.0.0.1:8000/mcp``.
+    """
+    server = build_server()
+    transport = os.environ.get("CLIO_MCP_TRANSPORT", "stdio").strip().lower()
+    if transport in ("http", "streamable-http", "sse"):
+        host = os.environ.get("CLIO_MCP_HOST", "127.0.0.1")
+        port = int(os.environ.get("CLIO_MCP_PORT", "8000"))
+        server.run(transport="http", host=host, port=port)
+    else:
+        server.run()  # default stdio transport
 
 
 if __name__ == "__main__":  # pragma: no cover - process entry
