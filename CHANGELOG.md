@@ -7,6 +7,15 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Full multi-stage knowledge-graph pipeline** (`kg --full`) — re-implements protoneo/knowledge's
+  6 stages (metadata → ontology → extraction → coref → verification → summary) clean-room (AGPL-3.0;
+  no code copied), with checkpoint/resume (`--stages`, `--resume`). Simple single-shot `kg` stays default.
+- **wtf-p writing workflows** as 5 new actions (now 24 total) — `research` (grounded literature brief),
+  `verify_work` (goal-backward claim coverage), `check_refs` (deterministic BibTeX + in-text \cite audit),
+  `section_review` (3-layer single-section review), `audit` (deterministic pre-submission checks);
+  `plan`/`SectionOutline` gain `research_needed`/`research_topics`. Re-implemented from concepts (MIT).
+- **MCP-over-HTTP transport + `/author` slash command** — `CLIO_MCP_TRANSPORT=http` runs one long-lived
+  bridge; a Claude Code `/author` command (and Codex prompt) drives the CLI.
 - **MCP bridge (`mcp` extra) + host-integration proof.** `clio_author/integration/mcp_bridge.py` exposes the subagent over MCP (FastMCP, stdio) so MCP-only hosts can invoke it; the harness itself stays non-MCP. Verified end-to-end that **Claude (CLI), Codex (CLI), and CLIO (its tool gateway)** each invoke clio-author and get the identical result — see `docs/INTEGRATION.md`.
 - **Multimodal review.** `review` now *looks at* figures when a vision client is enabled (`CLIO_VISION=gemini` + `--figures-json`/`--figures-file` or `blocks`): each figure is described and folded into the reviewed text, so the critique is vision-grounded. Backward compatible (no vision / no figures -> unchanged); records `vision_review` / `figures_seen`.
 - **`rebuttal` action** (19th) + `RebuttalExpert` — draft an author response addressing a review point by point (concede/clarify/propose revisions), grounded in the paper, inventing no new claims or citations. CLI: `clio-author rebuttal --paper-file P --review-json '{...}'`.
