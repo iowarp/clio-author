@@ -17,12 +17,23 @@ from clio_author.retrieval.rag import (
     render_scored,
 )
 from clio_author.retrieval.kg import (
-    EdgeRelation,
+    BASE_EDGE_RELATIONS,
+    BASE_NODE_TYPES,
     KGEdge,
     KGNode,
     KnowledgeGraph,
-    NodeType,
     build_kg_from_llm,
+    coerce_node_type,
+    coerce_relation,
+)
+from clio_author.retrieval.kg_pipeline import (
+    Ontology,
+    OntologyType,
+    detect_domain,
+    generate_ontology,
+    resolve_coref,
+    run_kg_pipeline,
+    verify_graph,
 )
 
 __all__ = [
@@ -33,12 +44,21 @@ __all__ = [
     "RetrievalDependencyError",
     "ScoredBlock",
     "SentenceTransformerEmbedder",
-    "EdgeRelation",
+    "BASE_EDGE_RELATIONS",
+    "BASE_NODE_TYPES",
     "KGEdge",
     "KGNode",
     "KnowledgeGraph",
-    "NodeType",
     "build_kg_from_llm",
+    "coerce_node_type",
+    "coerce_relation",
+    "Ontology",
+    "OntologyType",
+    "detect_domain",
+    "generate_ontology",
+    "resolve_coref",
+    "verify_graph",
+    "run_kg_pipeline",
     "inject_context",
     "render_scored",
 ]

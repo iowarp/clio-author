@@ -27,6 +27,7 @@ from clio_author.harness.types import AgentOutput, Task
 from clio_author.ingest.blocks import MemoryBlocks
 from clio_author.llm.client import EchoLLMClient, LLMClient
 from clio_author.retrieval.kg import KnowledgeGraph, build_kg_from_llm
+from clio_author.retrieval.kg_pipeline import run_kg_pipeline
 from clio_author.tools.files import FileToolError, SafeFiles
 
 KG_SYSTEM_PROMPT = (
@@ -94,14 +95,21 @@ class KGExpert(BaseAgent):
         if "blocks" not in task.payload:
             return self._error(session, "no 'blocks' provided in task.payload")
 
+        full = bool(task.payload.get("full")) or task.payload.get("stages") is not None
         try:
             blocks = self._coerce_blocks(task.payload["blocks"])
-            max_sections = task.payload.get("max_sections")
-            graph, error = build_kg_from_llm(
-                blocks,
-                self.llm,
-                max_sections=int(max_sections) if max_sections is not None else None,
-            )
+            error: str | None = None
+            pipeline: dict[str, Any] | None = None
+            ckpts: dict[str, Any] | None = None
+            if full:
+                graph, pipeline, ckpts = self._run_pipeline(task, blocks)
+            else:
+                max_sections = task.payload.get("max_sections")
+                graph, error = build_kg_from_llm(
+                    blocks,
+                    self.llm,
+                    max_sections=int(max_sections) if max_sections is not None else None,
+                )
             num_entities = sum(1 for node in graph.nodes if node.type in _ENTITY_TYPES)
             mermaid = graph.to_mermaid()
             wrote = self._maybe_write(task, graph, mermaid)
@@ -121,6 +129,10 @@ class KGExpert(BaseAgent):
             "num_edges": len(graph.edges),
             "wrote": wrote,
         }
+        if pipeline is not None:
+            metadata["pipeline"] = pipeline
+        if ckpts is not None:
+            metadata["checkpoints"] = ckpts
         if error is not None:
             metadata["parse_error"] = error
 
@@ -132,6 +144,52 @@ class KGExpert(BaseAgent):
         )
         session.add(output)
         return output
+
+    def _run_pipeline(
+        self, task: Task, blocks: MemoryBlocks
+    ) -> tuple[KnowledgeGraph, dict[str, Any], dict[str, Any]]:
+        """Run the multi-stage pipeline; return ``(graph, report, checkpoints)``.
+
+        ``payload["stages"]`` (a comma-separated string or a list) restricts the
+        stages run; ``payload["checkpoints"]`` (a ``{stage: graph.to_dict()}`` map)
+        is fed in for resume and the (updated) map is returned for the next call.
+        When ``payload["out_dir"]`` is set the pipeline also writes per-stage
+        snapshots under ``<out_dir>/kg_pipeline/``.
+        """
+        raw_stages = task.payload.get("stages")
+        stages: list[str] | None
+        if isinstance(raw_stages, str):
+            stages = [s.strip() for s in raw_stages.split(",") if s.strip()]
+        elif isinstance(raw_stages, list):
+            stages = [str(s).strip() for s in raw_stages if str(s).strip()]
+        else:
+            stages = None
+
+        raw_ckpts = task.payload.get("checkpoints")
+        checkpoints: dict[str, Any] = dict(raw_ckpts) if isinstance(raw_ckpts, dict) else {}
+
+        out_dir = task.payload.get("out_dir")
+        files: SafeFiles | None
+        if out_dir and self._files is not None:
+            # A constructor-injected sandbox: nest the pipeline under out_dir.
+            try:
+                (self._files.root / str(out_dir)).mkdir(parents=True, exist_ok=True)
+                files = SafeFiles(self._files.root / str(out_dir))
+            except OSError:
+                files = None
+        elif out_dir:
+            files = SafeFiles(Path(str(out_dir)))
+        else:
+            files = None
+
+        graph, report = run_kg_pipeline(
+            blocks,
+            self.llm,
+            stages=stages,
+            checkpoints=checkpoints,
+            out_dir=files,
+        )
+        return graph, report, checkpoints
 
     def _maybe_write(self, task: Task, graph: KnowledgeGraph, mermaid: str) -> list[str]:
         """Persist ``kg.json`` + ``kg.mmd`` under ``out_dir`` when given.
