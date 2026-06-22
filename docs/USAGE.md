@@ -71,7 +71,7 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 
 ---
 
-## Action catalog (19 actions)
+## Action catalog (24 actions)
 
 Payload keys below are exactly the keys each expert reads. Keys marked *(optional)* have a fallback.
 
@@ -300,7 +300,9 @@ These plans are exactly what `write` / `compose` consume via the `section_plan` 
   (each with `tasks`, `claims`, `sources`, `word_budget`, `citation_hints`); `metadata` =
   `{num_sections, plan_errors, wrote}`. A section whose plan JSON fails to parse falls back to a
   `SectionPlan` wrapping the bare outline with empty tasks (counted in `plan_errors`) rather than
-  aborting.
+  aborting. Each `SectionOutline` in the plan includes `research_needed` (bool) and
+  `research_topics` (list of strings) that flag sections benefiting from a `research` action call
+  before drafting.
 - **Extra:** none; needs a real `LLMClient` for useful plans. Degrades gracefully to echo-path
   fallbacks offline.
 - **File inputs:** `--idea-file`, `--log-file`, `--outline-file`, `--blocks-file`,
@@ -330,7 +332,99 @@ sub.run("write", {"section_plan": plans[0], "source": "..."})
 
 ---
 
-### 8. `write`
+### 8. `research`
+
+Produce a grounded literature brief for a topic or section: foundational works, recent work,
+competing/alternative approaches, open gaps, a synthesis, and confidence. When a scholar client is
+configured, each proposed title is verified against it so the brief is grounded in real records
+rather than fabricated ones.
+
+- **Reads:**
+  - `topic` *(optional — falls back to `section` + `outline` joined with " - ")*.
+  - `section` *(optional)* — section name used when no `topic` is given.
+  - `outline` *(optional)* — outline context used when no `topic` is given.
+  - `blocks` *(optional)* — `MemoryBlocks` for grounding context.
+  - `source` *(optional)* — raw text grounding context.
+  - `depth` *(optional, `"standard"` | `"deep"`)* — `deep` asks for more sources and precise gaps.
+  - `out_dir` *(optional)* — not currently written by the expert; available for future use via
+    `--json '{"out_dir":"..."}'`.
+- **Returns:** `content` = a one-line summary (sources, grounded count, gaps, confidence);
+  `structured` = a `ResearchBrief` dump (`topic`, `foundational`, `recent`, `competing`, each a list
+  of `{title, note, year, grounded, verified_title}`; `gaps`, `synthesis`, `confidence`,
+  `recommendations`); `metadata` = `{num_sources, confidence, grounded}`. With no parseable JSON
+  (echo path), flags `parse_error` and returns an empty brief — never invents verified citations.
+- **Extra:** none for the LLM call. Scholar verification is best-effort; a scholar failure per source
+  simply leaves that source ungrounded.
+- **File inputs:** `--topic-file`; also `--blocks-file`.
+
+```bash
+# By topic:
+CLIO_LLM=claude clio-author research \
+  --topic "attention mechanisms for long-range dependencies" --format prose
+
+# Deep research with scholar grounding:
+CLIO_SCHOLAR=auto CLIO_LLM=claude clio-author research \
+  --topic "transformer self-attention" --depth deep --format prose \
+  --out research.md
+
+# Section-specific research via --json:
+CLIO_LLM=claude clio-author research \
+  --json '{"section":"Related Work","outline":"AUTHOR: multi-agent paper lifecycle"}' \
+  --blocks-file clio-out/2601.23265/blocks.json --format prose
+```
+```python
+sub.run("research", {"topic": "attention mechanisms for long-range dependencies", "depth": "deep"})
+# With scholar grounding (CLIO_SCHOLAR configured):
+sub.run("research", {"topic": "transformer self-attention", "blocks": blocks_dump})
+```
+
+---
+
+### 9. `verify_work`
+
+Goal-backward check of written prose against the claims it was supposed to make. For each intended
+claim, determines whether the prose actually states it (`made`) and whether it is supported with
+evidence or argument (`supported`). The overall verdict (`VERIFIED` / `GAPS`) is derived
+deterministically from the per-claim results.
+
+- **Reads:**
+  - Claims from `claims` (explicit list of strings) or from `section_plan` (a `SectionPlan` /
+    loose dict; uses its `claims` field).
+  - Prose from `text` / `markdown` / `draft` (first non-empty string).
+- **Returns:** `content` = a one-line summary (status, counts); `structured` = a `VerifyResult`
+  dump: `{claims: [{claim, made, supported, evidence, gap}], gaps[], status}`; `metadata` =
+  `{num_claims, num_gaps, status}` where `status` ∈ `{"VERIFIED", "GAPS"}`.
+  With no parseable JSON (echo path), flags `parse_error` and returns `status="GAPS"` — never
+  fabricates a VERIFIED verdict.
+- **Extra:** none; needs a real `LLMClient` for useful per-claim judgements.
+- **File inputs:** `--text-file`; `--section-plan-file`.
+
+```bash
+CLIO_LLM=claude clio-author verify-work \
+  --text-file clio-out/mypaper/sections/01-introduction.md \
+  --claims-json '["AUTHOR unifies ingestion, review, and writing","The harness is grounded"]' \
+  --format prose
+
+# From a saved SectionPlan:
+CLIO_LLM=claude clio-author verify-work \
+  --text-file clio-out/mypaper/sections/01-introduction.md \
+  --section-plan-file clio-out/mypaper/plan.json --format prose
+```
+```python
+sub.run("verify_work", {
+    "text": "AUTHOR is a multi-agent harness that...",
+    "claims": ["AUTHOR unifies ingestion, review, and writing"],
+})
+# Or from a SectionPlan:
+sub.run("verify_work", {
+    "text": section_draft,
+    "section_plan": plan_dict,   # SectionPlan.model_dump()
+})
+```
+
+---
+
+### 10. `write`
 
 Draft a single paper section grounded in scoped source material.
 
@@ -355,7 +449,7 @@ agent.write(outline={"title": "Methods"}, source="...")
 
 ---
 
-### 9. `edit`
+### 11. `edit`
 
 Revise existing prose to address reviewer feedback (one-shot).
 
@@ -374,7 +468,7 @@ agent.edit("...", review_dump)
 
 ---
 
-### 10. `polish`
+### 12. `polish`
 
 Polish existing prose for clarity, flow, and academic voice **without changing meaning or removing
 citations**.
@@ -401,7 +495,7 @@ sub.run("polish", {"text": "...", "target": "sections/01-introduction.md"})
 
 ---
 
-### 11. `coherence`
+### 13. `coherence`
 
 Check **cross-section consistency** of a manuscript — terminology drift, contradictions, undefined
 terms, duplication, and broken narrative flow.
@@ -428,33 +522,184 @@ sub.run("coherence", {"sections": [{"title": "Introduction", "draft": "..."}, ..
 
 ---
 
-### 12. `kg`
+### 14. `check_refs`
+
+Deterministically lint a BibTeX bibliography and cross-check it against the `\cite{}` keys used in
+the manuscript prose. Flags malformed entries, duplicate entries, cited-but-missing keys, and
+uncited entries. **No LLM call** — always produces a real result, even with the offline echo model.
+Emits suggestions only; never modifies any file.
+
+- **Reads:** `bibtex` *(optional)* — a BibTeX string; `markdown` / `text` *(optional)* — prose to
+  scan for `\cite{}` keys; `sections` *(optional)* — compose's `[{title, draft}]` list (joined as
+  prose). At least one of `bibtex` or prose is required.
+- **Returns:** `content` = a one-line issue count summary; `structured` = `{malformed[],
+  duplicates[], missing_in_bib[], uncited_entries[], counts}`; `metadata` = counts dict
+  (`num_entries`, `num_cited`, `num_malformed`, `num_duplicates`, `num_missing_in_bib`,
+  `num_uncited_entries`).
+- **Extra:** none; pure Python (no model, no network).
+- **File inputs:** `--bibtex-file references.bib`; `--markdown-file paper.md`.
+
+```bash
+clio-author check-refs \
+  --bibtex-file clio-out/mypaper/references.bib \
+  --markdown-file clio-out/mypaper/paper.md
+
+# Inline bibtex + text:
+clio-author check-refs \
+  --bibtex "@article{key1, title={...}, ...}" \
+  --text "We follow \cite{key1} and extend \cite{key2}."
+```
+```python
+sub.run("check_refs", {"bibtex": bibtex_string, "markdown": manuscript_text})
+```
+
+---
+
+### 15. `section_review`
+
+Three-layer review of a **single section**: L1 deterministic reference/citation checking
+(`check_refs`) → L2 single-section coherence (`coherence`) → L3 persona-conditioned peer review
+(`reviewer`). The aggregate severity summary is derived deterministically from the three layer
+results — no additional model call for the aggregation.
+
+Severity rules (deterministic): a cited key with no matching bibliography entry is `critical`; a
+`contradiction` coherence issue is `major`; a reviewer overall rating below 5 is `major`.
+
+- **Reads:**
+  - Section text from `section` / `text` / `markdown` / `draft` (first non-empty).
+  - `bibtex` *(optional)* — for the L1 reference check.
+  - `persona` *(optional, `PersonaSpec` / loose dict)* — for the L3 reviewer.
+  - `out_dir` *(optional)* — available for future persistence; not currently written.
+- **Returns:** `content` = a one-line verdict; `structured` = `{layer1, layer2, layer3,
+  severity_summary: [{layer, severity, detail}]}`; `metadata` = `{num_findings, max_severity}`.
+  L2 and L3 require a real `LLMClient`; L1 always runs deterministically.
+- **Extra:** none; L1 is offline, L2/L3 need a real model.
+- **File inputs:** `--text-file`; `--bibtex-file`; persona via `--persona-json`.
+
+```bash
+CLIO_LLM=claude clio-author section-review \
+  --text-file clio-out/mypaper/sections/01-introduction.md \
+  --bibtex-file clio-out/mypaper/references.bib --format prose
+
+# With a custom persona:
+CLIO_LLM=claude clio-author section-review \
+  --text-file clio-out/mypaper/sections/02-methods.md \
+  --persona-json '{"label":"strict methods reviewer"}' --format prose
+```
+```python
+sub.run("section_review", {
+    "text": section_text,
+    "bibtex": bibtex_string,
+    "persona": {"label": "strict methods reviewer"},
+})
+```
+
+---
+
+### 16. `audit`
+
+Deterministic manuscript completeness audit: required sections present, per-section word-count vs
+budget, unresolved `[TODO]`/`[CITE:]`/empty `\cite{}` placeholders, and citation coverage. **No
+LLM call** — always produces a real result. Emits a checklist and verdict; never modifies the
+manuscript.
+
+- **Reads:**
+  - `sections` — a list of `{title, draft, word_budget?}` dicts **or** `markdown` (split on `## `
+    headings). At least one is required.
+  - `outline` *(optional, `PaperOutline` / loose dict)* — provides the required section titles for
+    the presence check.
+  - `bibtex` *(optional)* — for citation-coverage checking.
+  - `candidates` *(optional)* — citation candidates for the ≥90% verified-coverage target.
+  - `verified` *(optional)* — pre-verified citations from a prior `cite` run.
+- **Returns:** `content` = a one-line verdict ("Audit PASSED" or "Audit FOUND ISSUES: …");
+  `structured` = `{missing_sections[], word_counts[], placeholders, coverage}`; `metadata` =
+  `{passed, num_sections, num_problems}`.
+- **Extra:** none; pure Python (no model, no network).
+- **File inputs:** `--sections-file`; `--markdown-file`; `--bibtex-file`; outline via `--json`.
+
+```bash
+# From a whole manuscript file:
+clio-author audit \
+  --markdown-file clio-out/mypaper/paper.md \
+  --bibtex-file clio-out/mypaper/references.bib
+
+# With an outline for required-section presence check:
+clio-author audit \
+  --sections-file clio-out/mypaper/sections.json \
+  --bibtex-file clio-out/mypaper/references.bib \
+  --json '{"outline":{"title":"AUTHOR","sections":[{"title":"Introduction"},{"title":"Method"},{"title":"Conclusion"}]}}'
+```
+```python
+sub.run("audit", {
+    "markdown": manuscript_text,
+    "bibtex": bibtex_string,
+    "outline": {"title": "AUTHOR", "sections": [{"title": "Introduction"}, {"title": "Method"}]},
+})
+```
+
+---
+
+### 17. `kg`
 
 Extract a content knowledge graph of a paper -- its claims, methods, datasets, results, metrics,
 concepts, and tasks plus the relations between them -- from the paper's memory blocks. This is the
 paper's *content* graph, distinct from any citation / literature graph.
 
-- **Reads:** `blocks` (a `MemoryBlocks` or its dump); `max_sections` *(optional cap on sections)*;
-  `out_dir` *(optional)*.
+Two extraction modes:
+
+- **Single-shot** (default): the LLM extracts the graph in one pass from the blocks' text.
+- **Multi-stage pipeline** (`full=True` or a non-empty `stages` list): runs six sequential stages
+  (metadata → ontology → extraction → coref → verification → summary), writing per-stage checkpoint
+  files under `<out_dir>/kg_pipeline/`. A prior run's checkpoints can be resumed by passing them
+  back in `checkpoints` (Python) or `--resume DIR` (CLI).
+
+- **Reads:** `blocks` (a `MemoryBlocks` or its dump); `max_sections` *(optional cap on sections,
+  single-shot only)*; `full` *(optional bool)* — run the pipeline; `stages` *(optional comma-
+  separated string or list)* — restrict pipeline stages; `checkpoints` *(optional dict)* — seed
+  resume; `out_dir` *(optional)*.
 - **Returns:** `content` = a one-line summary (or a Mermaid `graph TD` rendering with
   `format=prose`); `structured` = `{nodes, edges}` (each node `{id, label, type, description,
   section_path}`; each edge `{source, target, relation}`; edges whose endpoints are not nodes are
-  dropped); `metadata` = `{num_nodes, num_entities, num_edges, wrote}`. An unparseable LLM response
-  flags `metadata["parse_error"]` and returns an empty graph (never raises).
-- **Writes:** when `out_dir` is set (via CLI `--json '{"out_dir":"..."}'` or payload key), writes
-  `<out_dir>/kg.json` and `<out_dir>/kg.mmd` (Mermaid). The CLI and adapter derive a `SafeFiles`
-  from `out_dir` automatically; an in-process `SafeFiles` root is respected when provided.
+  dropped); `metadata` = `{num_nodes, num_entities, num_edges, wrote}`. Pipeline runs also set
+  `metadata["pipeline"]` (stage report) and `metadata["checkpoints"]` (updated checkpoint map). An
+  unparseable LLM response flags `metadata["parse_error"]` and returns an empty graph (never raises).
+- **Writes:** when `out_dir` is set, writes `<out_dir>/kg.json` and `<out_dir>/kg.mmd` (Mermaid).
+  Pipeline mode additionally writes `<out_dir>/kg_pipeline/<stage>.json` for each stage.
+- **CLI flags:** `--full`, `--stages <comma-list>`, `--resume <dir>`, `--out-dir`.
 
 ```bash
+# Single-shot (default):
 clio-author kg --blocks-file clio-out/2601.23265/blocks.json --format prose
+
+# Full 6-stage pipeline with checkpoints:
+clio-author kg --blocks-file clio-out/2601.23265/blocks.json \
+  --full --out-dir clio-out/2601.23265/kg-pipeline
+
+# Resume an interrupted pipeline run:
+clio-author kg --blocks-file clio-out/2601.23265/blocks.json \
+  --full --resume clio-out/2601.23265/kg-pipeline \
+  --out-dir clio-out/2601.23265/kg-pipeline
+
+# Run only specific stages:
+clio-author kg --blocks-file clio-out/2601.23265/blocks.json \
+  --stages metadata,ontology --out-dir clio-out/2601.23265/kg-pipeline
 ```
 ```python
+# Single-shot:
 sub.run("kg", {"blocks": blocks_dump, "out_dir": "clio-out/2601.23265"})
+
+# Full pipeline with resume:
+sub.run("kg", {
+    "blocks": blocks_dump,
+    "full": True,
+    "checkpoints": prior_checkpoint_dict,   # {} on first run
+    "out_dir": "clio-out/2601.23265/kg-pipeline",
+})
 ```
 
 ---
 
-### 13. `describe_figures`
+### 18. `describe_figures`
 
 Fill in descriptions/captions for figures in memory blocks.
 
@@ -480,7 +725,7 @@ agent.describe_figures(blocks_dump)
 
 ---
 
-### 14. `plot`
+### 19. `plot`
 
 Generate matplotlib plot **code** (text only; never executed on this path).
 
@@ -506,7 +751,7 @@ agent.plot({"kind": "plot", "intent": "bar chart of accuracy by model"})
 
 ---
 
-### 15. `compose`
+### 20. `compose`
 
 **Whole-paper orchestration.** Drafts a full multi-section manuscript from an idea and optional
 experimental log, chaining the existing experts in sequence.
@@ -572,7 +817,7 @@ print("section errors:", result["metadata"]["section_errors"])
 
 ---
 
-### 16. `export`
+### 21. `export`
 
 Export a composed Markdown manuscript to a standalone LaTeX document (`paper.tex` + optional
 `references.bib`).
@@ -622,7 +867,7 @@ print(result["metadata"]["wrote"])
 
 ---
 
-### 17. `write_review`
+### 22. `write_review`
 
 Run a writer ↔ reviewer **critic-refine** loop and return the final output.
 
@@ -644,7 +889,7 @@ sub.run("write_review", {"outline": {"title": "Methods"}, "source": "...", "max_
 
 ---
 
-### 18. `figure_refine`
+### 23. `figure_refine`
 
 Run a figure visualizer ↔ critic **critic-refine** loop and return the final output.
 
@@ -664,7 +909,7 @@ sub.run("figure_refine", {"spec": {"kind": "plot", "intent": "line chart of loss
 
 ---
 
-### 19. `orchestrate`
+### 24. `orchestrate`
 
 Plan and run a sequence of the other actions to achieve a natural-language **goal** (dynamic
 multi-step). An LLM proposes a minimal ordered plan of action calls, which are executed through the

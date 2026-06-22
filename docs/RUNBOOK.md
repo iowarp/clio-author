@@ -59,16 +59,17 @@ GEMINI_API_KEY=...
 
 ```bash
 uv run ruff check clio_author tests        # -> All checks passed!
-uv run mypy clio_author                    # -> Success: no issues found in 55 source files
-uv run pytest -q                           # -> 434 passed, 3 skipped, 10 deselected
-uv run clio-author capabilities            # -> name=clio-author, version 0.3.0, 19 actions
+uv run mypy clio_author                    # -> Success: no issues found in 69 source files
+uv run pytest -q                           # -> 532 passed, 3 skipped, 10 deselected
+uv run clio-author capabilities            # -> name=clio-author, 24 actions
 ```
 
-> **16 subcommands** have dedicated flags: `capabilities, ingest, ask, review, cite, plan, write,
-> compose, export, polish, coherence, kg, describe, orchestrate, rebuttal, run`. The other **5 actions**
+> **21 subcommands** have dedicated flags: `capabilities, ingest, ask, review, cite, plan, write,
+> compose, export, polish, coherence, kg, describe, orchestrate, rebuttal, research, verify-work,
+> check-refs, section-review, audit, run`. The other **5 actions**
 > (`edit`, `meta_review`, `plot`, `write_review`, `figure_refine`) have **no dedicated subcommand**
 > — reach them with `clio-author run <action> --json '{...}'`. `run <action>` works for *any* of
-> the 19 actions.
+> the 24 actions.
 
 ---
 
@@ -124,17 +125,39 @@ CLIO_LLM=claude uv run clio-author ask \
 |---|---|---|
 | `--blocks-json` | JSON string | inline MemoryBlocks dump |
 | `--blocks-file` | one file | path to a JSON MemoryBlocks file |
+| `--full` | flag | run the 6-stage pipeline (metadata→ontology→extraction→coref→verify→summary) with per-stage checkpoints |
+| `--stages` | comma-separated list | restrict the pipeline to specific stage names (implies pipeline path; e.g. `metadata,ontology`) |
+| `--resume` | directory | path to a prior run's `kg_pipeline/*.json` checkpoints to resume from |
+| `--out-dir` | directory | persist `kg.json`/`kg.mmd` and (with `--full`) per-stage pipeline checkpoints under `kg_pipeline/` |
 | `--format` | `structured`\|`prose` | `prose` emits a Mermaid `graph TD` rendering |
-| `--json` | JSON object | merge payload keys, e.g. `{"out_dir":"..."}` to write `kg.json`/`kg.mmd` |
+| `--json` | JSON object | merge payload keys |
 | `--out` | file path | save result |
 
+Plain `kg` (single-shot LLM extraction) is the default. `--full` activates the multi-stage pipeline; `--stages` lets you run a subset; `--resume DIR` feeds prior checkpoints so interrupted runs continue where they left off.
+
 ```bash
+# Single-shot extraction (default):
 CLIO_LLM=claude uv run clio-author kg \
   --blocks-file runbook-out/ingest/blocks.json \
-  --json '{"out_dir":"runbook-out/kg-out"}' \
+  --out-dir runbook-out/kg-out \
   --format prose          # prose => content is a Mermaid graph
+
+# Full 6-stage pipeline with checkpoint writes:
+CLIO_LLM=claude uv run clio-author kg \
+  --blocks-file runbook-out/ingest/blocks.json \
+  --full --out-dir runbook-out/kg-pipeline
+
+# Resume an interrupted pipeline run:
+CLIO_LLM=claude uv run clio-author kg \
+  --blocks-file runbook-out/ingest/blocks.json \
+  --full --resume runbook-out/kg-pipeline --out-dir runbook-out/kg-pipeline
+
+# Run only specific pipeline stages:
+CLIO_LLM=claude uv run clio-author kg \
+  --blocks-file runbook-out/ingest/blocks.json \
+  --stages metadata,ontology --out-dir runbook-out/kg-pipeline
 ```
-**Artifacts:** `runbook-out/kg-out/{kg.json, kg.mmd}`.
+**Artifacts:** `runbook-out/kg-out/{kg.json, kg.mmd}`; pipeline: `runbook-out/kg-pipeline/kg_pipeline/{stage}.json`.
 
 ---
 
@@ -267,6 +290,75 @@ CLIO_LLM=claude uv run clio-author coherence \
 # or check a whole manuscript file: --markdown-file runbook-out/compose-out/paper.md
 ```
 
+**`check_refs`** — deterministically lint a BibTeX bibliography and cross-check `\cite{}` keys in the prose. **No model needed.**
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--bibtex` | string | BibTeX bibliography text (inline) |
+| `--bibtex-file` | one file | path to a `.bib` file |
+| `--markdown-file` | one file | Markdown manuscript to scan for `\cite{}` keys |
+| `--text` | string | prose to scan for `\cite{}` keys (inline) |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys; also reads `sections` |
+| `--out` | file path | save result |
+
+```bash
+uv run clio-author check-refs \
+  --bibtex-file runbook-out/cite-out/suggested.bib \
+  --markdown-file runbook-out/compose-out/paper.md
+```
+**Expect:** `structured` = `{malformed[], duplicates[], missing_in_bib[], uncited_entries[], counts}`; emits suggestions only, never modifies files.
+
+**`section_review`** — three-layer review of a single section: L1 reference check → L2 coherence → L3 persona peer review.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--text` | string | the section text (inline) |
+| `--text-file` | one file | file holding the section text |
+| `--bibtex-file` | one file | BibTeX file for the L1 reference check |
+| `--persona-json` | JSON string | a `PersonaSpec` for the L3 reviewer (inline), e.g. `{"label":"harsh reviewer"}` |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys; also reads `section`, `markdown`, `out_dir` |
+| `--out` | file path | save result |
+
+```bash
+CLIO_LLM=claude uv run clio-author section-review \
+  --text-file runbook-out/compose-out/sections/01-introduction.md \
+  --bibtex-file runbook-out/cite-out/suggested.bib \
+  --format prose
+
+# With a custom reviewer persona:
+CLIO_LLM=claude uv run clio-author section-review \
+  --text-file runbook-out/compose-out/sections/01-introduction.md \
+  --persona-json '{"label":"harsh ML reviewer"}' --format prose
+```
+**Expect:** `structured` = `{layer1, layer2, layer3, severity_summary: [{layer, severity, detail}]}`; `metadata` = `{num_findings, max_severity}` where severity ∈ {critical, major, minor}.
+
+**`audit`** — deterministic manuscript completeness checklist. **No model needed.**
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--sections-json` | JSON string | inline list of `{title, draft, word_budget?}` |
+| `--sections-file` | one file | same format, as a JSON file |
+| `--markdown-file` | one file | full Markdown manuscript to split and audit |
+| `--bibtex-file` | one file | BibTeX file for citation-coverage checking |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys; also reads `outline`, `candidates`, `verified` |
+| `--out` | file path | save result |
+
+```bash
+uv run clio-author audit \
+  --markdown-file runbook-out/compose-out/paper.md \
+  --bibtex-file runbook-out/cite-out/suggested.bib
+
+# From structured sections with an outline for required-section check:
+uv run clio-author audit \
+  --sections-file runbook-out/compose-out/sections.json \
+  --json '{"outline":{"title":"AUTHOR","sections":[{"title":"Introduction"},{"title":"Method"},{"title":"Experiments"},{"title":"Conclusion"}]}}' \
+  --format prose
+```
+**Expect:** `structured` = `{missing_sections[], word_counts[], placeholders, coverage}`; `metadata` = `{passed, num_sections, num_problems}`.
+
 ---
 
 ## Act V · Plan, then write a new paper
@@ -292,6 +384,8 @@ CLIO_LLM=claude uv run clio-author coherence \
 | `--out` | file path | save result |
 
 The output `plans` feed `write` (`--json '{"section_plan":{...}}'`) or `compose --plan`.
+Each `SectionOutline` in the returned plan includes `research_needed` (bool) and `research_topics`
+(list of strings) — these flag sections that benefit from a `research` action call before drafting.
 ```bash
 CLIO_LLM=claude uv run clio-author plan \
   --idea "AUTHOR: a multi-agent system that reads, reviews, and writes scientific papers." \
@@ -302,6 +396,61 @@ CLIO_LLM=claude uv run clio-author plan --idea "cooperating agents for the paper
 ```
 **Expect:** `num_sections`, `num_tasks`, `plan_errors=0`; each plan has tasks/claims/sources + a word budget.
 **Artifacts:** `runbook-out/plan-out/plan.json`.
+
+**`research`** — produce a grounded literature brief for a topic or section.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--topic` | string | the topic to research (inline) |
+| `--topic-file` | one file | file holding the topic text |
+| `--blocks-file` | one file | JSON MemoryBlocks file for grounding context |
+| `--depth` | `standard`\|`deep` | research depth; `deep` aims for more sources and precise gaps |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys; also reads `section`, `outline`, `source`, `out_dir` |
+| `--out` | file path | save result |
+
+```bash
+CLIO_LLM=claude uv run clio-author research \
+  --topic "attention mechanisms for long-range dependencies" --format prose
+
+# With CLIO_SCHOLAR set, proposed titles are verified against a scholar backend:
+CLIO_SCHOLAR=auto CLIO_LLM=claude uv run clio-author research \
+  --topic "transformer self-attention" --depth deep --format prose \
+  --out runbook-out/research.md
+
+# Supply a section name and outline via --json for section-specific research:
+CLIO_LLM=claude uv run clio-author research \
+  --json '{"section":"Related Work","outline":"AUTHOR: multi-agent paper lifecycle"}' \
+  --blocks-file runbook-out/ingest/blocks.json --format prose
+```
+**Expect:** `structured` = `{topic, foundational[], recent[], competing[], gaps[], synthesis, confidence, recommendations[]}`; `metadata` = `{num_sources, confidence, grounded}`.
+
+**`verify_work`** — goal-backward check of written prose against the claims it was supposed to make.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--text` | string | the written prose to verify (inline) |
+| `--text-file` | one file | file holding the written prose |
+| `--section-plan-json` | JSON string | a `SectionPlan` whose `claims` to verify (inline) |
+| `--section-plan-file` | one file | path to a JSON `SectionPlan` file |
+| `--claims-json` | JSON string | an explicit list of claim strings to verify (inline) |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys |
+| `--out` | file path | save result |
+
+```bash
+CLIO_LLM=claude uv run clio-author verify-work \
+  --text-file runbook-out/compose-out/sections/01-introduction.md \
+  --claims-json '["AUTHOR unifies ingestion, review, and writing","The harness is grounded; it invents no citations"]' \
+  --format prose
+
+# From a saved section plan (output of plan):
+CLIO_LLM=claude uv run clio-author verify-work \
+  --text-file runbook-out/compose-out/sections/01-introduction.md \
+  --section-plan-file runbook-out/plan-out/plan.json \
+  --format prose
+```
+**Expect:** `structured` = `{claims: [{claim, made, supported, evidence, gap}], gaps[], status}`; `metadata` = `{num_claims, num_gaps, status}` where `status` ∈ {VERIFIED, GAPS}.
 
 **`write`** — draft one paper section from an outline and source material.
 
@@ -511,9 +660,10 @@ CLIO_LLM=claude uv run clio-author orchestrate \
 
 ---
 
-## The 5 run-only actions — payload key reference
+## The run-only actions — payload key reference
 
 These actions have no dedicated subcommand. Reach them with `clio-author run <action> --json '{...}'`.
+All other actions (including the 5 new ones) have dedicated subcommands — see Appendix A.
 
 | Action | Payload keys | Purpose |
 |---|---|---|
@@ -542,7 +692,7 @@ These actions have no dedicated subcommand. Reach them with `clio-author run <ac
   `ClioAuthorSubagent(llm=…).run("review", {"paper": "..."})`.
 - See a subcommand's exact flags anytime: `clio-author <cmd> --help`.
 
-## Appendix A — all 19 actions at a glance
+## Appendix A — all 24 actions at a glance
 
 | # | Action | Dedicated subcommand |
 |---|---|---|
@@ -558,13 +708,18 @@ These actions have no dedicated subcommand. Reach them with `clio-author run <ac
 | 10 | `coherence` | `clio-author coherence` |
 | 11 | `kg` | `clio-author kg` |
 | 12 | `plan` | `clio-author plan` |
-| 13 | `describe_figures` | `clio-author describe` |
-| 14 | `plot` | `clio-author run plot` |
-| 15 | `compose` | `clio-author compose` |
-| 16 | `export` | `clio-author export` |
-| 17 | `write_review` | `clio-author run write_review` |
-| 18 | `figure_refine` | `clio-author run figure_refine` |
-| 19 | `orchestrate` | `clio-author orchestrate` |
+| 13 | `research` | `clio-author research` |
+| 14 | `verify_work` | `clio-author verify-work` |
+| 15 | `check_refs` | `clio-author check-refs` |
+| 16 | `section_review` | `clio-author section-review` |
+| 17 | `audit` | `clio-author audit` |
+| 18 | `describe_figures` | `clio-author describe` |
+| 19 | `plot` | `clio-author run plot` |
+| 20 | `compose` | `clio-author compose` |
+| 21 | `export` | `clio-author export` |
+| 22 | `write_review` | `clio-author run write_review` |
+| 23 | `figure_refine` | `clio-author run figure_refine` |
+| 24 | `orchestrate` | `clio-author orchestrate` |
 
 ## Appendix B — each action's LLM prompt source (to read/tune)
 | Action | Prompt constant | File |
@@ -579,6 +734,11 @@ These actions have no dedicated subcommand. Reach them with `clio-author run <ac
 | polish | `POLISH_SYSTEM_PROMPT` | `clio_author/experts/polish.py` |
 | coherence | `COHERENCE_SYSTEM_PROMPT` | `clio_author/experts/coherence.py` |
 | kg | `KG_SYSTEM_PROMPT` + `KG_PROMPT` | `clio_author/experts/kg.py`, `clio_author/retrieval/kg.py` |
+| research | `RESEARCH_SYSTEM_PROMPT` | `clio_author/experts/research.py` |
+| verify_work | `VERIFY_WORK_SYSTEM_PROMPT` | `clio_author/experts/verify_work.py` |
+| check_refs | (deterministic, no LLM call) | `clio_author/experts/check_refs.py`, `bib_utils.py` |
+| section_review | composes check_refs + coherence + reviewer | `clio_author/experts/section_review.py` |
+| audit | (deterministic, no LLM call) | `clio_author/experts/audit.py` |
 | plot / describe / figure_refine | figure prompts | `clio_author/experts/figure_agent.py` |
 | compose | outline-gen prompt | `clio_author/experts/compose.py` |
 | orchestrate | orchestrate prompt | `clio_author/experts/orchestrate.py` |
