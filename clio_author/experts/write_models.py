@@ -35,6 +35,18 @@ def _coerce_list(raw: Any) -> list[str]:
     return [str(raw)]
 
 
+def _coerce_bool(raw: Any) -> bool:
+    """Coerce common truthy/falsey scalar encodings into a ``bool``.
+
+    Mirrors :func:`clio_author.experts.review_models._coerce_bool`.
+    """
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        return raw.strip().lower() in {"true", "yes", "1"}
+    return bool(raw)
+
+
 def _coerce_int_or_none(raw: Any) -> int | None:
     """Best-effort parse ``raw`` to an int, or ``None`` when absent/unparseable."""
     if raw is None:
@@ -54,6 +66,8 @@ class SectionOutline(BaseModel):
     word_budget: int | None = None
     citation_hints: list[str] = Field(default_factory=list)
     figure_refs: list[str] = Field(default_factory=list)
+    research_needed: bool = False
+    research_topics: list[str] = Field(default_factory=list)
     subsections: list[SectionOutline] = Field(default_factory=list)
 
     @classmethod
@@ -91,6 +105,8 @@ class SectionOutline(BaseModel):
             word_budget=_coerce_int_or_none(pick("word_budget", "words", "budget")),
             citation_hints=_coerce_list(pick("citation_hints", "citations", "cite")),
             figure_refs=_coerce_list(pick("figure_refs", "figures", "figure")),
+            research_needed=_coerce_bool(pick("research_needed", "needs_research", "research")),
+            research_topics=_coerce_list(pick("research_topics", "research_queries", "topics")),
             subsections=subsections,
         )
 

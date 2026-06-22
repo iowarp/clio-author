@@ -317,6 +317,144 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_plan)
     _add_json(p_plan)
 
+    p_research = sub.add_parser(
+        "research",
+        help="Propose + ground a literature brief for a topic or section.",
+    )
+    p_research.add_argument("--topic", default=None, help="The topic to research (inline).")
+    p_research.add_argument(
+        "--topic-file",
+        dest="topic_file",
+        default=None,
+        help="Path to a file holding the topic text.",
+    )
+    p_research.add_argument(
+        "--blocks-file",
+        dest="blocks_file",
+        default=None,
+        help="Path to a JSON MemoryBlocks file for grounding (e.g. clio-out/<id>/blocks.json).",
+    )
+    p_research.add_argument(
+        "--depth",
+        choices=("standard", "deep"),
+        default="standard",
+        help="Research depth (standard = default; deep = more thorough).",
+    )
+    _add_format(p_research)
+    _add_json(p_research)
+
+    p_verify = sub.add_parser(
+        "verify-work",
+        help="Goal-backward check of written prose against the claims it should make.",
+    )
+    p_verify.add_argument("--text", default=None, help="The written prose to verify (inline).")
+    p_verify.add_argument(
+        "--text-file",
+        dest="text_file",
+        default=None,
+        help="Path to a text/Markdown file holding the written prose.",
+    )
+    p_verify.add_argument(
+        "--section-plan-json",
+        dest="section_plan_json",
+        default=None,
+        help="A JSON SectionPlan (inline) whose claims to verify.",
+    )
+    p_verify.add_argument(
+        "--section-plan-file",
+        dest="section_plan_file",
+        default=None,
+        help="Path to a JSON SectionPlan file whose claims to verify.",
+    )
+    p_verify.add_argument(
+        "--claims-json",
+        dest="claims_json",
+        default=None,
+        help="A JSON list of claim strings (inline) to verify.",
+    )
+    _add_format(p_verify)
+    _add_json(p_verify)
+
+    p_check_refs = sub.add_parser(
+        "check-refs",
+        help="Lint a BibTeX bibliography and cross-check cited keys (deterministic).",
+    )
+    p_check_refs.add_argument("--bibtex", default=None, help="The BibTeX bibliography (inline).")
+    p_check_refs.add_argument(
+        "--bibtex-file",
+        dest="bibtex_file",
+        default=None,
+        help="Path to a BibTeX file (e.g. references.bib).",
+    )
+    p_check_refs.add_argument(
+        "--markdown-file",
+        dest="markdown_file",
+        default=None,
+        help="Path to a Markdown manuscript whose \\cite{} keys to cross-check.",
+    )
+    p_check_refs.add_argument(
+        "--text", default=None, help="Prose to scan for \\cite{} keys (inline)."
+    )
+    _add_format(p_check_refs)
+    _add_json(p_check_refs)
+
+    p_section_review = sub.add_parser(
+        "section-review",
+        help="Layered (refs -> coherence -> review) check of one section.",
+    )
+    p_section_review.add_argument("--text", default=None, help="The section text (inline).")
+    p_section_review.add_argument(
+        "--text-file",
+        dest="text_file",
+        default=None,
+        help="Path to a file holding the section text.",
+    )
+    p_section_review.add_argument(
+        "--bibtex-file",
+        dest="bibtex_file",
+        default=None,
+        help="Path to a BibTeX file for the L1 reference check.",
+    )
+    p_section_review.add_argument(
+        "--persona-json",
+        dest="persona_json",
+        default=None,
+        help="A JSON PersonaSpec (inline) for the L3 reviewer.",
+    )
+    _add_format(p_section_review)
+    _add_json(p_section_review)
+
+    p_audit = sub.add_parser(
+        "audit",
+        help="Deterministic manuscript completeness audit (sections/budgets/placeholders/cites).",
+    )
+    p_audit.add_argument(
+        "--sections-json",
+        dest="sections_json",
+        default=None,
+        help="A JSON list of sections ([{title, draft, word_budget?}], inline).",
+    )
+    p_audit.add_argument(
+        "--sections-file",
+        dest="sections_file",
+        default=None,
+        help="Path to a JSON file of sections ([{title, draft, word_budget?}]).",
+    )
+    p_audit.add_argument(
+        "--markdown-file",
+        dest="markdown_file",
+        default=None,
+        help="Path to a full Markdown manuscript to split and audit.",
+    )
+    p_audit.add_argument(
+        "--bibtex-file",
+        dest="bibtex_file",
+        default=None,
+        help="Path to a BibTeX file for citation-coverage checking.",
+    )
+    _add_format(p_audit)
+    _add_json(p_audit)
+
     p_export = sub.add_parser(
         "export", help="Export a composed manuscript to LaTeX (paper.tex + references.bib)."
     )
@@ -719,6 +857,71 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         if args.out_dir is not None:
             payload["out_dir"] = args.out_dir
         payload["format"] = args.fmt
+    elif command == "research":
+        if args.topic_file is not None:
+            payload["topic"] = _read_file(args.topic_file, field="--topic-file")
+        elif args.topic is not None:
+            payload["topic"] = args.topic
+        blocks = _json_input(args.blocks_file, None, field="blocks (--blocks-file)")
+        if blocks is not None:
+            payload["blocks"] = blocks
+        payload["depth"] = args.depth
+        payload["format"] = args.fmt
+        return "research", payload
+    elif command == "verify-work":
+        if args.text_file is not None:
+            payload["text"] = _read_file(args.text_file, field="--text-file")
+        elif args.text is not None:
+            payload["text"] = args.text
+        section_plan = _json_input(
+            args.section_plan_file,
+            args.section_plan_json,
+            field="section_plan (--section-plan-json/--section-plan-file)",
+        )
+        if section_plan is not None:
+            payload["section_plan"] = section_plan
+        claims = _parse_json(args.claims_json, field="--claims-json")
+        if claims is not None:
+            payload["claims"] = claims
+        payload["format"] = args.fmt
+        return "verify_work", payload
+    elif command == "check-refs":
+        if args.bibtex_file is not None:
+            payload["bibtex"] = _read_file(args.bibtex_file, field="--bibtex-file")
+        elif args.bibtex is not None:
+            payload["bibtex"] = args.bibtex
+        if args.markdown_file is not None:
+            payload["markdown"] = _read_file(args.markdown_file, field="--markdown-file")
+        elif args.text is not None:
+            payload["text"] = args.text
+        payload["format"] = args.fmt
+        return "check_refs", payload
+    elif command == "section-review":
+        if args.text_file is not None:
+            payload["text"] = _read_file(args.text_file, field="--text-file")
+        elif args.text is not None:
+            payload["text"] = args.text
+        if args.bibtex_file is not None:
+            payload["bibtex"] = _read_file(args.bibtex_file, field="--bibtex-file")
+        persona = _parse_json(args.persona_json, field="--persona-json")
+        if persona is not None:
+            payload["persona"] = persona
+        payload["format"] = args.fmt
+        return "section_review", payload
+    elif command == "audit":
+        sections = _json_input(
+            args.sections_file,
+            args.sections_json,
+            field="sections (--sections-json/--sections-file)",
+        )
+        if sections is not None:
+            payload["sections"] = sections
+        if args.markdown_file is not None:
+            payload["markdown"] = _read_file(args.markdown_file, field="--markdown-file")
+        if args.bibtex_file is not None:
+            payload["bibtex"] = _read_file(args.bibtex_file, field="--bibtex-file")
+        payload["format"] = args.fmt
+        return "audit", payload
     elif command == "export":
         if args.title is not None:
             payload["title"] = args.title

@@ -163,7 +163,7 @@ def test_capabilities_lists_plan() -> None:
     caps = ClioAuthorSubagent().capabilities()
     actions = {entry["action"] for entry in caps["actions"]}
     assert "plan" in actions
-    assert len(caps["actions"]) == 19
+    assert len(caps["actions"]) == 24
 
 
 # --------------------------------------------------------------------------- #

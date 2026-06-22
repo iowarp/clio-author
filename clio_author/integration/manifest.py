@@ -99,6 +99,49 @@ ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["idea", "experimental_log", "outline", "blocks", "candidates", "out_dir"],
     },
     {
+        "action": "research",
+        "description": (
+            "Propose foundational/recent/competing sources, gaps, and a synthesis "
+            "for a topic or section; grounds proposed titles against a scholar "
+            "backend when one is configured (invents no verified citations)."
+        ),
+        "payload_keys": ["topic", "section", "outline", "blocks", "source", "depth", "out_dir"],
+    },
+    {
+        "action": "verify_work",
+        "description": (
+            "Goal-backward check of written prose against the claims it should "
+            "make: per-claim made/supported, rolled up to a VERIFIED/GAPS verdict."
+        ),
+        "payload_keys": ["section_plan", "claims", "text", "markdown", "draft"],
+    },
+    {
+        "action": "check_refs",
+        "description": (
+            "Deterministically lint a BibTeX bibliography and cross-check it "
+            "against the cited keys in the prose (malformed/duplicate entries, "
+            "cited-but-missing, uncited entries). No LLM; suggestions only."
+        ),
+        "payload_keys": ["bibtex", "markdown", "text", "sections"],
+    },
+    {
+        "action": "section_review",
+        "description": (
+            "Layered review of ONE section: L1 reference check, L2 coherence, L3 "
+            "persona peer review, with a deterministically derived severity summary."
+        ),
+        "payload_keys": ["section", "text", "markdown", "bibtex", "persona", "out_dir"],
+    },
+    {
+        "action": "audit",
+        "description": (
+            "Deterministic manuscript completeness audit: required sections "
+            "present, per-section word budgets, unresolved [TODO]/[CITE:]/empty "
+            "\\cite{} placeholders, and citation coverage. No LLM."
+        ),
+        "payload_keys": ["sections", "markdown", "outline", "bibtex", "candidates", "verified"],
+    },
+    {
         "action": "describe_figures",
         "description": "Fill in descriptions/captions for the figures in memory blocks.",
         "payload_keys": ["blocks", "figures", "context"],

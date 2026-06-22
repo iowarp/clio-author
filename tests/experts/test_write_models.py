@@ -22,6 +22,8 @@ def test_section_outline_from_loose_dict_coerces_and_recurses() -> None:
         "Words": "350",
         "citations": "smith2020",
         "figure": ["fig:arch"],
+        "research_needed": "yes",
+        "research_topics": "fast attention",
         "children": [{"title": "Setup", "citations": ["a", "b"]}],
     }
     outline = SectionOutline.from_loose_dict(raw)
@@ -32,8 +34,16 @@ def test_section_outline_from_loose_dict_coerces_and_recurses() -> None:
     assert outline.word_budget == 350
     assert outline.citation_hints == ["smith2020"]
     assert outline.figure_refs == ["fig:arch"]
+    assert outline.research_needed is True
+    assert outline.research_topics == ["fast attention"]
     assert outline.subsections[0].title == "Setup"
     assert outline.subsections[0].citation_hints == ["a", "b"]
+
+
+def test_section_outline_research_fields_default_false() -> None:
+    outline = SectionOutline.from_loose_dict({"title": "Intro"})
+    assert outline.research_needed is False
+    assert outline.research_topics == []
 
 
 def test_section_outline_from_loose_dict_defaults() -> None:
