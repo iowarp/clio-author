@@ -124,6 +124,37 @@ def test_route_figure_refine_loop() -> None:
     assert out.agent == "figure"
 
 
+def test_route_research() -> None:
+    out = _agent().invoke(_task("research", topic="attention mechanisms"))
+    assert out.agent == "research"
+
+
+def test_route_verify_work() -> None:
+    out = _agent().invoke(
+        _task("verify_work", claims=["X improves Y"], text="We show X improves Y.")
+    )
+    assert out.agent == "verify_work"
+
+
+def test_route_check_refs() -> None:
+    out = _agent().invoke(_task("check_refs", bibtex="@article{a,title={X}}", text="see \\cite{a}"))
+    assert out.agent == "check_refs"
+    assert "error" not in out.metadata  # deterministic, runs under echo
+
+
+def test_route_audit() -> None:
+    out = _agent().invoke(
+        _task("audit", sections=[{"title": "Intro", "draft": "Some body text here."}])
+    )
+    assert out.agent == "audit"
+    assert "error" not in out.metadata
+
+
+def test_route_section_review() -> None:
+    out = _agent().invoke(_task("section_review", text="## Intro\n\nSome content with \\cite{a}."))
+    assert out.agent == "section_review"
+
+
 # --- fallthrough + back-compat ---------------------------------------------- #
 def test_unknown_action_falls_through_to_echo() -> None:
     out = _agent().invoke(_task("nonexistent", foo="bar"))
@@ -218,3 +249,22 @@ def test_prose_format_renders_meta_review_as_text() -> None:
     assert out.structured is None
     assert out.metadata.get("format") == "prose"
     assert "Meta-review" in out.content
+
+
+def test_prose_format_renders_research_as_text() -> None:
+    # Echo client yields an empty (parse_error) brief; the prose view still
+    # renders the topic and drops the JSON.
+    agent = ClioAuthorAgent()
+    out = agent.invoke(_task("research", topic="attention", format="prose"))
+    assert out.structured is None
+    assert out.metadata.get("format") == "prose"
+
+
+def test_prose_format_renders_check_refs_as_text() -> None:
+    agent = ClioAuthorAgent()
+    out = agent.invoke(
+        _task("check_refs", bibtex="@article{a,title={X}}", text="\\cite{missing}", format="prose")
+    )
+    assert out.structured is None
+    assert out.metadata.get("format") == "prose"
+    assert "issue" in out.content.lower()

@@ -50,7 +50,10 @@ _PLAN_INSTRUCTIONS = (
     '{"tasks": ["<ordered writing step>"], "claims": ["<claim to make>"], '
     '"sources": ["<source/evidence the claim rests on>"], '
     '"word_budget": <int or null>, '
-    '"citation_hints": ["<\\\\cite{key} placeholder, optional>"]}\n'
+    '"citation_hints": ["<\\\\cite{key} placeholder, optional>"], '
+    '"research_needed": <true if this section needs a literature search before '
+    "drafting, else false>, "
+    '"research_topics": ["<topic/query to research, only if research_needed>"]}\n'
     "```\n"
     "Keep the format precise; the JSON is parsed automatically."
 )
@@ -214,7 +217,7 @@ class PlannerExpert(BaseAgent):
         parsed: dict[str, Any],
         extra_hints: list[str],
     ) -> SectionOutline:
-        """Merge a refined word budget / citation hints back into the section."""
+        """Merge a refined word budget / citation hints / research flags back in."""
         update: dict[str, Any] = {}
 
         raw_budget = parsed.get("word_budget")
@@ -223,6 +226,38 @@ class PlannerExpert(BaseAgent):
                 update["word_budget"] = int(round(float(raw_budget)))
             except (TypeError, ValueError):
                 pass
+
+        # Carry the planner's research decision onto the section so the writing
+        # path (and the research expert) can act on it.
+        raw_topics = parsed.get("research_topics")
+        topics: list[str] = list(section.research_topics)
+        if isinstance(raw_topics, (list, tuple)):
+            topics.extend(str(t).strip() for t in raw_topics if str(t).strip())
+        elif isinstance(raw_topics, str) and raw_topics.strip():
+            topics.append(raw_topics.strip())
+        # De-dupe preserving order.
+        seen_topics: set[str] = set()
+        deduped_topics: list[str] = []
+        for topic in topics:
+            if topic not in seen_topics:
+                seen_topics.add(topic)
+                deduped_topics.append(topic)
+        if deduped_topics != list(section.research_topics):
+            update["research_topics"] = deduped_topics
+
+        raw_research = parsed.get("research_needed")
+        research_needed = section.research_needed
+        if raw_research is not None:
+            if isinstance(raw_research, bool):
+                research_needed = raw_research
+            elif isinstance(raw_research, str):
+                research_needed = raw_research.strip().lower() in {"true", "yes", "1"}
+            else:
+                research_needed = bool(raw_research)
+        # A section with research topics implicitly needs research.
+        research_needed = research_needed or bool(deduped_topics)
+        if research_needed != section.research_needed:
+            update["research_needed"] = research_needed
 
         hints: list[str] = list(section.citation_hints)
         raw_hints = parsed.get("citation_hints")

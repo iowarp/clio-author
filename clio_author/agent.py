@@ -24,6 +24,8 @@ import json
 from typing import Any
 from uuid import uuid4
 
+from clio_author.experts.audit import AuditExpert
+from clio_author.experts.check_refs import CheckRefsExpert
 from clio_author.experts.citation import CitationExpert
 from clio_author.experts.coherence import CoherenceExpert
 from clio_author.experts.compose import run_compose
@@ -38,7 +40,10 @@ from clio_author.experts.paper_qa import PaperQAExpert
 from clio_author.experts.planner import PlannerExpert
 from clio_author.experts.polish import PolishExpert
 from clio_author.experts.rebuttal import RebuttalExpert
+from clio_author.experts.research import ResearchExpert
 from clio_author.experts.reviewer import ReviewerExpert
+from clio_author.experts.section_review import run_section_review
+from clio_author.experts.verify_work import VerifyWorkExpert
 from clio_author.experts.write_loop import run_write_review_loop
 from clio_author.experts.writer import WriterExpert
 from clio_author.export.latex import run_export
@@ -99,6 +104,10 @@ class ClioAuthorAgent:
         self.kg_expert = KGExpert(self.llm, files=files)
         self.planner = PlannerExpert(self.llm, files=files)
         self.figure = FigureAgentExpert(self.llm, files=files, vision=vision)
+        self.research = ResearchExpert(self.llm, scholar_client=scholar_client)
+        self.verify_work = VerifyWorkExpert(self.llm)
+        self.check_refs = CheckRefsExpert(self.llm)
+        self.audit = AuditExpert(self.llm)
 
         # M0 echo wiring is preserved for the unknown/None-action fallthrough.
         self.engine = Engine()
@@ -167,6 +176,22 @@ class ClioAuthorAgent:
             return self.kg_expert.run(task, session)
         if action == "plan":
             return self.planner.run(task, session)
+        if action == "research":
+            return self.research.run(task, session)
+        if action == "verify_work":
+            return self.verify_work.run(task, session)
+        if action == "check_refs":
+            return self.check_refs.run(task, session)
+        if action == "audit":
+            return self.audit.run(task, session)
+        if action == "section_review":
+            return run_section_review(
+                task,
+                check_refs=self.check_refs,
+                coherence=self.coherence,
+                reviewer=self.reviewer,
+                session=session,
+            )
         if action == "describe_figures":
             return self.figure.run(
                 task.model_copy(update={"payload": {**task.payload, "mode": "describe"}}),
@@ -334,6 +359,22 @@ def _bullets(label: str, items: Any) -> str:
     return f"{label}:\n{lines}\n\n"
 
 
+def _source_titles(notes: Any) -> list[str]:
+    """Render a list of research source-note dicts as ``title (grounded?)`` lines."""
+    if not isinstance(notes, (list, tuple)):
+        return []
+    rendered: list[str] = []
+    for note in notes:
+        if not isinstance(note, dict):
+            continue
+        title = str(note.get("title") or "").strip()
+        if not title:
+            continue
+        suffix = " [grounded]" if note.get("grounded") else ""
+        rendered.append(f"{title}{suffix}")
+    return rendered
+
+
 def _prose_view(action: Any, out: AgentOutput) -> str:
     """Render an action's structured result as human-readable prose.
 
@@ -364,6 +405,31 @@ def _prose_view(action: Any, out: AgentOutput) -> str:
         ds = s.get("descriptions") or []
         rendered = "\n".join(f"Figure {d.get('figure_id')}: {d.get('description')}" for d in ds)
         return rendered or out.content
+    if action == "research":
+        head = (
+            f"Research brief on '{s.get('topic', '')}' — confidence {s.get('confidence', '?')}.\n\n"
+        )
+        return (
+            head
+            + _bullets("Foundational", _source_titles(s.get("foundational")))
+            + _bullets("Recent", _source_titles(s.get("recent")))
+            + _bullets("Competing", _source_titles(s.get("competing")))
+            + _bullets("Gaps", s.get("gaps"))
+        ).strip() or out.content
+    if action == "verify_work":
+        head = f"Verification: {s.get('status', '?')}.\n\n"
+        claim_lines = [
+            f"- [{'made' if c.get('made') else 'not made'}/"
+            f"{'supported' if c.get('supported') else 'unsupported'}] {c.get('claim', '')}"
+            for c in (s.get("claims") or [])
+            if isinstance(c, dict)
+        ]
+        body = ("Claims:\n" + "\n".join(claim_lines) + "\n\n") if claim_lines else ""
+        return (head + body + _bullets("Gaps", s.get("gaps"))).strip() or out.content
+    if action in ("check_refs", "audit", "section_review"):
+        # These deterministic / aggregated actions already summarise themselves
+        # in `content`; reuse it (falling back to pretty JSON).
+        return out.content or json.dumps(s, indent=2)
     # ask / write / edit / plot / polish / coherence: content is already the
     # human answer / draft / code / polished prose / issue summary.
     return out.content or json.dumps(s, indent=2)
