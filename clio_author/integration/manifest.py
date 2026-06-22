@@ -83,9 +83,12 @@ ACTIONS: list[dict[str, Any]] = [
         "action": "kg",
         "description": (
             "Extract a content knowledge graph (claims/methods/datasets/results + "
-            "relations) from a paper's memory blocks."
+            "relations) from a paper's memory blocks. With full=True (or an explicit "
+            "stages list) runs the multi-stage pipeline "
+            "(metadata -> ontology -> extraction -> coref -> verification -> summary) "
+            "with checkpoint/resume."
         ),
-        "payload_keys": ["blocks", "out_dir"],
+        "payload_keys": ["blocks", "out_dir", "full", "stages", "checkpoints"],
     },
     {
         "action": "plan",

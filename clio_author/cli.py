@@ -415,6 +415,27 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to a JSON MemoryBlocks file (e.g. clio-out/<id>/blocks.json).",
     )
+    p_kg.add_argument(
+        "--full",
+        action="store_true",
+        help="Run the multi-stage KG pipeline (metadata/ontology/extraction/coref/verify/summary).",
+    )
+    p_kg.add_argument(
+        "--stages",
+        default=None,
+        help="Comma-separated subset of pipeline stages to run (implies the pipeline path).",
+    )
+    p_kg.add_argument(
+        "--resume",
+        default=None,
+        help="Directory holding a prior run's kg_pipeline/*.json checkpoints to resume from.",
+    )
+    p_kg.add_argument(
+        "--out-dir",
+        dest="out_dir",
+        default=None,
+        help="Directory to persist kg.json/kg.mmd and per-stage pipeline checkpoints.",
+    )
     _add_format(p_kg)
     _add_json(p_kg)
 
@@ -516,6 +537,24 @@ def _json_input(file_path: str | None, raw: str | None, *, field: str) -> Any:
     if file_path is not None:
         raw = _read_file(file_path, field=field)
     return _parse_json(raw, field=field)
+
+
+def _load_kg_checkpoints(resume_dir: str) -> dict[str, Any]:
+    """Best-effort load of ``<resume_dir>/kg_pipeline/<stage>.json`` checkpoints.
+
+    Returns a ``{stage: graph_dict}`` map (empty when the directory or files are
+    missing/unreadable). Used by ``kg --resume`` to continue a prior pipeline run.
+    """
+    base = Path(resume_dir) / "kg_pipeline"
+    checkpoints: dict[str, Any] = {}
+    if not base.is_dir():
+        return checkpoints
+    for path in sorted(base.glob("*.json")):
+        try:
+            checkpoints[path.stem] = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+    return checkpoints
 
 
 def _load_env_file(path: Path) -> None:
@@ -725,6 +764,17 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         )
         if blocks is not None:
             payload["blocks"] = blocks
+        if args.full:
+            payload["full"] = True
+        if args.stages is not None:
+            payload["stages"] = args.stages
+        if args.out_dir is not None:
+            payload["out_dir"] = args.out_dir
+        if args.resume is not None:
+            checkpoints = _load_kg_checkpoints(args.resume)
+            if checkpoints:
+                payload["checkpoints"] = checkpoints
+                payload["full"] = True
         payload["format"] = args.fmt
         return "kg", payload
     elif command == "orchestrate":

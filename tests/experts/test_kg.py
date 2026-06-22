@@ -146,6 +146,32 @@ def test_kg_cli_blocks_json_exit_zero(capsys) -> None:
     assert code == 0
 
 
+def test_kg_full_pipeline_under_echo_returns_report() -> None:
+    """The `full` flag runs the multi-stage pipeline deterministically under echo."""
+    expert = KGExpert(EchoLLMClient())
+    out = expert.run(_task(blocks=_blocks(), full=True), SessionContext(id="s"))
+
+    assert out.structured is not None
+    pipeline = out.metadata["pipeline"]
+    assert pipeline["order"] == [
+        "metadata",
+        "ontology",
+        "extraction",
+        "coref",
+        "verification",
+        "summary",
+    ]
+    # checkpoints round-trip for resume and the whole output is JSON-serializable.
+    assert set(out.metadata["checkpoints"]) >= {"metadata", "summary"}
+    assert json.loads(json.dumps(out.metadata)) == out.metadata
+
+
+def test_kg_stages_subset_runs_only_requested_stages() -> None:
+    expert = KGExpert(EchoLLMClient())
+    out = expert.run(_task(blocks=_blocks(), stages="metadata,ontology"), SessionContext(id="s"))
+    assert out.metadata["pipeline"]["order"] == ["metadata", "ontology"]
+
+
 def test_build_kg_batches_and_merges_across_sections() -> None:
     """Many sections are split into batches; duplicate entities merge by type+label."""
     from clio_author.ingest.blocks import MemoryBlocks, SectionBlock
