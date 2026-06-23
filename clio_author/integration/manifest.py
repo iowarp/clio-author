@@ -108,6 +108,14 @@ ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["topic", "section", "outline", "blocks", "source", "depth", "out_dir"],
     },
     {
+        "action": "discover",
+        "description": (
+            "Find real candidate papers for a topic via scholarly search "
+            "(Semantic Scholar/OpenAlex/Crossref/arXiv)."
+        ),
+        "payload_keys": ["query", "topic", "limit", "cutoff_date", "out_dir"],
+    },
+    {
         "action": "verify_work",
         "description": (
             "Goal-backward check of written prose against the claims it should "
@@ -164,12 +172,13 @@ ACTIONS: list[dict[str, Any]] = [
             "max_rounds",
             "plan",
             "out_dir",
+            "pdf",
         ],
     },
     {
         "action": "export",
         "description": "Export a composed manuscript to LaTeX (paper.tex + references.bib).",
-        "payload_keys": ["title", "sections", "markdown", "outline", "bibtex", "out_dir"],
+        "payload_keys": ["title", "sections", "markdown", "outline", "bibtex", "out_dir", "pdf"],
     },
     {
         "action": "write_review",

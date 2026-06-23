@@ -30,7 +30,7 @@ from clio_author.experts.reviewer import ReviewerExpert, _extract_json_object
 from clio_author.experts.write_loop import run_write_review_loop
 from clio_author.experts.write_models import PaperOutline, SectionOutline, SectionPlan
 from clio_author.experts.writer import WriterExpert
-from clio_author.export.latex import to_latex_document
+from clio_author.export.latex import compile_pdf, to_latex_document
 from clio_author.harness.session import SessionContext
 from clio_author.harness.types import AgentOutput, Message, Task
 from clio_author.ingest.blocks import MemoryBlocks
@@ -190,13 +190,19 @@ def _run_compose(
     manuscript = _assemble(outline, sections, suggested_bibtex)
 
     # --- Persist (if reachable) --------------------------------------------- #
+    # --pdf implies --latex (a .tex must exist before it can be compiled).
+    want_pdf = bool(payload.get("pdf", False))
+    want_latex = bool(payload.get("latex", False)) or want_pdf
     wrote: list[str] = []
     latex_written = False
     if files is not None:
         wrote = _persist(files, manuscript, sections)
-        if bool(payload.get("latex", False)):
-            wrote.extend(_persist_latex(files, outline, sections, suggested_bibtex))
+        if want_latex:
+            latex_wrote = _persist_latex(files, outline, sections, suggested_bibtex)
+            wrote.extend(latex_wrote)
             latex_written = True
+            if want_pdf:
+                _compile_compose_pdf(latex_wrote, wrote, metadata)
 
     metadata.update(
         {
@@ -447,6 +453,32 @@ def _persist_latex(
         except FileToolError:
             pass
     return wrote
+
+
+def _compile_compose_pdf(
+    latex_wrote: list[str],
+    wrote: list[str],
+    metadata: dict[str, Any],
+) -> None:
+    """Compile the just-written ``paper.tex`` to PDF, recording the outcome.
+
+    Best-effort/never-raise, mirroring :func:`_persist_latex`: on success the
+    PDF path is appended to ``wrote`` and recorded in ``metadata["pdf"]``; on a
+    missing engine / failed compile the reason is recorded in
+    ``metadata["pdf_error"]`` and compose still succeeds.
+    """
+    from pathlib import Path
+
+    tex_written = next((p for p in latex_wrote if p.endswith("paper.tex")), None)
+    if tex_written is None:
+        metadata["pdf_error"] = "paper.tex was not written (write refused)"
+        return
+    pdf_path, error = compile_pdf(Path(tex_written))
+    if pdf_path is not None:
+        wrote.append(str(pdf_path))
+        metadata["pdf"] = str(pdf_path)
+    else:
+        metadata["pdf_error"] = error or "PDF compilation failed"
 
 
 def _slug(text: str) -> str:

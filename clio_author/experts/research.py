@@ -35,6 +35,7 @@ from clio_author.retrieval.scholar import (
     Reference,
     ScholarClient,
     VerifiedCitation,
+    discover_papers,
     verify,
 )
 
@@ -171,6 +172,9 @@ class ResearchExpert(BaseAgent):
             if not brief.topic:
                 brief = brief.model_copy(update={"topic": topic})
 
+            if bool(payload.get("discover", False)) and self._scholar is not None:
+                brief = self._seed_from_discovery(brief, topic, payload)
+
             grounded = False
             if self._scholar is not None:
                 brief, grounded = self._ground_brief(brief)
@@ -205,6 +209,56 @@ class ResearchExpert(BaseAgent):
             Message(role="system", content=self.system_prompt),
             Message(role="user", content="\n\n".join(parts)),
         ]
+
+    def _seed_from_discovery(
+        self, brief: ResearchBrief, topic: str, payload: dict[str, Any]
+    ) -> ResearchBrief:
+        """Seed the brief's ``recent`` bucket from real discovered papers.
+
+        With ``discover=True`` and a scholar client, the proposed (LLM) titles are
+        augmented with real search results from
+        :func:`~clio_author.retrieval.scholar.discover_papers`, so the brief is
+        anchored in records that actually exist rather than only LLM proposals.
+        Discovered notes are pre-marked ``grounded`` (they came from the index)
+        and de-duplicated by title against the existing buckets. Best-effort: a
+        discovery failure leaves the brief unchanged.
+        """
+        assert self._scholar is not None  # guarded by the caller
+        try:
+            limit = int(payload.get("limit", 10))
+        except (TypeError, ValueError):
+            limit = 10
+        cutoff_date = payload.get("cutoff_date")
+        cutoff = str(cutoff_date).strip() if cutoff_date else None
+        try:
+            records = discover_papers(topic, self._scholar, limit=max(1, limit), cutoff_date=cutoff)
+        except Exception:  # noqa: BLE001 - discovery is best-effort
+            return brief
+        if not records:
+            return brief
+
+        existing = {
+            note.title.strip().lower()
+            for bucket in (brief.foundational, brief.recent, brief.competing)
+            for note in bucket
+            if note.title
+        }
+        seeded: list[SourceNote] = list(brief.recent)
+        for record in records:
+            key = record.title.strip().lower()
+            if not key or key in existing:
+                continue
+            existing.add(key)
+            seeded.append(
+                SourceNote(
+                    title=record.title,
+                    note=(record.abstract or "")[:200],
+                    year=record.year,
+                    grounded=True,
+                    verified_title=record.title,
+                )
+            )
+        return brief.model_copy(update={"recent": seeded})
 
     def _ground_brief(self, brief: ResearchBrief) -> tuple[ResearchBrief, bool]:
         """Verify each proposed title against the scholar client; mark grounded.

@@ -18,6 +18,9 @@ code is copied -- the conversion is re-implemented from scratch.
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
+from pathlib import Path
 from typing import Any
 
 from clio_author.experts.write_models import PaperOutline
@@ -260,6 +263,82 @@ def to_latex_document(
 
 
 # --------------------------------------------------------------------------- #
+# PDF compilation (best-effort; degrades gracefully)                          #
+# --------------------------------------------------------------------------- #
+# Engines are tried in order of preference: tectonic (self-contained, fetches
+# packages), then latexmk (drives multiple passes), then a bare pdflatex.
+_ENGINES: tuple[str, ...] = ("tectonic", "latexmk", "pdflatex")
+
+
+def find_latex_engine() -> str | None:
+    """Return the first available LaTeX engine on ``PATH`` (or ``None``).
+
+    Searches for ``tectonic``, then ``latexmk``, then ``pdflatex`` via
+    :func:`shutil.which`. Pure lookup -- no process is launched.
+    """
+    for engine in _ENGINES:
+        if shutil.which(engine):
+            return engine
+    return None
+
+
+def compile_pdf(tex_path: Path, *, timeout: int = 120) -> tuple[Path | None, str | None]:
+    """Compile ``tex_path`` to a sibling PDF. Returns ``(pdf_path, error)``.
+
+    Best-effort and never raises: returns ``(pdf, None)`` on success and
+    ``(None, "<reason>")`` on a missing engine, a failed/non-zero run, a timeout,
+    or a missing output PDF. The engine runs in the ``.tex`` file's directory
+    (``tectonic <tex>``; ``latexmk -pdf -interaction=nonstopmode``; ``pdflatex``
+    run twice with ``-interaction=nonstopmode -halt-on-error``). The source
+    ``.tex`` is left intact.
+    """
+    tex_path = Path(tex_path)
+    if not tex_path.is_file():
+        return None, f"tex file not found: {tex_path}"
+    engine = find_latex_engine()
+    if engine is None:
+        return None, "no LaTeX engine found"
+
+    cwd = tex_path.parent
+    name = tex_path.name
+    pdf_path = tex_path.with_suffix(".pdf")
+    commands = _engine_commands(engine, name)
+    try:
+        for command in commands:
+            result = subprocess.run(  # noqa: S603 - fixed engine name + our tex path
+                command,
+                cwd=str(cwd),
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
+            if result.returncode != 0:
+                tail = (result.stdout or result.stderr or "").strip().splitlines()[-1:]
+                detail = tail[0] if tail else f"exit code {result.returncode}"
+                return None, f"{engine} failed: {detail}"
+    except subprocess.TimeoutExpired:
+        return None, f"{engine} timed out after {timeout}s"
+    except OSError as exc:  # pragma: no cover - which() found it but exec failed
+        return None, f"could not run {engine}: {exc}"
+
+    if pdf_path.is_file() and pdf_path.stat().st_size > 0:
+        return pdf_path, None
+    return None, f"{engine} produced no PDF"
+
+
+def _engine_commands(engine: str, tex_name: str) -> list[list[str]]:
+    """Build the argv list(s) to run for ``engine`` against ``tex_name``."""
+    if engine == "tectonic":
+        return [["tectonic", tex_name]]
+    if engine == "latexmk":
+        return [["latexmk", "-pdf", "-interaction=nonstopmode", tex_name]]
+    # pdflatex: run twice so refs/citations resolve.
+    pdflatex = ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", tex_name]
+    return [pdflatex, pdflatex]
+
+
+# --------------------------------------------------------------------------- #
 # Orchestration: the routed ``export`` action                                 #
 # --------------------------------------------------------------------------- #
 def run_export(
@@ -318,11 +397,30 @@ def _run_export(
     if files is not None:
         wrote = _persist(files, latex, bib)
 
+    metadata: dict[str, Any] = {
+        "wrote": wrote,
+        "format": "latex",
+        "num_sections": len(sections),
+    }
+
+    # Optional PDF compilation: only when a paper.tex was actually written.
+    if bool(payload.get("pdf", False)):
+        tex_written = next((p for p in wrote if p.endswith("paper.tex")), None)
+        if tex_written is None:
+            metadata["pdf_error"] = "paper.tex was not written (no out_dir or write refused)"
+        else:
+            pdf_path, error = compile_pdf(Path(tex_written))
+            if pdf_path is not None:
+                wrote.append(str(pdf_path))
+                metadata["pdf"] = str(pdf_path)
+            else:
+                metadata["pdf_error"] = error or "PDF compilation failed"
+
     out = AgentOutput(
         agent="export",
         content=latex,
         structured={"latex": latex, "bibtex": bib},
-        metadata={"wrote": wrote, "format": "latex", "num_sections": len(sections)},
+        metadata=metadata,
     )
     if session is not None:
         session.add(out)
@@ -428,4 +526,11 @@ def _error(session: SessionContext | None, message: str) -> AgentOutput:
     return out
 
 
-__all__ = ["escape_latex", "markdown_to_latex", "to_latex_document", "run_export"]
+__all__ = [
+    "escape_latex",
+    "markdown_to_latex",
+    "to_latex_document",
+    "run_export",
+    "find_latex_engine",
+    "compile_pdf",
+]

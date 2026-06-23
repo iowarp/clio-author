@@ -129,6 +129,17 @@ def test_route_research() -> None:
     assert out.agent == "research"
 
 
+def test_route_discover() -> None:
+    agent = ClioAuthorAgent(
+        scholar_client=FakeScholarClient(
+            {"attention": [S2Record(paper_id="p1", title="Attention Is All You Need", year=2017)]}
+        )
+    )
+    out = agent.invoke(_task("discover", query="attention"))
+    assert out.agent == "discover"
+    assert out.metadata["count"] == 1
+
+
 def test_route_verify_work() -> None:
     out = _agent().invoke(
         _task("verify_work", claims=["X improves Y"], text="We show X improves Y.")
