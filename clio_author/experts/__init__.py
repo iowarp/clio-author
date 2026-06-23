@@ -2,6 +2,7 @@
 
 from clio_author.experts.citation import CitationExpert
 from clio_author.experts.coherence import CoherenceExpert
+from clio_author.experts.context import ContextExpert
 from clio_author.experts.echo import EchoExpert
 from clio_author.experts.editor import EditorExpert
 from clio_author.experts.figure_agent import (
@@ -23,6 +24,7 @@ from clio_author.experts.writer import WriterExpert
 __all__ = [
     "CitationExpert",
     "CoherenceExpert",
+    "ContextExpert",
     "EchoExpert",
     "EditorExpert",
     "FigureAgentExpert",

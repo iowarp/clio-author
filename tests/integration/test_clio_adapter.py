@@ -14,6 +14,7 @@ from clio_author.integration import ClioAuthorSubagent
 
 _ROUTED_ACTIONS = {
     "ingest",
+    "gather",
     "ask",
     "review",
     "meta_review",
@@ -49,7 +50,7 @@ def test_capabilities_shape_lists_all_actions() -> None:
     assert actions == _ROUTED_ACTIONS
     assert {"polish", "coherence", "kg", "orchestrate"} <= actions
     assert {"research", "verify_work", "check_refs", "section_review", "audit"} <= actions
-    assert len(caps["actions"]) == 25
+    assert len(caps["actions"]) == 26
     for entry in caps["actions"]:
         assert {"action", "description", "payload_keys"} <= entry.keys()
         assert isinstance(entry["payload_keys"], list)

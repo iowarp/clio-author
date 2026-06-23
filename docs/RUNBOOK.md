@@ -11,10 +11,13 @@ one at a time and inspect each result. Arranged as a paper's life — **read →
   (merge extra payload keys) — see the per-subcommand tables below for which flags each one takes.
 - Text actions need a model (`CLIO_LLM=…`); without one they return an offline **echo** placeholder.
 
-> **Single-file rule.** Every `--*-file` flag reads exactly **one** file (internally `_read_file`
-> in `cli.py`; no `nargs`, `append`, or glob). To supply several files as context, concatenate them
-> into one file first, or `ingest` each one and pass the resulting `blocks.json`. This applies to
-> every file-taking flag listed in this document.
+> **Single-file rule (and the multi-source exception).** Every `--*-file` flag reads exactly **one**
+> file (internally `_read_file` in `cli.py`; no `append` or glob). The exception is `--sources`,
+> which takes **many** sources at once: the grounding actions (`ask`, `plan`, `write`, `compose`,
+> `research`, `kg`, `review`) and the standalone `gather` action accept `--sources S [S ...]` (a mix
+> of files, folders, globs, git repo URLs, PDFs/arXiv ids) or `--sources-file FILE` (one per line, or
+> a JSON array). They are auto-ingested and merged into the grounding `blocks` for you — so you no
+> longer need to concatenate files or pre-`ingest` each one by hand.
 
 ---
 
@@ -59,17 +62,17 @@ GEMINI_API_KEY=...
 
 ```bash
 uv run ruff check clio_author tests        # -> All checks passed!
-uv run mypy clio_author                    # -> Success: no issues found in 69 source files
-uv run pytest -q                           # -> 532 passed, 3 skipped, 10 deselected
-uv run clio-author capabilities            # -> name=clio-author, 25 actions
+uv run mypy clio_author                    # -> Success: no issues found in 72 source files
+uv run pytest -q                           # -> 579 passed, 3 skipped, 12 deselected
+uv run clio-author capabilities            # -> name=clio-author, 26 actions
 ```
 
-> **22 subcommands** have dedicated flags: `capabilities, ingest, ask, review, cite, discover, plan,
-> write, compose, export, polish, coherence, kg, describe, orchestrate, rebuttal, research,
+> **23 subcommands** have dedicated flags: `capabilities, ingest, gather, ask, review, cite, discover,
+> plan, write, compose, export, polish, coherence, kg, describe, orchestrate, rebuttal, research,
 > verify-work, check-refs, section-review, audit, run`. The other **5 actions**
 > (`edit`, `meta_review`, `plot`, `write_review`, `figure_refine`) have **no dedicated subcommand**
 > — reach them with `clio-author run <action> --json '{...}'`. `run <action>` works for *any* of
-> the 25 actions.
+> the 26 actions.
 
 ---
 
@@ -94,6 +97,38 @@ uv run --extra pdf clio-author ingest https://arxiv.org/abs/1706.03762   # url
 uv run --extra pdf clio-author ingest ./mypaper.pdf                      # local PDF
 ```
 **Expect:** `extractor=docling`, ~125 sections, 12 figures. **Artifacts:** `runbook-out/ingest/`.
+
+**`gather`** — ingest **many** sources (files / folders / globs / git repos / PDFs) into one merged
+memory-block set. Deterministic (no LLM). Writes `context.json` (a drop-in `--blocks-file` for the
+writing actions) + `context.md`. Directories/repos contribute their docs (`.md`/`.rst`/`.txt`/`.tex`
++ `README`); an explicit file path of any text/code type is ingested as given; PDFs/arXiv ids use the
+`pdf` extra. Per-source failures are reported in `structured.skipped`, never fatal.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--sources` | one or more strings | file/folder/glob path, git repo URL, arXiv id, or PDF URL/path |
+| `--sources-file` | file path | sources listed one per line, or a JSON array of strings |
+| `--out-dir` | dir path | persist `context.json` (drop-in `--blocks-file`) + `context.md` |
+| `--max-files` | int | cap on files pulled from folders/globs/repos in total (default 50) |
+| `--max-text-chars` | int | per-text-file character cap; longer files truncated (default 200000) |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys (`sources`, `out_dir`, `max_files`, `max_text_chars`) |
+| `--out` | file path | save result |
+
+```bash
+# Merge a repo's docs + a notes folder + a PDF into one reusable context:
+uv run --extra pdf clio-author gather \
+  --sources https://github.com/owner/repo ./notes/ 2601.23265 \
+  --out-dir runbook-out/context
+# context.json then drops straight into any grounding action:
+CLIO_LLM=claude uv run clio-author plan \
+  --idea "my thesis" --blocks-file runbook-out/context/context.json
+```
+**Expect:** `metadata.ingested` units, merged `sections`/`figures`. **Artifacts:** `runbook-out/context/`.
+
+> **Shortcut:** instead of running `gather` first, pass `--sources …` directly to `ask`, `plan`,
+> `write`, `compose`, `research`, `kg`, or `review` — they auto-gather into grounding `blocks` before
+> running (an explicit `--blocks-file`/`--blocks-json` still takes precedence).
 
 ---
 
@@ -766,7 +801,7 @@ All other actions have dedicated subcommands — see Appendix A.
   `ClioAuthorSubagent(llm=…).run("review", {"paper": "..."})`.
 - See a subcommand's exact flags anytime: `clio-author <cmd> --help`.
 
-## Appendix A — all 25 actions at a glance
+## Appendix A — all 26 actions at a glance
 
 | # | Action | Dedicated subcommand |
 |---|---|---|

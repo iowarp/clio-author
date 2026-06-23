@@ -36,7 +36,7 @@ cd clio-author
 uv sync
 ```
 
-**Step 3. Confirm it works** (prints the list of 25 things it can do — no model or network needed):
+**Step 3. Confirm it works** (prints the list of 26 things it can do — no model or network needed):
 
 ```bash
 uv run clio-author capabilities
@@ -91,11 +91,19 @@ That is the whole loop: **ingest → read → review.** Everything below is vari
 
 ---
 
-## 2. Capabilities — 25 actions, grouped by intent
+## 2. Capabilities — 26 actions, grouped by intent
 
 Pick the workflow that matches what you want to do. Add `--format prose` for human-readable text;
 omit it to get JSON (the default, handy for programs). Text actions need a real model (`CLIO_LLM=…`,
-see §3); `ingest`, `cite`, `discover`, `check_refs`, `audit`, and `meta_review` work without one.
+see §3); `ingest`, `gather`, `cite`, `discover`, `check_refs`, `audit`, and `meta_review` work
+without one.
+
+> **Grounding shortcut — `--sources`.** Every writing/reading action that grounds on memory blocks
+> (`ask`, `plan`, `write`, `compose`, `research`, `kg`, `review`) accepts `--sources` (and
+> `--sources-file`): point it at any mix of files, folders, globs, git repo URLs, and PDFs/arXiv ids
+> and they are auto-ingested and merged into the grounding context before the action runs — no
+> separate `ingest`/`gather` step needed. Use the standalone `gather` action when you want to build
+> and inspect that merged context once and reuse it.
 
 ---
 
@@ -120,6 +128,37 @@ uv run --extra pdf clio-author ingest "Attention Is All You Need"
 uv run --extra pdf clio-author ingest ./mypaper.pdf
 ```
 
+#### `gather` — ingest many sources into one merged context
+
+Takes a whole working set — files, folders, globs, git repo URLs, PDFs/arXiv ids — ingests each, and
+merges them into one `MemoryBlocks`. Writes `context.json` (a drop-in `--blocks-file` for the writing
+actions) and `context.md`. Deterministic (no LLM). Directories/repos contribute their docs
+(`.md`/`.rst`/`.txt`/`.tex` and `README`); an explicit file path of any text/code type is ingested
+as given. PDFs/arXiv ids need the `pdf` extra. Per-source failures are reported in `skipped`, never
+fatal.
+
+| Argument | Meaning |
+|---|---|
+| `--sources S [S ...]` | one or more sources: file/folder/glob path, git repo URL, arXiv id, PDF URL/path |
+| `--sources-file FILE` | file listing sources (one per line, or a JSON array of strings) |
+| `--out-dir DIR` | persist `context.json` (drop-in `--blocks-file`) + `context.md` |
+| `--max-files N` | cap on files pulled from folders/globs/repos in total (default 50) |
+| `--max-text-chars N` | per-text-file character cap; longer files truncated (default 200000) |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys (`sources`, `out_dir`, `max_files`, `max_text_chars`) |
+| `--out FILE` | save the result |
+
+```bash
+# Gather a repo's docs + a folder of notes + a paper into one reusable context:
+uv run --extra pdf clio-author gather \
+  --sources https://github.com/owner/repo ./notes/ 2601.23265 \
+  --out-dir clio-out/context
+
+# Then ground any writing action on it:
+CLIO_LLM=claude uv run clio-author plan \
+  --idea "my thesis" --blocks-file clio-out/context/context.json
+```
+
 ---
 
 ### Understand — question-answer and concept mapping
@@ -133,6 +172,8 @@ Use after `ingest` to interrogate or map a paper's content.
 | `--question TEXT` | the question to answer (required) |
 | `--blocks-json JSON` | inline MemoryBlocks dump |
 | `--blocks-file FILE` | path to `blocks.json` (preferred for real papers) |
+| `--sources S [S ...]` | auto-gather files/folders/globs/git/PDFs into grounding blocks |
+| `--sources-file FILE` | file listing sources (one per line, or a JSON array) |
 | `--format structured\|prose` | default `structured` |
 | `--json '{...}'` | merge additional payload keys |
 | `--out FILE` | save the result |
@@ -252,6 +293,8 @@ When `CLIO_SCHOLAR` is configured, each proposed title is verified against a rea
 | Argument | Meaning |
 |---|---|
 | `--topic TEXT` | the topic to research (inline) |
+| `--sources S [S ...]` | auto-gather files/folders/globs/git/PDFs into grounding blocks |
+| `--sources-file FILE` | file listing sources (one per line, or a JSON array) |
 | `--topic-file FILE` | file holding the topic text |
 | `--blocks-file FILE` | JSON MemoryBlocks for grounding context |
 | `--depth standard\|deep` | `deep` aims for more sources and precise gaps |
@@ -400,6 +443,8 @@ Produces tasks, claims, sources, and word budgets for each section before any pr
 | `--outline-json JSON` | a `PaperOutline` to plan against |
 | `--outline-file FILE` | same format as a JSON file |
 | `--blocks-file FILE` | JSON MemoryBlocks for grounding |
+| `--sources S [S ...]` | auto-gather files/folders/globs/git/PDFs into grounding blocks |
+| `--sources-file FILE` | file listing sources (one per line, or a JSON array) |
 | `--candidates-file FILE` | JSON citation candidates to fold into citation hints |
 | `--out-dir DIR` | persist `plan.json` |
 | `--format structured\|prose` | default `structured` |
@@ -419,6 +464,8 @@ CLIO_LLM=claude uv run clio-author plan \
 |---|---|
 | `--source TEXT` | source material (inline) |
 | `--source-file FILE` | source-material file (single file only) |
+| `--sources S [S ...]` | auto-gather files/folders/globs/git/PDFs into grounding blocks |
+| `--sources-file FILE` | file listing sources (one per line, or a JSON array) |
 | `--outline TEXT` | section title; richer outlines via `--json '{"outline":{...}}'` |
 | `--format structured\|prose` | default `structured` |
 | `--json '{...}'` | merge payload keys; use for `section_plan`, `blocks`, `out_path` |
@@ -487,6 +534,8 @@ to also emit `paper.tex`; add `--pdf` to compile `paper.pdf` (requires a LaTeX e
 | `--log-file FILE` | file holding the experimental log |
 | `--outline-json JSON` | a `PaperOutline` to use instead of generating one |
 | `--outline-file FILE` | same format as a JSON file |
+| `--sources S [S ...]` | auto-gather files/folders/globs/git/PDFs into grounding blocks |
+| `--sources-file FILE` | file listing sources (one per line, or a JSON array) |
 | `--candidates-file FILE` | JSON citation candidates to verify and cite |
 | `--review` | run a per-section writer/reviewer refine loop |
 | `--max-rounds N` | max refine rounds per section when `--review` is set (default 3) |
@@ -738,7 +787,7 @@ from clio_author.llm.providers import resolve_llm
 # Build the subagent. resolve_llm("claude") | "codex" | "ollama" | None (offline echo).
 sub = ClioAuthorSubagent(llm=resolve_llm("claude"))
 
-# 1) Discover what it can do (25 actions).
+# 1) Discover what it can do (26 actions).
 for a in sub.capabilities()["actions"]:
     print(a["action"], "—", a["description"])
 
@@ -787,35 +836,36 @@ CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper
 
 ---
 
-## 5. The 25 actions at a glance
+## 5. The 26 actions at a glance
 
 | # | Action | What it's for | Subcommand |
 |---|--------|---------------|------------|
 | 1 | `ingest` | **Read a paper.** arXiv id / URL / PDF / title → Markdown + blocks + figures. | `clio-author ingest <source>` |
-| 2 | `ask` | **Question answering.** Grounded answer from the paper's memory blocks. | `clio-author ask` |
-| 3 | `kg` | **Map content.** Claims/methods/datasets/results graph; `--full` for the 6-stage pipeline. | `clio-author kg` |
-| 4 | `discover` | **Find real papers.** Scholarly search (S2/OpenAlex/Crossref/arXiv); no LLM. | `clio-author discover` |
-| 5 | `cite` | **Verify citations.** Check candidates against scholarly backends; suggestions only. | `clio-author cite` |
-| 6 | `check_refs` | **Lint bibliography.** Malformed/duplicate entries, missing/uncited keys; no LLM. | `clio-author check-refs` |
-| 7 | `research` | **Survey literature.** Foundational/recent/competing sources, gaps, synthesis. | `clio-author research` |
-| 8 | `review` | **Peer review.** Accept/Reject + scores + critique; optional grounding and vision. | `clio-author review` |
-| 9 | `meta_review` | **Area-chair decision.** Aggregate several reviews; offline arithmetic. | `clio-author run meta_review` |
-| 10 | `section_review` | **Section review.** L1 refs → L2 coherence → L3 persona; severity summary. | `clio-author section-review` |
-| 11 | `rebuttal` | **Author rebuttal.** Point-by-point response grounded in the paper. | `clio-author rebuttal` |
-| 12 | `verify_work` | **Claim audit.** Per-claim made/supported check → VERIFIED/GAPS verdict. | `clio-author verify-work` |
-| 13 | `audit` | **Manuscript checklist.** Sections, word counts, placeholders, coverage; no LLM. | `clio-author audit` |
-| 14 | `plan` | **Section blueprints.** Tasks, claims, sources, word budgets before drafting. | `clio-author plan` |
-| 15 | `write` | **Draft a section.** Grounded in supplied source material. | `clio-author write` |
-| 16 | `edit` | **Revise to feedback.** Rewrite prose to address reviewer weaknesses. | `clio-author run edit` |
-| 17 | `polish` | **Improve prose.** Clarity, flow, academic voice; preserves citations. | `clio-author polish` |
-| 18 | `coherence` | **Consistency check.** Terminology drift, contradictions, broken flow. | `clio-author coherence` |
-| 19 | `compose` | **Write a whole paper.** idea → outline → cite → write → assemble; `--latex`/`--pdf`. | `clio-author compose` |
-| 20 | `write_review` | **Self-improve a draft.** Writer ↔ reviewer critic-refine loop. | `clio-author run write_review` |
-| 21 | `plot` | **Make a plot/diagram.** Matplotlib code (or real PNG with vision). | `clio-author run plot` |
-| 22 | `describe_figures` | **Caption figures.** Text or Gemini vision descriptions. | `clio-author describe` |
-| 23 | `figure_refine` | **Self-improve a figure.** Visualizer ↔ critic refine loop. | `clio-author run figure_refine` |
-| 24 | `export` | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF. | `clio-author export` |
-| 25 | `orchestrate` | **Goal-driven.** Plan and run a sequence of actions from a natural-language goal. | `clio-author orchestrate` |
+| 2 | `gather` | **Build context.** Many sources (files/folders/globs/git/PDFs) → one merged `context.json`. | `clio-author gather` |
+| 3 | `ask` | **Question answering.** Grounded answer from the paper's memory blocks. | `clio-author ask` |
+| 4 | `kg` | **Map content.** Claims/methods/datasets/results graph; `--full` for the 6-stage pipeline. | `clio-author kg` |
+| 5 | `discover` | **Find real papers.** Scholarly search (S2/OpenAlex/Crossref/arXiv); no LLM. | `clio-author discover` |
+| 6 | `cite` | **Verify citations.** Check candidates against scholarly backends; suggestions only. | `clio-author cite` |
+| 7 | `check_refs` | **Lint bibliography.** Malformed/duplicate entries, missing/uncited keys; no LLM. | `clio-author check-refs` |
+| 8 | `research` | **Survey literature.** Foundational/recent/competing sources, gaps, synthesis. | `clio-author research` |
+| 9 | `review` | **Peer review.** Accept/Reject + scores + critique; optional grounding and vision. | `clio-author review` |
+| 10 | `meta_review` | **Area-chair decision.** Aggregate several reviews; offline arithmetic. | `clio-author run meta_review` |
+| 11 | `section_review` | **Section review.** L1 refs → L2 coherence → L3 persona; severity summary. | `clio-author section-review` |
+| 12 | `rebuttal` | **Author rebuttal.** Point-by-point response grounded in the paper. | `clio-author rebuttal` |
+| 13 | `verify_work` | **Claim audit.** Per-claim made/supported check → VERIFIED/GAPS verdict. | `clio-author verify-work` |
+| 14 | `audit` | **Manuscript checklist.** Sections, word counts, placeholders, coverage; no LLM. | `clio-author audit` |
+| 15 | `plan` | **Section blueprints.** Tasks, claims, sources, word budgets before drafting. | `clio-author plan` |
+| 16 | `write` | **Draft a section.** Grounded in supplied source material. | `clio-author write` |
+| 17 | `edit` | **Revise to feedback.** Rewrite prose to address reviewer weaknesses. | `clio-author run edit` |
+| 18 | `polish` | **Improve prose.** Clarity, flow, academic voice; preserves citations. | `clio-author polish` |
+| 19 | `coherence` | **Consistency check.** Terminology drift, contradictions, broken flow. | `clio-author coherence` |
+| 20 | `compose` | **Write a whole paper.** idea → outline → cite → write → assemble; `--latex`/`--pdf`. | `clio-author compose` |
+| 21 | `write_review` | **Self-improve a draft.** Writer ↔ reviewer critic-refine loop. | `clio-author run write_review` |
+| 22 | `plot` | **Make a plot/diagram.** Matplotlib code (or real PNG with vision). | `clio-author run plot` |
+| 23 | `describe_figures` | **Caption figures.** Text or Gemini vision descriptions. | `clio-author describe` |
+| 24 | `figure_refine` | **Self-improve a figure.** Visualizer ↔ critic refine loop. | `clio-author run figure_refine` |
+| 25 | `export` | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF. | `clio-author export` |
+| 26 | `orchestrate` | **Goal-driven.** Plan and run a sequence of actions from a natural-language goal. | `clio-author orchestrate` |
 
 Actions without a dedicated subcommand are reachable via `clio-author run <action> --json '...'`.
 

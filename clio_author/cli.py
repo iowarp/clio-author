@@ -681,6 +681,63 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_describe)
     _add_json(p_describe)
 
+    p_gather = sub.add_parser(
+        "gather",
+        help="Ingest many sources (files/folders/globs/git repos/PDFs) into merged blocks.",
+    )
+    p_gather.add_argument(
+        "--sources",
+        nargs="+",
+        default=None,
+        help="One or more sources: file/folder/glob path, git repo URL, arXiv id, or PDF URL/path.",
+    )
+    p_gather.add_argument(
+        "--sources-file",
+        dest="sources_file",
+        default=None,
+        help="Path to a file listing sources (one per line, or a JSON array of strings).",
+    )
+    p_gather.add_argument(
+        "--out-dir",
+        dest="out_dir",
+        default=None,
+        help="Directory to persist context.json (a drop-in --blocks-file) + context.md (optional).",
+    )
+    p_gather.add_argument(
+        "--max-files",
+        dest="max_files",
+        type=int,
+        default=None,
+        help="Cap on files pulled from folders/globs/repos in total (default 50).",
+    )
+    p_gather.add_argument(
+        "--max-text-chars",
+        dest="max_text_chars",
+        type=int,
+        default=None,
+        help="Per-text-file character cap; longer files are truncated (default 200000).",
+    )
+    _add_format(p_gather)
+    _add_json(p_gather)
+
+    # `--sources` on the grounding subcommands: auto-gather files/folders/globs/
+    # git repos/PDFs into `blocks` before the action runs (no pre-ingest needed).
+    for _name in ("ask", "review", "write", "compose", "plan", "research", "kg"):
+        _gp = sub.choices[_name]
+        _gp.add_argument(
+            "--sources",
+            nargs="+",
+            default=None,
+            help="Auto-gather these sources (files/folders/globs/git repos/PDFs) into grounding "
+            "blocks before running.",
+        )
+        _gp.add_argument(
+            "--sources-file",
+            dest="sources_file",
+            default=None,
+            help="Path to a file listing sources (one per line, or a JSON array of strings).",
+        )
+
     # `--out FILE` on every subcommand: also save the result (prose `content`
     # for .md/.txt, full JSON for .json) so callers need not redirect stdout.
     for _p in sub.choices.values():
@@ -717,6 +774,29 @@ def _json_input(file_path: str | None, raw: str | None, *, field: str) -> Any:
     if file_path is not None:
         raw = _read_file(file_path, field=field)
     return _parse_json(raw, field=field)
+
+
+def _sources_from_args(args: argparse.Namespace) -> list[str] | None:
+    """Resolve the ``--sources`` / ``--sources-file`` inputs to a list of strings.
+
+    ``--sources`` (a list) wins. ``--sources-file`` is read as either a JSON array
+    of strings or a newline-separated list (blank lines and ``#`` comments
+    skipped). Returns ``None`` when neither is given.
+    """
+    sources = getattr(args, "sources", None)
+    if sources:
+        return [str(s) for s in sources]
+    sources_file = getattr(args, "sources_file", None)
+    if not sources_file:
+        return None
+    text = _read_file(sources_file, field="--sources-file")
+    stripped = text.strip()
+    if stripped.startswith("["):
+        parsed = _parse_json(stripped, field="--sources-file")
+        if isinstance(parsed, list):
+            return [str(s) for s in parsed]
+        raise ValueError("--sources-file JSON must be an array of strings")
+    return [line.strip() for line in text.splitlines() if line.strip() and not line.startswith("#")]
 
 
 def _load_kg_checkpoints(resume_dir: str) -> dict[str, Any]:
@@ -801,6 +881,18 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         payload["source"] = args.source
         # Persist to a visible folder by default so output isn't lost in /tmp.
         payload.setdefault("out_dir", _default_out_dir(args.source))
+    elif command == "gather":
+        sources = _sources_from_args(args)
+        if sources is not None:
+            payload["sources"] = sources
+        if args.out_dir is not None:
+            payload["out_dir"] = args.out_dir
+        if args.max_files is not None:
+            payload["max_files"] = args.max_files
+        if args.max_text_chars is not None:
+            payload["max_text_chars"] = args.max_text_chars
+        payload["format"] = args.fmt
+        return "gather", payload
     elif command == "ask":
         payload["question"] = args.question
         blocks = _json_input(
@@ -1063,6 +1155,14 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
             payload["blocks"] = blocks
         payload["format"] = args.fmt
         return "describe_figures", payload
+
+    # Grounding subcommands accept `--sources`/`--sources-file`: pass the list
+    # through so the agent auto-gathers it into `blocks` before dispatch (unless
+    # explicit blocks were already supplied).
+    if command in ("ask", "review", "write", "compose", "plan", "research", "kg"):
+        sources = _sources_from_args(args)
+        if sources is not None and "blocks" not in payload:
+            payload["sources"] = sources
 
     return command, payload
 

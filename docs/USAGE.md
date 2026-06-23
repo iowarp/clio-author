@@ -71,7 +71,7 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 
 ---
 
-## Action catalog (25 actions)
+## Action catalog (26 actions)
 
 Payload keys below are exactly the keys each expert reads. Keys marked *(optional)* have a fallback.
 
@@ -107,7 +107,38 @@ agent.ingest("path/to/paper.pdf")
 
 ---
 
-### 2. `ask`
+### 2. `gather`
+
+Ingest **many** sources into one merged `MemoryBlocks` for grounding the writing path.
+
+- **Reads:** `sources` (a string or list of: file path, folder, glob, git repo URL, arXiv id, or
+  PDF URL/path); `out_dir` *(optional)* — writes `context.json` (a drop-in `blocks` / `--blocks-file`)
+  and `context.md`; `max_files` *(optional, default 50)*; `max_text_chars` *(optional, default 200000)*.
+- **Returns:** `content` = a one-line summary; `structured` = `{blocks, ingested, skipped, count}`
+  (`blocks` is the merged `MemoryBlocks` dump); `metadata` = `{ingested, skipped, sections, figures, wrote}`.
+- **Routing:** directories/repos contribute their docs (`.md`/`.rst`/`.txt`/`.tex` + `README`);
+  an explicit file path of any text/code type is ingested as given; PDFs/arXiv ids run the extraction
+  pipeline (needs the `pdf` extra). Each merged section is labelled with its source
+  (e.g. `[README.md] Design`) and figures are re-indexed to stay unique.
+- **Deterministic, never-raise:** no LLM; a bad/unreachable source lands in `skipped` and gathering
+  continues. Heavy PDF/`git` work is lazy-imported, so the module stays hermetic.
+
+```bash
+clio-author gather --sources https://github.com/owner/repo ./notes/ 2601.23265 \
+  --out-dir clio-out/context
+```
+```python
+sub.run("gather", {"sources": ["./notes/", "https://github.com/owner/repo"], "out_dir": "clio-out/context"})
+agent.gather(["./notes/", "paper.pdf"])
+```
+
+> **Auto-chaining:** `ask`, `plan`, `write`, `compose`, `research`, `kg`, and `review` also accept a
+> `sources` key (CLI `--sources`/`--sources-file`); the agent gathers it into `blocks` before the
+> action runs, unless explicit `blocks` were supplied.
+
+---
+
+### 3. `ask`
 
 Answer a question grounded only in the provided memory blocks (selective context injection).
 
@@ -130,7 +161,7 @@ agent.ask("What is the main result?", blocks_dump)
 
 ---
 
-### 3. `review`
+### 4. `review`
 
 Produce a structured, persona-conditioned peer review. Optionally multimodal: when a vision client
 is configured (`CLIO_VISION=gemini`) and figures are supplied, the reviewer looks at each figure
@@ -181,7 +212,7 @@ sub.run("review", {"paper": "# Title\n\nAbstract...", "blocks": blocks_dump})
 
 ---
 
-### 4. `meta_review`
+### 5. `meta_review`
 
 Aggregate several reviews into a single area-chair meta-review (deterministic, offline).
 
@@ -202,7 +233,7 @@ sub.run("meta_review", {"reviews": [review_a_dump, review_b_dump]})
 
 ---
 
-### 5. `rebuttal`
+### 6. `rebuttal`
 
 Draft an author rebuttal that addresses a peer review point by point, grounded strictly in the
 paper, inventing no new results or citations.
@@ -250,7 +281,7 @@ sub.run("rebuttal", {
 
 ---
 
-### 6. `cite`
+### 7. `cite`
 
 Verify citation candidates against scholarly metadata backends and emit **suggestions only**.
 
@@ -281,7 +312,7 @@ agent.cite([{"title": "Attention Is All You Need", "year": 2017}], out_dir="/tmp
 
 ---
 
-### 7. `plan`
+### 8. `plan`
 
 Turn an idea (or a provided `PaperOutline`) into per-section **writing plans**: ordered tasks,
 claims, sources/evidence, refined word budgets, and citation hints — one `SectionPlan` per section.
@@ -332,7 +363,7 @@ sub.run("write", {"section_plan": plans[0], "source": "..."})
 
 ---
 
-### 8. `research`
+### 9. `research`
 
 Produce a grounded literature brief for a topic or section: foundational works, recent work,
 competing/alternative approaches, open gaps, a synthesis, and confidence. When a scholar client is
@@ -389,7 +420,7 @@ sub.run("research", {"topic": "transformer self-attention", "discover": True})
 
 ---
 
-### 9. `discover`
+### 10. `discover`
 
 Find real candidate papers for a topic via scholarly search (Semantic Scholar / OpenAlex / Crossref /
 arXiv). Deterministic — no LLM call. Returns only records the search actually returns; never
@@ -433,7 +464,7 @@ sub.run("discover", {"topic": "transformer self-attention", "limit": 10})
 
 ---
 
-### 10. `verify_work`
+### 11. `verify_work`
 
 Goal-backward check of written prose against the claims it was supposed to make. For each intended
 claim, determines whether the prose actually states it (`made`) and whether it is supported with
@@ -477,7 +508,7 @@ sub.run("verify_work", {
 
 ---
 
-### 11. `write`
+### 12. `write`
 
 Draft a single paper section grounded in scoped source material.
 
@@ -502,7 +533,7 @@ agent.write(outline={"title": "Methods"}, source="...")
 
 ---
 
-### 12. `edit`
+### 13. `edit`
 
 Revise existing prose to address reviewer feedback (one-shot).
 
@@ -521,7 +552,7 @@ agent.edit("...", review_dump)
 
 ---
 
-### 13. `polish`
+### 14. `polish`
 
 Polish existing prose for clarity, flow, and academic voice **without changing meaning or removing
 citations**.
@@ -548,7 +579,7 @@ sub.run("polish", {"text": "...", "target": "sections/01-introduction.md"})
 
 ---
 
-### 14. `coherence`
+### 15. `coherence`
 
 Check **cross-section consistency** of a manuscript — terminology drift, contradictions, undefined
 terms, duplication, and broken narrative flow.
@@ -575,7 +606,7 @@ sub.run("coherence", {"sections": [{"title": "Introduction", "draft": "..."}, ..
 
 ---
 
-### 15. `check_refs`
+### 16. `check_refs`
 
 Deterministically lint a BibTeX bibliography and cross-check it against the `\cite{}` keys used in
 the manuscript prose. Flags malformed entries, duplicate entries, cited-but-missing keys, and
@@ -608,7 +639,7 @@ sub.run("check_refs", {"bibtex": bibtex_string, "markdown": manuscript_text})
 
 ---
 
-### 16. `section_review`
+### 17. `section_review`
 
 Three-layer review of a **single section**: L1 deterministic reference/citation checking
 (`check_refs`) → L2 single-section coherence (`coherence`) → L3 persona-conditioned peer review
@@ -649,7 +680,7 @@ sub.run("section_review", {
 
 ---
 
-### 17. `audit`
+### 18. `audit`
 
 Deterministic manuscript completeness audit: required sections present, per-section word-count vs
 budget, unresolved `[TODO]`/`[CITE:]`/empty `\cite{}` placeholders, and citation coverage. **No
@@ -692,7 +723,7 @@ sub.run("audit", {
 
 ---
 
-### 18. `kg`
+### 19. `kg`
 
 Extract a content knowledge graph of a paper -- its claims, methods, datasets, results, metrics,
 concepts, and tasks plus the relations between them -- from the paper's memory blocks. This is the
@@ -752,7 +783,7 @@ sub.run("kg", {
 
 ---
 
-### 19. `describe_figures`
+### 20. `describe_figures`
 
 Fill in descriptions/captions for figures in memory blocks.
 
@@ -778,7 +809,7 @@ agent.describe_figures(blocks_dump)
 
 ---
 
-### 20. `plot`
+### 21. `plot`
 
 Generate matplotlib plot **code** (text only; never executed on this path).
 
@@ -804,7 +835,7 @@ agent.plot({"kind": "plot", "intent": "bar chart of accuracy by model"})
 
 ---
 
-### 21. `compose`
+### 22. `compose`
 
 **Whole-paper orchestration.** Drafts a full multi-section manuscript from an idea and optional
 experimental log, chaining the existing experts in sequence.
@@ -881,7 +912,7 @@ print("section errors:", result["metadata"]["section_errors"])
 
 ---
 
-### 22. `export`
+### 23. `export`
 
 Export a composed Markdown manuscript to a standalone LaTeX document (`paper.tex` + optional
 `references.bib`).
@@ -946,7 +977,7 @@ print(result["metadata"]["wrote"])
 
 ---
 
-### 23. `write_review`
+### 24. `write_review`
 
 Run a writer ↔ reviewer **critic-refine** loop and return the final output.
 
@@ -968,7 +999,7 @@ sub.run("write_review", {"outline": {"title": "Methods"}, "source": "...", "max_
 
 ---
 
-### 24. `figure_refine`
+### 25. `figure_refine`
 
 Run a figure visualizer ↔ critic **critic-refine** loop and return the final output.
 
@@ -988,7 +1019,7 @@ sub.run("figure_refine", {"spec": {"kind": "plot", "intent": "line chart of loss
 
 ---
 
-### 25. `orchestrate`
+### 26. `orchestrate`
 
 Plan and run a sequence of the other actions to achieve a natural-language **goal** (dynamic
 multi-step). An LLM proposes a minimal ordered plan of action calls, which are executed through the

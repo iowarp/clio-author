@@ -27,14 +27,23 @@ ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["source"],
     },
     {
+        "action": "gather",
+        "description": (
+            "Ingest many sources (files, folders, globs, git repos, PDFs/arXiv "
+            "ids) into one merged memory-block set (context.json) for grounding "
+            "the writing path."
+        ),
+        "payload_keys": ["sources", "out_dir", "max_files", "max_text_chars"],
+    },
+    {
         "action": "ask",
         "description": "Answer a question grounded only in the provided memory blocks.",
-        "payload_keys": ["question", "blocks"],
+        "payload_keys": ["question", "blocks", "sources"],
     },
     {
         "action": "review",
         "description": "Produce a structured, persona-conditioned peer review of a paper.",
-        "payload_keys": ["paper", "persona", "ground", "figures", "blocks"],
+        "payload_keys": ["paper", "persona", "ground", "figures", "blocks", "sources"],
     },
     {
         "action": "meta_review",
@@ -57,7 +66,15 @@ ACTIONS: list[dict[str, Any]] = [
     {
         "action": "write",
         "description": "Draft a single paper section grounded in scoped source material.",
-        "payload_keys": ["outline", "section_plan", "blocks", "source", "vision", "out_path"],
+        "payload_keys": [
+            "outline",
+            "section_plan",
+            "blocks",
+            "sources",
+            "source",
+            "vision",
+            "out_path",
+        ],
     },
     {
         "action": "edit",
@@ -88,7 +105,7 @@ ACTIONS: list[dict[str, Any]] = [
             "(metadata -> ontology -> extraction -> coref -> verification -> summary) "
             "with checkpoint/resume."
         ),
-        "payload_keys": ["blocks", "out_dir", "full", "stages", "checkpoints"],
+        "payload_keys": ["blocks", "sources", "out_dir", "full", "stages", "checkpoints"],
     },
     {
         "action": "plan",
@@ -96,7 +113,15 @@ ACTIONS: list[dict[str, Any]] = [
             "Turn an idea or outline into per-section writing plans "
             "(tasks, claims, sources, word budgets)."
         ),
-        "payload_keys": ["idea", "experimental_log", "outline", "blocks", "candidates", "out_dir"],
+        "payload_keys": [
+            "idea",
+            "experimental_log",
+            "outline",
+            "blocks",
+            "sources",
+            "candidates",
+            "out_dir",
+        ],
     },
     {
         "action": "research",
@@ -105,7 +130,16 @@ ACTIONS: list[dict[str, Any]] = [
             "for a topic or section; grounds proposed titles against a scholar "
             "backend when one is configured (invents no verified citations)."
         ),
-        "payload_keys": ["topic", "section", "outline", "blocks", "source", "depth", "out_dir"],
+        "payload_keys": [
+            "topic",
+            "section",
+            "outline",
+            "blocks",
+            "sources",
+            "source",
+            "depth",
+            "out_dir",
+        ],
     },
     {
         "action": "discover",
@@ -168,6 +202,7 @@ ACTIONS: list[dict[str, Any]] = [
             "outline",
             "candidates",
             "blocks",
+            "sources",
             "review",
             "max_rounds",
             "plan",
@@ -183,7 +218,7 @@ ACTIONS: list[dict[str, Any]] = [
     {
         "action": "write_review",
         "description": "Run a writer/reviewer critic-refine loop and return the final output.",
-        "payload_keys": ["outline", "section_plan", "blocks", "source", "max_rounds"],
+        "payload_keys": ["outline", "section_plan", "blocks", "sources", "source", "max_rounds"],
     },
     {
         "action": "figure_refine",
