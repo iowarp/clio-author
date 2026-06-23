@@ -300,15 +300,11 @@ def test_out_flag_available_on_ask(capsys: pytest.CaptureFixture[str], tmp_path)
     assert p.exists()
 
 
-def test_gather_command_routes_and_persists(
-    capsys: pytest.CaptureFixture[str], tmp_path
-) -> None:
+def test_gather_command_routes_and_persists(capsys: pytest.CaptureFixture[str], tmp_path) -> None:
     doc = tmp_path / "a.md"
     doc.write_text("# Title\n\nbody\n", encoding="utf-8")
     out_dir = tmp_path / "ctx"
-    code, result = _run(
-        capsys, ["gather", "--sources", str(doc), "--out-dir", str(out_dir)]
-    )
+    code, result = _run(capsys, ["gather", "--sources", str(doc), "--out-dir", str(out_dir)])
     assert code == 0
     assert result["action"] == "gather"
     assert result["metadata"]["ingested"] == 1
