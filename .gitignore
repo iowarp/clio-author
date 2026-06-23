@@ -48,3 +48,4 @@ dist/
 /docs/SOURCE-COVERAGE.md
 /docs/INTEGRATION.md
 /eval/agentic/
+/.claude/
