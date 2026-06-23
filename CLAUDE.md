@@ -26,20 +26,31 @@ is tested on its own.**
 
 ```
 clio_author/
-  agent.py            MainAgent: plan -> delegate to experts -> critic-refine -> synthesize
+  agent.py            ClioAuthorAgent: routes invoke() by payload["action"] to experts
   harness/            BaseAgent, AgentProtocol, engine, patterns, session, types
-  experts/            ingestor · figure_agent · retriever · reviewer · writer · editor · citation
-  ingest/             Docling + postprocess (fresh port) + tables + memory blocks
-  retrieval/          rag (LanceDB) · scholar (Semantic Scholar) · kg (optional)
-  tools/files.py      read / write / edit (diff-based)
-  llm/client.py       provider abstraction (local vision models, Ollama, API)
-integration/clio_adapter.py   thin shim so CLIO can invoke ClioAuthorAgent (deferred)
+  experts/            ingestor · context(gather) · paper_qa(ask) · citation · discover · research ·
+                      reviewer · meta_reviewer · rebuttal · section_review · verify_work · check_refs ·
+                      audit · planner · writer · editor · polish · coherence · compose · experiment ·
+                      kg · figure_agent · echo
+  ingest/             Docling + postprocess + tables + memory blocks + gather (multi-source)
+  retrieval/          rag (LanceDB) · scholar (S2/OpenAlex/Crossref/arXiv cascade) · kg pipeline
+  export/latex.py     paper.md -> LaTeX (+ optional PDF compile)
+  tools/files.py      SafeFiles read / write / edit (diff-based)
+  llm/client.py       provider abstraction (Claude/Codex CLIs, Ollama, echo); llm/vision.py (Gemini)
+  integration/        ClioAuthorSubagent adapter + manifest (action + lifecycle metadata) + mcp_bridge
 tests/baselines/      comparisons vs paper-to-md / PaperBanana / PaperOrchestra
 ```
 
+**Capability surface:** 26 actions organized by the **author lifecycle** (frame · gather · plan ·
+draft · strengthen · referee · respond · ship · drive). The manifest tags each action with `phase` +
+`needs_source`; `clio-author lifecycle` and **`docs/LIFECYCLE.md`** are the map. User docs:
+`README.md` (front door), `docs/RUNBOOK.md` (every command/flag), `docs/USAGE.md` (library/payload
+reference), `docs/MOTIVATION.md`, `docs/SECURITY.md`.
+
 The authoritative design lives in **`artifact/notes/DESIGN.md`**; cross-artifact rationale in
 **`artifact/notes/SYNTHESIS.md`**; per-source deep studies in `artifact/notes/*.md`. Read those
-before large changes — do not duplicate their content here.
+before large changes — do not duplicate their content here. (`.claude/` — agents, commands, skills —
+is local tooling and is **not tracked** in the repo.)
 
 ## Tech stack & standards
 

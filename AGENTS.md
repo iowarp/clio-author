@@ -16,11 +16,22 @@ subagent by a host agent** (e.g. an external orchestration layer) via an in-proc
 
 ## Capabilities (the action surface)
 
-`ingest` (arXiv/PDF → scientific Markdown + memory blocks) · `ask` (grounded Q&A) · `cite`
-(Semantic Scholar verification, suggestions-only) · `review` / `meta_review` (AgentReview rubric +
-panel) · `write` / `edit` (outline→draft→revise) · `literature_graph` (visual paper graph with
-year/citation/link/ingest metadata) · `describe_figures` / `plot` (figure captioning + matplotlib
-code-gen) · `write_review` / `figure_refine` (iterative critic loops).
+**26 actions across the author lifecycle** (frame · gather · plan · draft · strengthen · referee ·
+respond · ship · drive). Each manifest action carries `phase` + `needs_source` metadata. Highlights:
+
+- **Read & gather:** `ingest` (arXiv/PDF → scientific Markdown + memory blocks), `gather` (many
+  sources — files/folders/globs/git/PDFs — → one merged `context.json`).
+- **Understand:** `ask` (grounded Q&A), `kg` (content knowledge graph; `--full` 6-stage pipeline).
+- **Sources:** `discover` (scholarly search), `cite` (verify, suggestions-only), `check_refs`
+  (deterministic bib lint), `research` (grounded literature brief).
+- **Plan & write:** `plan`, `write`, `compose`, `revise` (`mode=feedback|style`; `edit`/`polish` are
+  aliases), `coherence`, `experiment` (recreate an evaluation plan from reference papers).
+- **Review & respond:** `review`, `section_review`, `meta_review`, `verify_work`, `audit`, `rebuttal`.
+- **Figures / ship / drive:** `plot`, `describe_figures`, `figure_refine`, `export` (LaTeX + PDF),
+  `orchestrate` (goal-driven multi-step), plus `write_review` (writer↔reviewer loop).
+
+Full map: `clio-author lifecycle` and `docs/LIFECYCLE.md`; per-action reference in `README.md` and
+`docs/RUNBOOK.md`.
 
 ## Architecture
 
@@ -30,12 +41,16 @@ clio_author/
   integration/        ClioAuthorSubagent — host-facing adapter (JSON in/out, CLIO-agnostic)
   cli.py              `clio-author` console script
   harness/            BaseAgent, AgentProtocol, Engine, patterns (Sequential/Parallel/CriticRefine), session, types
-  experts/            ingestor · paper_qa · citation · reviewer · meta_reviewer · writer · editor · literature_graph · figure_agent · echo
-  ingest/             Docling+PyMuPDF extraction + postprocess (sections/citations/equations/figures/bibliography/tables/cleanup) + blocks
-  retrieval/          rag (embeddings) · scholar (Semantic Scholar) · literature_graph (S2/OpenAlex)
+  experts/            ingestor · context (gather) · paper_qa (ask) · citation · discover · research ·
+                      reviewer · meta_reviewer · rebuttal · section_review · verify_work · check_refs ·
+                      audit · planner · writer · editor (revise/edit) · polish · coherence · compose ·
+                      experiment · kg · figure_agent (plot/describe/refine) · echo
+  ingest/             Docling+PyMuPDF extraction + postprocess (sections/citations/equations/figures/bibliography/tables/cleanup) + blocks + gather (multi-source)
+  retrieval/          rag (embeddings) · scholar (4-backend cascade: S2/OpenAlex/Crossref/arXiv) · kg (content knowledge-graph pipeline)
+  export/latex.py     paper.md -> paper.tex + references.bib (+ optional PDF compile)
   tools/files.py      SafeFiles — sandboxed read/write/edit
   llm/client.py       LLMClient protocol + EchoLLMClient (offline default)
-  eval/report.py      metrics + report
+  integration/        ClioAuthorSubagent adapter + manifest (action + lifecycle metadata) + mcp_bridge
 ```
 
 Design rationale: `artifact/notes/DESIGN.md`; cross-artifact analysis: `artifact/notes/SYNTHESIS.md`;
@@ -55,8 +70,9 @@ status + per-milestone plans: `artifact/notes/PROGRESS.md` and `artifact/notes/M
 ## Optional extras (lazy, gated)
 
 `pdf` (Docling + PyMuPDF) · `rag` (LanceDB + sentence-transformers) · `scholar` (thefuzz + httpx) ·
-`viz` (matplotlib). All heavy imports are **lazy inside functions**; importing any module must work
-without the extras installed. The default install needs only `pydantic`.
+`viz` (matplotlib) · `mcp` (fastmcp — the MCP bridge for MCP-only hosts). All heavy imports are
+**lazy inside functions**; importing any module must work without the extras installed. The default
+install needs only `pydantic`. (`git` on PATH is used by `gather` for git-repo sources.)
 
 ## Conventions (follow these)
 
