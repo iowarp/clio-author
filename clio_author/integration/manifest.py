@@ -248,4 +248,81 @@ ACTIONS: list[dict[str, Any]] = [
 ]
 
 
-__all__ = ["ACTIONS"]
+# --------------------------------------------------------------------------- #
+# Author-lifecycle metadata
+# --------------------------------------------------------------------------- #
+# The phases of the author's journey, in order. An action may serve several
+# phases (e.g. ``review`` is used both to self-check your own draft in
+# ``strengthen`` and to referee others' papers). ``docs/LIFECYCLE.md`` tells the
+# full story; this is the machine-readable map a host can route by.
+PHASES: list[tuple[str, str]] = [
+    ("frame", "Frame — what's my story, and what already exists?"),
+    ("gather", "Gather — pull in the material to build on"),
+    ("plan", "Plan — blueprint the paper and its evaluation"),
+    ("draft", "Draft — write and illustrate"),
+    ("strengthen", "Strengthen — self-review and tighten before anyone sees it"),
+    ("referee", "Referee — review others' papers"),
+    ("respond", "Respond — answer the reviewers of your paper"),
+    ("ship", "Ship — produce the camera-ready"),
+    ("drive", "Drive — run a multi-step job end to end"),
+]
+
+# Per-action lifecycle assignment: ``action -> (phases, needs_source)``.
+# ``needs_source`` is True when the action operates on a *processed paper* (memory
+# blocks / figures), i.e. you will normally ``ingest`` or ``gather`` first;
+# False when it works from text / an idea / JSON you supply directly. ``ingest``
+# and ``gather`` are the producers of source content, so they are False.
+_LIFECYCLE: dict[str, tuple[list[str], bool]] = {
+    "ingest": (["gather"], False),
+    "gather": (["gather"], False),
+    "experiment": (["frame", "plan"], True),
+    "ask": (["frame", "gather"], True),
+    "review": (["strengthen", "referee"], False),
+    "meta_review": (["referee"], False),
+    "rebuttal": (["respond"], False),
+    "cite": (["gather", "strengthen"], False),
+    "revise": (["strengthen", "respond"], False),
+    "coherence": (["strengthen"], False),
+    "kg": (["frame", "gather"], True),
+    "plan": (["plan"], False),
+    "research": (["frame", "plan"], False),
+    "discover": (["frame"], False),
+    "verify_work": (["strengthen"], False),
+    "check_refs": (["strengthen"], False),
+    "section_review": (["strengthen", "referee"], False),
+    "audit": (["strengthen", "respond"], False),
+    "describe_figures": (["draft"], True),
+    "plot": (["draft"], False),
+    "compose": (["draft", "ship"], False),
+    "export": (["ship"], False),
+    "write": (["draft"], False),
+    "write_review": (["strengthen"], False),
+    "figure_refine": (["draft", "strengthen"], False),
+    "orchestrate": (["drive"], False),
+}
+
+# Attach the lifecycle metadata to each action entry, keeping the manifest the
+# single source of truth. A KeyError here means an action was added without a
+# lifecycle assignment (intentional lock-step guard).
+_VALID_PHASES = {key for key, _ in PHASES}
+for _entry in ACTIONS:
+    _phases, _needs_source = _LIFECYCLE[_entry["action"]]
+    if not set(_phases) <= _VALID_PHASES:  # pragma: no cover - guards a typo
+        raise ValueError(f"action {_entry['action']!r} has an unknown phase: {_phases}")
+    _entry["phase"] = _phases
+    _entry["needs_source"] = _needs_source
+
+
+def actions_for_phase(phase: str) -> list[str]:
+    """Return the action names that serve ``phase`` (in manifest order)."""
+    return [entry["action"] for entry in ACTIONS if phase in entry["phase"]]
+
+
+def lifecycle_overview() -> list[dict[str, Any]]:
+    """Return the phase catalog with the actions that serve each phase."""
+    return [
+        {"phase": key, "title": title, "actions": actions_for_phase(key)} for key, title in PHASES
+    ]
+
+
+__all__ = ["ACTIONS", "PHASES", "actions_for_phase", "lifecycle_overview"]

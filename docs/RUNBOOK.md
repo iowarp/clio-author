@@ -63,9 +63,15 @@ GEMINI_API_KEY=...
 ```bash
 uv run ruff check clio_author tests        # -> All checks passed!
 uv run mypy clio_author                    # -> Success: no issues found in 74 source files
-uv run pytest -q                           # -> 595 passed, 3 skipped, 12 deselected
+uv run pytest -q                           # -> 602 passed, 3 skipped, 12 deselected
 uv run clio-author capabilities            # -> name=clio-author, 26 actions
+uv run clio-author lifecycle               # -> the phase -> actions map (see docs/LIFECYCLE.md)
 ```
+
+> **Pick by phase, not by name.** AUTHOR is a toolkit you enter at any phase of the author lifecycle
+> (Frame · Gather · Plan · Draft · Strengthen · Referee · Respond · Ship). Most actions do **not**
+> need `ingest` first. `clio-author lifecycle` prints which actions serve each phase;
+> [`docs/LIFECYCLE.md`](LIFECYCLE.md) tells the full story with copy-paste recipes.
 
 > **Dedicated subcommands** with their own flags: `capabilities, ingest, gather, ask, experiment,
 > review, cite, discover, plan, write, compose, revise, export, polish, coherence, kg, describe,

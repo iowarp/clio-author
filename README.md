@@ -91,12 +91,32 @@ That is the whole loop: **ingest → read → review.** Everything below is vari
 
 ---
 
-## 2. Capabilities — 26 actions, grouped by intent
+## 2. Capabilities — 26 actions across the author lifecycle
 
-Pick the workflow that matches what you want to do. Add `--format prose` for human-readable text;
-omit it to get JSON (the default, handy for programs). Text actions need a real model (`CLIO_LLM=…`,
-see §3); `ingest`, `gather`, `cite`, `discover`, `check_refs`, `audit`, and `meta_review` work
-without one.
+AUTHOR is a **toolkit you reach into at different moments**, not a fixed pipeline. You wear two hats —
+the **Writer** (producing your own paper) and the **Referee** (judging others') — and you can **enter
+at any phase**: most jobs do *not* start with `ingest` (you can review pasted text, write from an
+idea, polish a draft, or answer reviewers without processing a PDF). Find your phase, then jump to the
+action. The full story + copy-paste recipes per phase live in **[`docs/LIFECYCLE.md`](docs/LIFECYCLE.md)**;
+`clio-author lifecycle` prints this map, and every action in `clio-author capabilities` carries a
+`phase` list and a `needs_source` flag.
+
+| Phase | Your question | Actions |
+|---|---|---|
+| **① Frame** | *What's my story; what exists?* | `research`, `discover`, `ask`, `kg`, `experiment` |
+| **② Gather** | *Pull in what I'll build on* | `ingest`, `gather`, `ask`, `kg`, `cite` |
+| **③ Plan** | *Blueprint the paper + evaluation* | `plan`, `experiment`, `research` |
+| **④ Draft** | *Write & illustrate* | `write`, `compose`, `plot`, `describe_figures`, `figure_refine` |
+| **⑤ Strengthen** | *Make my own paper bulletproof* | `review`, `revise`, `coherence`, `verify_work`, `check_refs`, `cite`, `audit`, `section_review`, `write_review` |
+| **⑥ Referee** | *Judge others' papers* | `review`, `section_review`, `meta_review` |
+| **⑦ Respond** | *Answer my reviewers* | `rebuttal`, `revise`, `audit` |
+| **⑧ Ship** | *Camera-ready* | `compose`, `export` |
+| **⟳ Drive** | *Run a multi-step job for me* | `orchestrate` |
+
+The per-action reference below is grouped by mechanism (most actions live in one phase; a few — like
+`review`, `revise`, `experiment` — serve several). Add `--format prose` for human-readable text; omit
+it for JSON (the default). Text actions need a real model (`CLIO_LLM=…`, see §3); `ingest`, `gather`,
+`cite`, `discover`, `check_refs`, `audit`, and `meta_review` work without one.
 
 > **Grounding shortcut — `--sources`.** Every writing/reading action that grounds on memory blocks
 > (`ask`, `plan`, `write`, `compose`, `research`, `kg`, `review`, `experiment`) accepts `--sources` (and
