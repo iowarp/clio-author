@@ -501,6 +501,7 @@ uv run python scripts/real_test.py   # full real end-to-end run; set CLIO_TEST_L
 ## More
 
 - **Why AUTHOR — motivation, the gap, capability matrix** → [`docs/MOTIVATION.md`](docs/MOTIVATION.md)
+- **What AUTHOR took from each source project (have / partial / missing)** → [`docs/SOURCE-COVERAGE.md`](docs/SOURCE-COVERAGE.md)
 - **Full action & payload reference, providers, output details** → [`docs/USAGE.md`](docs/USAGE.md)
 - **Copy-paste runbook (every command, every flag)** → [`docs/RUNBOOK.md`](docs/RUNBOOK.md)
 - **Invoking AUTHOR as a subagent (in-process / CLI / MCP)** → [`docs/INTEGRATION.md`](docs/INTEGRATION.md)
