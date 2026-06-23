@@ -1,8 +1,8 @@
 # AUTHOR (clio-author) — CLI Runbook
 
 A complete, copy-paste reference: **every subcommand, every flag, every setting.** Run the blocks
-one at a time and inspect each result. Arranged as a paper's life — **read → understand → verify
-sources → judge → write → refine → illustrate → ship.**
+one at a time and inspect each result. Arranged as a paper's life — **read → understand → discover
+& verify sources → judge → write → refine → illustrate → ship.**
 
 - Every command prints a JSON result on **stdout** (logs → stderr; add `2>/dev/null` for clean JSON).
   Exit code `0` = ok, `1` = error.
@@ -33,7 +33,7 @@ mkdir -p runbook-out
 | `CLIO_LLM` | **`echo`** · `claude` · `codex` · `ollama` | all text actions |
 | `CLIO_LLM_MODEL` | any model name (provider-specific) | the chosen `CLIO_LLM` |
 | `CLIO_OLLAMA_URL` | **`http://localhost:11434`** | `CLIO_LLM=ollama` |
-| `CLIO_SCHOLAR` | **`auto`** (=`cascade`/`all`) · `semantic`(`s2`) · `openalex`(`oa`) · `crossref`(`cr`) · `arxiv` · `off`(`none`/`offline`/`disabled`) | `cite`, `review --ground` |
+| `CLIO_SCHOLAR` | **`auto`** (=`cascade`/`all`) · `semantic`(`s2`) · `openalex`(`oa`) · `crossref`(`cr`) · `arxiv` · `off`(`none`/`offline`/`disabled`) | `cite`, `discover`, `review --ground`, `research` |
 | `CLIO_VISION` | **`off`** (`none`/`offline`/`disabled`) · `gemini`(`google`) | `describe`, `review` (with figures), `plot kind="diagram"` |
 | `CLIO_VISION_MODEL` | **`gemini-2.5-flash`** | vision describe |
 | `CLIO_IMAGE_MODEL` | **`gemini-2.5-flash-image`** | vision image-gen |
@@ -61,15 +61,15 @@ GEMINI_API_KEY=...
 uv run ruff check clio_author tests        # -> All checks passed!
 uv run mypy clio_author                    # -> Success: no issues found in 69 source files
 uv run pytest -q                           # -> 532 passed, 3 skipped, 10 deselected
-uv run clio-author capabilities            # -> name=clio-author, 24 actions
+uv run clio-author capabilities            # -> name=clio-author, 25 actions
 ```
 
-> **21 subcommands** have dedicated flags: `capabilities, ingest, ask, review, cite, plan, write,
-> compose, export, polish, coherence, kg, describe, orchestrate, rebuttal, research, verify-work,
-> check-refs, section-review, audit, run`. The other **5 actions**
+> **22 subcommands** have dedicated flags: `capabilities, ingest, ask, review, cite, discover, plan,
+> write, compose, export, polish, coherence, kg, describe, orchestrate, rebuttal, research,
+> verify-work, check-refs, section-review, audit, run`. The other **5 actions**
 > (`edit`, `meta_review`, `plot`, `write_review`, `figure_refine`) have **no dedicated subcommand**
 > — reach them with `clio-author run <action> --json '{...}'`. `run <action>` works for *any* of
-> the 24 actions.
+> the 25 actions.
 
 ---
 
@@ -161,7 +161,49 @@ CLIO_LLM=claude uv run clio-author kg \
 
 ---
 
-## Act III · Verify the scholarship
+## Act III · Discover & verify the scholarship
+
+**`discover`** — find real candidate papers for a topic via scholarly search. **No LLM needed.**
+
+Queries the configured scholar backend (Semantic Scholar → OpenAlex → Crossref → arXiv with `CLIO_SCHOLAR=auto`).
+Returns only records the search actually returns; never fabricates titles, authors, or identifiers.
+Writes `discovered.json` + `discovered.bib` when `--out-dir` is set.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--query` | string | the topic/query to search for (inline) |
+| `--query-file` | one file | path to a file holding the query text |
+| `--limit` | int (default 10) | maximum number of candidate papers to return |
+| `--cutoff-date` | `YYYY-MM` string | keep only papers strictly before this date |
+| `--out-dir` | directory | persist `discovered.json` + `discovered.bib` |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys (`query`, `topic`, `limit`, `cutoff_date`, `out_dir`) |
+| `--out` | file path | save result |
+
+Needs `CLIO_SCHOLAR` (default `auto`). The `scholar` extra adds the Semantic Scholar `httpx` path;
+OpenAlex, Crossref, and arXiv use stdlib HTTP.
+
+```bash
+# Find up to 5 real papers on retrieval-augmented generation:
+CLIO_SCHOLAR=auto uv run clio-author discover \
+  --query "retrieval augmented generation" \
+  --limit 5 \
+  --out-dir runbook-out/discover-out
+
+# With a recency gate (papers before 2024-01 only):
+CLIO_SCHOLAR=auto uv run clio-author discover \
+  --query "large language model evaluation" \
+  --limit 10 --cutoff-date 2024-01 \
+  --out-dir runbook-out/discover-out
+
+# From a file and forcing arXiv only:
+CLIO_SCHOLAR=arxiv uv run clio-author discover \
+  --query-file runbook-out/topic.txt --limit 5
+```
+**Expect:** `structured.papers = [{title, year, authors, venue, abstract, paper_id, url}]`;
+`metadata.count`, `metadata.backends_tried`. **Artifacts:** `runbook-out/discover-out/{discovered.json, discovered.bib}`.
+
+---
 
 **`cite`** — verify citation candidates; emits **suggestions only**, never overwrites.
 
@@ -406,8 +448,12 @@ CLIO_LLM=claude uv run clio-author plan --idea "cooperating agents for the paper
 | `--blocks-file` | one file | JSON MemoryBlocks file for grounding context |
 | `--depth` | `standard`\|`deep` | research depth; `deep` aims for more sources and precise gaps |
 | `--format` | `structured`\|`prose` | default `structured` |
-| `--json` | JSON object | merge payload keys; also reads `section`, `outline`, `source`, `out_dir` |
+| `--json` | JSON object | merge payload keys; also reads `section`, `outline`, `source`, `out_dir`, `discover` |
 | `--out` | file path | save result |
+
+The `discover` payload key (pass via `--json '{"discover":true}'`) seeds the brief's `recent` bucket from
+real discovered papers via the configured scholar backend before LLM synthesis, giving the brief a
+grounded starting point.
 
 ```bash
 CLIO_LLM=claude uv run clio-author research \
@@ -417,6 +463,11 @@ CLIO_LLM=claude uv run clio-author research \
 CLIO_SCHOLAR=auto CLIO_LLM=claude uv run clio-author research \
   --topic "transformer self-attention" --depth deep --format prose \
   --out runbook-out/research.md
+
+# With real discovered papers seeding the recent bucket:
+CLIO_SCHOLAR=auto CLIO_LLM=claude uv run clio-author research \
+  --topic "transformer self-attention" \
+  --json '{"discover":true}' --format prose
 
 # Supply a section name and outline via --json for section-specific research:
 CLIO_LLM=claude uv run clio-author research \
@@ -491,10 +542,15 @@ CLIO_LLM=claude uv run clio-author run write_review \
 | `--max-rounds` | int (default 3) | max writer/reviewer rounds per section when `--review` is set |
 | `--out-dir` | directory | persist `paper.md` + per-section files |
 | `--latex` | flag | also export `paper.tex` (+`references.bib`) when `--out-dir` is set |
+| `--pdf` | flag | compile `paper.pdf` from the LaTeX (implies `--latex`; needs a LaTeX engine on PATH) |
 | `--plan` | flag | plan each section (tasks/claims/sources) before drafting |
 | `--format` | `structured`\|`prose` | default `structured` |
 | `--json` | JSON object | merge payload keys; use for `blocks` and other advanced keys |
 | `--out` | file path | save result |
+
+PDF compilation is best-effort: `tectonic`, `latexmk`, and `pdflatex` are tried in that order.
+On success `metadata["pdf"]` holds the path; on failure `metadata["pdf_error"]` holds the reason
+and compose still succeeds with the Markdown + LaTeX output intact.
 
 ```bash
 # provided outline, no review:
@@ -508,8 +564,14 @@ CLIO_LLM=claude uv run clio-author compose \
   --idea "AUTHOR: cooperating agents for the paper lifecycle." \
   --log "On PaperBananaBench, AUTHOR verified 1/1 citations and drafted 2 sections." \
   --review --max-rounds 1 --out-dir runbook-out/compose-gen
+
+# write + export LaTeX + compile PDF in one call:
+CLIO_LLM=claude uv run clio-author compose \
+  --idea "AUTHOR: cooperating agents for the paper lifecycle." \
+  --review --out-dir runbook-out/compose-pdf --pdf
 ```
-**Artifacts:** `runbook-out/compose-out/{paper.md, sections/01-*.md, 02-*.md}`.
+**Artifacts:** `runbook-out/compose-out/{paper.md, sections/01-*.md, 02-*.md}`;
+with `--pdf`: also `paper.tex`, `references.bib`, `paper.pdf` (if a LaTeX engine is found).
 
 ---
 
@@ -591,9 +653,9 @@ print('rendered:', render_plot_code(code, Path('runbook-out/figure.png'), timeou
 
 ---
 
-## Act VIII · Ship it — LaTeX
+## Act VIII · Ship it — LaTeX + PDF
 
-**`export`** — convert Markdown to compilable `paper.tex` (+ `references.bib`).
+**`export`** — convert Markdown to compilable `paper.tex` (+ `references.bib`), optionally compile PDF.
 
 | Flag | Takes | Meaning |
 |---|---|---|
@@ -602,11 +664,13 @@ print('rendered:', render_plot_code(code, Path('runbook-out/figure.png'), timeou
 | `--sections-file` | one file | same format, as a JSON file |
 | `--markdown-file` | one file | a full Markdown manuscript to split and export |
 | `--bibtex-file` | one file | BibTeX file to emit as `references.bib` |
-| `--out-dir` | directory | persist `paper.tex` (+ `references.bib`) |
-| `--json` | JSON object | merge payload keys (`title`, `sections`, `markdown`, `outline`, `bibtex`, `out_dir`) |
+| `--out-dir` | directory | persist `paper.tex` (+ `references.bib`; + `paper.pdf` with `--pdf`) |
+| `--pdf` | flag | compile `paper.pdf` from the written `.tex` (needs `--out-dir` and a LaTeX engine on PATH); sets `metadata.pdf` on success or `metadata.pdf_error` on failure; never fails the export |
+| `--json` | JSON object | merge payload keys (`title`, `sections`, `markdown`, `outline`, `bibtex`, `out_dir`, `pdf`) |
 | `--out` | file path | save result |
 
-Note: `export` has no `--format` flag.
+Note: `export` has no `--format` flag. PDF compilation tries `tectonic`, then `latexmk`, then
+`pdflatex`; if none is found the export still succeeds and `metadata.pdf_error` records the reason.
 
 ```bash
 uv run clio-author export --title "Demo Paper" \
@@ -615,15 +679,24 @@ uv run clio-author export --title "Demo Paper" \
 # from a whole manuscript file + a bib:
 uv run clio-author export --title "AUTHOR" --markdown-file runbook-out/compose-out/paper.md \
   --bibtex-file runbook-out/cite-out/suggested.bib --out-dir runbook-out/export-out2
+# compile PDF in the same call:
+uv run clio-author export --title "AUTHOR" --markdown-file runbook-out/compose-out/paper.md \
+  --bibtex-file runbook-out/cite-out/suggested.bib --out-dir runbook-out/export-pdf --pdf
 ```
+**Artifacts:** `paper.tex` (+ `references.bib` when bib is given); with `--pdf` also `paper.pdf` if a LaTeX engine is available.
 
-…or one shot — **`compose --latex`** writes Markdown *and* LaTeX:
+…or one shot — **`compose --latex`** / **`compose --pdf`** writes Markdown *and* LaTeX *and* optionally PDF:
 ```bash
 CLIO_LLM=claude uv run clio-author compose \
   --idea "AUTHOR: cooperating agents for the paper lifecycle." \
   --latex --out-dir runbook-out/paper
+# with PDF:
+CLIO_LLM=claude uv run clio-author compose \
+  --idea "AUTHOR: cooperating agents for the paper lifecycle." \
+  --pdf --out-dir runbook-out/paper-pdf
 ```
-**Artifacts:** `runbook-out/paper/{paper.md, sections/, paper.tex}`.
+**Artifacts (--latex):** `runbook-out/paper/{paper.md, sections/, paper.tex, references.bib}`.
+**Artifacts (--pdf):** same, plus `paper.pdf` when a LaTeX engine is on PATH.
 
 ---
 
@@ -663,7 +736,7 @@ CLIO_LLM=claude uv run clio-author orchestrate \
 ## The run-only actions — payload key reference
 
 These actions have no dedicated subcommand. Reach them with `clio-author run <action> --json '{...}'`.
-All other actions (including the 5 new ones) have dedicated subcommands — see Appendix A.
+All other actions have dedicated subcommands — see Appendix A.
 
 | Action | Payload keys | Purpose |
 |---|---|---|
@@ -678,8 +751,9 @@ All other actions (including the 5 new ones) have dedicated subcommands — see 
 ## 4. Where outputs go
 - **stdout** always (the JSON result); **`--out FILE`** to also save it.
 - **`out_dir` / `out_path`** (payload keys / `--out-dir`) persist structured artifacts:
-  ingest → `paper.md`+`blocks.json`+`img/`; cite → `suggested.bib`; kg → `kg.json`+`kg.mmd`;
-  compose → `paper.md`+`sections/`(+`paper.tex` with `--latex`); export → `paper.tex`+`references.bib`;
+  ingest → `paper.md`+`blocks.json`+`img/`; cite → `suggested.bib`; discover → `discovered.json`+`discovered.bib`;
+  kg → `kg.json`+`kg.mmd`; compose → `paper.md`+`sections/`(+`paper.tex` with `--latex`; +`paper.pdf` with `--pdf`);
+  export → `paper.tex`+`references.bib`(+`paper.pdf` with `--pdf`);
   orchestrate → `orchestrate.json`; write/plot/figure_refine → `out_path`.
 - Print-only otherwise (ask, review, edit, polish, coherence, meta_review) — use `--out` to capture.
 
@@ -692,34 +766,35 @@ All other actions (including the 5 new ones) have dedicated subcommands — see 
   `ClioAuthorSubagent(llm=…).run("review", {"paper": "..."})`.
 - See a subcommand's exact flags anytime: `clio-author <cmd> --help`.
 
-## Appendix A — all 24 actions at a glance
+## Appendix A — all 25 actions at a glance
 
 | # | Action | Dedicated subcommand |
 |---|---|---|
 | 1 | `ingest` | `clio-author ingest <source>` |
 | 2 | `ask` | `clio-author ask` |
-| 3 | `review` | `clio-author review` |
-| 4 | `meta_review` | `clio-author run meta_review` |
-| 5 | `rebuttal` | `clio-author rebuttal` |
-| 6 | `cite` | `clio-author cite` |
-| 7 | `write` | `clio-author write` |
-| 8 | `edit` | `clio-author run edit` |
-| 9 | `polish` | `clio-author polish` |
-| 10 | `coherence` | `clio-author coherence` |
-| 11 | `kg` | `clio-author kg` |
-| 12 | `plan` | `clio-author plan` |
-| 13 | `research` | `clio-author research` |
-| 14 | `verify_work` | `clio-author verify-work` |
-| 15 | `check_refs` | `clio-author check-refs` |
-| 16 | `section_review` | `clio-author section-review` |
-| 17 | `audit` | `clio-author audit` |
-| 18 | `describe_figures` | `clio-author describe` |
-| 19 | `plot` | `clio-author run plot` |
-| 20 | `compose` | `clio-author compose` |
-| 21 | `export` | `clio-author export` |
-| 22 | `write_review` | `clio-author run write_review` |
+| 3 | `kg` | `clio-author kg` |
+| 4 | `discover` | `clio-author discover` |
+| 5 | `cite` | `clio-author cite` |
+| 6 | `check_refs` | `clio-author check-refs` |
+| 7 | `research` | `clio-author research` |
+| 8 | `review` | `clio-author review` |
+| 9 | `meta_review` | `clio-author run meta_review` |
+| 10 | `section_review` | `clio-author section-review` |
+| 11 | `rebuttal` | `clio-author rebuttal` |
+| 12 | `verify_work` | `clio-author verify-work` |
+| 13 | `audit` | `clio-author audit` |
+| 14 | `plan` | `clio-author plan` |
+| 15 | `write` | `clio-author write` |
+| 16 | `edit` | `clio-author run edit` |
+| 17 | `polish` | `clio-author polish` |
+| 18 | `coherence` | `clio-author coherence` |
+| 19 | `compose` | `clio-author compose` |
+| 20 | `write_review` | `clio-author run write_review` |
+| 21 | `plot` | `clio-author run plot` |
+| 22 | `describe_figures` | `clio-author describe` |
 | 23 | `figure_refine` | `clio-author run figure_refine` |
-| 24 | `orchestrate` | `clio-author orchestrate` |
+| 24 | `export` | `clio-author export` |
+| 25 | `orchestrate` | `clio-author orchestrate` |
 
 ## Appendix B — each action's LLM prompt source (to read/tune)
 | Action | Prompt constant | File |
@@ -743,4 +818,5 @@ All other actions (including the 5 new ones) have dedicated subcommands — see 
 | compose | outline-gen prompt | `clio_author/experts/compose.py` |
 | orchestrate | orchestrate prompt | `clio_author/experts/orchestrate.py` |
 | cite | (deterministic verify) | `clio_author/retrieval/scholar.py` |
-| export | (deterministic Markdown→LaTeX) | `clio_author/export/latex.py` |
+| discover | `DISCOVER_SYSTEM_PROMPT` (no LLM call on search path) | `clio_author/experts/discover.py` |
+| export | (deterministic Markdown→LaTeX + optional compile_pdf) | `clio_author/export/latex.py` |

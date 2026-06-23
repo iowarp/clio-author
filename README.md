@@ -36,7 +36,7 @@ cd clio-author
 uv sync
 ```
 
-**Step 3. Confirm it works** (prints the list of 24 things it can do — no model or network needed):
+**Step 3. Confirm it works** (prints the list of 25 things it can do — no model or network needed):
 
 ```bash
 uv run clio-author capabilities
@@ -91,138 +91,419 @@ That is the whole loop: **ingest → read → review.** Everything below is vari
 
 ---
 
-## 2. Every command, with a real example
+## 2. Capabilities — 25 actions, grouped by intent
 
-Run any of these after Step 4 above. Add `--format prose` for human-readable text; omit it to get
-JSON (the default, handy for programs). Anything that produces text needs a real model
-(`CLIO_LLM=…`, see §3); `ingest`, `cite`, `check_refs`, `audit`, and `meta_review` work without one.
+Pick the workflow that matches what you want to do. Add `--format prose` for human-readable text;
+omit it to get JSON (the default, handy for programs). Text actions need a real model (`CLIO_LLM=…`,
+see §3); `ingest`, `cite`, `discover`, `check_refs`, `audit`, and `meta_review` work without one.
 
-### Processing
+---
+
+### Read / process — turn a paper into usable data
+
+Use this first. Every other workflow builds on the output.
+
+#### `ingest` — convert a paper into Markdown + memory blocks
+
+Accepts an arXiv id, URL, PDF path, or paper title. Writes `paper.md`, `blocks.json`, and extracted
+figure images to an output directory.
+
+| Argument | Meaning |
+|---|---|
+| `source` (positional) | arXiv id / URL / local PDF path / paper title |
+| `--json '{"out_dir":"..."}'` | persist artifacts to a directory |
+| `--out FILE` | save the result |
 
 ```bash
-# Convert a paper to Markdown + memory blocks (arXiv id | URL | title | topic | local PDF):
 uv run --extra pdf clio-author ingest 2601.23265
+uv run --extra pdf clio-author ingest "Attention Is All You Need"
+uv run --extra pdf clio-author ingest ./mypaper.pdf
 ```
 
-### Question answering
+---
+
+### Understand — question-answer and concept mapping
+
+Use after `ingest` to interrogate or map a paper's content.
+
+#### `ask` — answer a question grounded in the paper's blocks
+
+| Argument | Meaning |
+|---|---|
+| `--question TEXT` | the question to answer (required) |
+| `--blocks-json JSON` | inline MemoryBlocks dump |
+| `--blocks-file FILE` | path to `blocks.json` (preferred for real papers) |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge additional payload keys |
+| `--out FILE` | save the result |
 
 ```bash
-# Ask a question, grounded in that paper's blocks:
 CLIO_LLM=claude uv run clio-author ask \
   --question "What problem does this paper solve?" \
   --blocks-file clio-out/2601.23265/blocks.json --format prose
 ```
 
-### Citation verification
+#### `kg` — extract a content knowledge graph
+
+Extracts claims/methods/datasets/results and their relations. `--full` runs a 6-stage pipeline
+(metadata → ontology → extraction → coref → verify → summary) with checkpoint/resume.
+
+| Argument | Meaning |
+|---|---|
+| `--blocks-json JSON` | inline MemoryBlocks dump |
+| `--blocks-file FILE` | path to `blocks.json` |
+| `--full` | run the 6-stage pipeline |
+| `--stages LIST` | restrict pipeline to named stages (e.g. `metadata,ontology`) |
+| `--resume DIR` | resume from prior checkpoint directory |
+| `--out-dir DIR` | persist `kg.json`, `kg.mmd`, and pipeline checkpoints |
+| `--format structured\|prose` | `prose` emits a Mermaid `graph TD` rendering |
+| `--json '{...}'` | merge payload keys |
+| `--out FILE` | save the result |
 
 ```bash
-# Verify citations against Semantic Scholar + fallback backends (suggestions only):
+# Single-shot extraction:
+CLIO_LLM=claude uv run clio-author kg \
+  --blocks-file clio-out/2601.23265/blocks.json --format prose
+
+# Full 6-stage pipeline with checkpoints:
+CLIO_LLM=claude uv run clio-author kg \
+  --blocks-file clio-out/2601.23265/blocks.json \
+  --full --out-dir clio-out/2601.23265/kg-pipeline
+
+# Resume an interrupted pipeline run:
+CLIO_LLM=claude uv run clio-author kg \
+  --blocks-file clio-out/2601.23265/blocks.json \
+  --full --resume clio-out/2601.23265/kg-pipeline --out-dir clio-out/2601.23265/kg-pipeline
+```
+
+---
+
+### Discover & verify sources — find and validate references
+
+Use to build a real, grounded bibliography before writing.
+
+#### `discover` — find real candidate papers via scholarly search *(no LLM)*
+
+Queries Semantic Scholar → OpenAlex → Crossref → arXiv (the `auto` cascade) for a free-text topic
+and returns the records it actually finds. Never fabricates records. Needs `CLIO_SCHOLAR` to be set
+(default is `auto`). Writes `discovered.json` + `discovered.bib` when `--out-dir` is given.
+
+| Argument | Meaning |
+|---|---|
+| `--query TEXT` | the topic/query to search (inline) |
+| `--query-file FILE` | file holding the query text |
+| `--limit N` | maximum papers to return (default 10) |
+| `--cutoff-date YYYY-MM` | keep only papers before this date |
+| `--out-dir DIR` | persist `discovered.json` + `discovered.bib` |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys (`query`, `topic`, `limit`, `cutoff_date`, `out_dir`) |
+| `--out FILE` | save the result |
+
+```bash
+CLIO_SCHOLAR=auto uv run clio-author discover \
+  --query "retrieval augmented generation" --limit 5 --out-dir clio-out/discovered
+```
+
+#### `cite` — verify citation candidates *(no LLM)*
+
+Given a list of `{title, year?}` dicts, checks them against scholarly backends and returns BibTeX
+suggestions. Never overwrites any file.
+
+| Argument | Meaning |
+|---|---|
+| `--candidates-json JSON` | inline list of `{title, year?, reason?}` |
+| `--candidates-file FILE` | same format as a JSON file |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys; use `{"out_dir":"..."}` to persist `suggested.bib` |
+| `--out FILE` | save the result |
+
+```bash
 uv run --extra scholar clio-author cite \
-  --candidates-json '[{"title": "Attention Is All You Need", "year": 2017}]'
+  --candidates-json '[{"title":"Attention Is All You Need","year":2017}]'
 ```
 
-### Literature research
+#### `check_refs` — lint a BibTeX file against cited keys in prose *(no LLM)*
+
+Flags malformed/duplicate entries, cited-but-missing keys, and uncited entries.
+
+| Argument | Meaning |
+|---|---|
+| `--bibtex TEXT` | BibTeX bibliography (inline) |
+| `--bibtex-file FILE` | path to a `.bib` file |
+| `--markdown-file FILE` | Markdown manuscript to scan for `\cite{}` keys |
+| `--text TEXT` | prose to scan for `\cite{}` keys (inline) |
+| `--sections-json JSON` | list of `{title, draft}` to scan |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys |
+| `--out FILE` | save the result |
 
 ```bash
-# Propose foundational/recent/competing sources, gaps, and a synthesis for a topic:
-CLIO_LLM=claude uv run clio-author research \
-  --topic "attention mechanisms for long-range dependencies" --format prose
-
-# With CLIO_SCHOLAR set, proposed titles are verified against a scholar backend:
-CLIO_SCHOLAR=auto CLIO_LLM=claude uv run clio-author research \
-  --topic "transformer self-attention" --depth deep --format prose
-```
-
-### Bibliography linting (no model)
-
-```bash
-# Audit a BibTeX file + check \cite{} keys used in the manuscript (no model needed):
 uv run clio-author check-refs \
   --bibtex-file clio-out/mypaper/references.bib \
   --markdown-file clio-out/mypaper/paper.md
 ```
 
-### Content knowledge graph
+#### `research` — propose and verify sources for a topic
+
+Produces a grounded literature brief (foundational, recent, competing sources, gaps, synthesis).
+When `CLIO_SCHOLAR` is configured, each proposed title is verified against a real backend. Pass
+`--json '{"discover":true}'` to seed the `recent` bucket from real discovered papers.
+
+| Argument | Meaning |
+|---|---|
+| `--topic TEXT` | the topic to research (inline) |
+| `--topic-file FILE` | file holding the topic text |
+| `--blocks-file FILE` | JSON MemoryBlocks for grounding context |
+| `--depth standard\|deep` | `deep` aims for more sources and precise gaps |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys; use `{"discover":true}` to seed from real search |
+| `--out FILE` | save the result |
 
 ```bash
-# Extract a content knowledge graph (claims/methods/datasets/results + relations)
-# from a paper's memory blocks (distinct from a citation graph).
-uv run clio-author kg --blocks-file clio-out/<id>/blocks.json
-
-# Add --format prose to print a Mermaid `graph TD` rendering for a human view.
-
-# Run the full 6-stage pipeline (metadata→ontology→extraction→coref→verify→summary)
-# with checkpoint/resume support:
-CLIO_LLM=claude uv run clio-author kg --blocks-file clio-out/<id>/blocks.json \
-  --full --out-dir clio-out/<id>/kg-pipeline
-
-# Resume a prior pipeline run from its checkpoints:
-CLIO_LLM=claude uv run clio-author kg --blocks-file clio-out/<id>/blocks.json \
-  --full --resume clio-out/<id>/kg-pipeline --out-dir clio-out/<id>/kg-pipeline
+CLIO_SCHOLAR=auto CLIO_LLM=claude uv run clio-author research \
+  --topic "transformer self-attention" --depth deep --format prose
 ```
 
-### Review
+---
+
+### Review & assess — judge a paper or draft
+
+#### `review` — produce a structured peer review
+
+Outputs Accept/Reject decision, 1–10 overall, 7 per-axis scores, and a full critique. Add
+`--ground` to cite real related work. Add `--figures-json`/`--figures-file` with `CLIO_VISION=gemini`
+for a multimodal review.
+
+| Argument | Meaning |
+|---|---|
+| `--paper TEXT` | paper Markdown text (inline) |
+| `--paper-file FILE` | path to a paper Markdown file |
+| `--ground` | retrieve related prior work and ground the review in it |
+| `--figures-json JSON` | list of `[{figure_id?, image_path, caption?}]` to look at |
+| `--figures-file FILE` | same format as a JSON file |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys; `{"persona":{"label":"..."}}` sets reviewer persona |
+| `--out FILE` | save the result |
 
 ```bash
-# Peer-review a paper (structured JSON, or --format prose):
 CLIO_LLM=claude uv run clio-author review \
-  --paper-file clio-out/2601.23265/paper.md --format prose
+  --paper-file clio-out/2601.23265/paper.md --format prose --out review.md
+```
 
-# Multimodal review — reviewer also looks at figures (needs CLIO_VISION=gemini):
-CLIO_VISION=gemini GEMINI_API_KEY=... CLIO_LLM=claude uv run clio-author review \
-  --paper-file clio-out/2601.23265/paper.md \
-  --figures-json '[{"figure_id":1,"image_path":"clio-out/2601.23265/img/figure1.png","caption":"Overview diagram"}]' \
-  --format prose
+#### `meta_review` — aggregate reviews into an area-chair decision *(no LLM)*
 
-# Draft an author rebuttal to a review, point by point:
+Reached via the `run` escape hatch (no dedicated subcommand). Payload: `reviews` (list of review
+dicts).
+
+```bash
+uv run clio-author run meta_review \
+  --json '{"reviews":[{"Overall":7,"Decision":"Accept"},{"Overall":5,"Decision":"Reject"}]}'
+```
+
+#### `section_review` — three-layer review of a single section
+
+L1 reference check → L2 coherence → L3 persona peer review, with a deterministic severity summary.
+
+| Argument | Meaning |
+|---|---|
+| `--text TEXT` | section text (inline) |
+| `--text-file FILE` | file holding the section text |
+| `--bibtex-file FILE` | BibTeX file for the L1 reference check |
+| `--persona-json JSON` | a `PersonaSpec` for the L3 reviewer (e.g. `{"label":"harsh reviewer"}`) |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys |
+| `--out FILE` | save the result |
+
+```bash
+CLIO_LLM=claude uv run clio-author section-review \
+  --text-file clio-out/mypaper/sections/01-introduction.md \
+  --bibtex-file clio-out/mypaper/references.bib --format prose
+```
+
+#### `rebuttal` — draft an author rebuttal point by point
+
+Addresses each weakness and question strictly from the paper, inventing nothing.
+
+| Argument | Meaning |
+|---|---|
+| `--paper TEXT` | paper Markdown text (inline) |
+| `--paper-file FILE` | path to a paper Markdown file |
+| `--review-json JSON` | a `PaperReview` dump or `{weaknesses:[...],questions:[...]}` (inline) |
+| `--review-file FILE` | path to a JSON `PaperReview` file |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys |
+| `--out FILE` | save the result |
+
+```bash
 CLIO_LLM=claude uv run clio-author rebuttal \
   --paper-file clio-out/2601.23265/paper.md \
   --review-json '{"weaknesses":["no baseline comparison"],"questions":["how is X measured?"]}' \
   --format prose
-
-# Aggregate several reviews into a single meta-review (no model needed):
-uv run clio-author run meta_review \
-  --json '{"reviews": [{"Overall": 7, "Decision": "Accept"}, {"Overall": 5, "Decision": "Reject"}]}'
 ```
 
-### Writing, composing, and exporting
+#### `verify_work` — goal-backward claim check
+
+Checks whether each intended claim is actually made and supported in a written section.
+
+| Argument | Meaning |
+|---|---|
+| `--text TEXT` | written prose to verify (inline) |
+| `--text-file FILE` | file holding the written prose |
+| `--section-plan-json JSON` | a `SectionPlan` whose `claims` to verify (inline) |
+| `--section-plan-file FILE` | path to a JSON `SectionPlan` file |
+| `--claims-json JSON` | explicit list of claim strings (inline) |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys |
+| `--out FILE` | save the result |
 
 ```bash
-# Turn an idea into per-section writing plans (tasks, claims, sources, word budgets):
+CLIO_LLM=claude uv run clio-author verify-work \
+  --text-file clio-out/mypaper/sections/01-introduction.md \
+  --claims-json '["AUTHOR unifies ingestion, review, and writing"]' --format prose
+```
+
+#### `audit` — deterministic manuscript completeness checklist *(no LLM)*
+
+Checks required sections present, word counts vs budgets, unresolved `[TODO]`/`[CITE:]` placeholders,
+and citation coverage.
+
+| Argument | Meaning |
+|---|---|
+| `--sections-json JSON` | inline list of `{title, draft, word_budget?}` |
+| `--sections-file FILE` | same format as a JSON file |
+| `--markdown-file FILE` | full Markdown manuscript to split and audit |
+| `--bibtex-file FILE` | BibTeX file for citation-coverage checking |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys; use `{"outline":{...}}` for required-section check |
+| `--out FILE` | save the result |
+
+```bash
+uv run clio-author audit \
+  --markdown-file clio-out/mypaper/paper.md \
+  --bibtex-file clio-out/mypaper/references.bib
+```
+
+---
+
+### Write & compose — draft and refine text
+
+#### `plan` — turn an idea into per-section writing plans
+
+Produces tasks, claims, sources, and word budgets for each section before any prose is written.
+
+| Argument | Meaning |
+|---|---|
+| `--idea TEXT` | research idea / thesis (inline) |
+| `--idea-file FILE` | file holding the idea text |
+| `--log TEXT` | experimental log / results notes (inline) |
+| `--log-file FILE` | file holding the experimental log |
+| `--outline-json JSON` | a `PaperOutline` to plan against |
+| `--outline-file FILE` | same format as a JSON file |
+| `--blocks-file FILE` | JSON MemoryBlocks for grounding |
+| `--candidates-file FILE` | JSON citation candidates to fold into citation hints |
+| `--out-dir DIR` | persist `plan.json` |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys |
+| `--out FILE` | save the result |
+
+```bash
 CLIO_LLM=claude uv run clio-author plan \
   --idea "Propose a new attention mechanism for long-range dependencies." \
   --outline-json '{"title":"Attention++","sections":[{"title":"Introduction","goal":"Motivate the problem."}]}' \
   --out-dir clio-out/mypaper
+```
 
-# Draft one section from an outline + source material:
+#### `write` — draft one section from source material
+
+| Argument | Meaning |
+|---|---|
+| `--source TEXT` | source material (inline) |
+| `--source-file FILE` | source-material file (single file only) |
+| `--outline TEXT` | section title; richer outlines via `--json '{"outline":{...}}'` |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys; use for `section_plan`, `blocks`, `out_path` |
+| `--out FILE` | save the result |
+
+```bash
 CLIO_LLM=claude uv run clio-author write \
   --outline "Introduction" --source-file clio-out/2601.23265/paper.md --format prose
+```
 
-# Polish a draft for clarity, flow, and academic voice:
+#### `edit` — revise prose to address reviewer feedback
+
+Reached via the `run` escape hatch. Payload: `draft`, `review`, `critic_notes`, `target`.
+
+```bash
+CLIO_LLM=claude uv run clio-author run edit \
+  --json '{"draft":"We propose a system.","review":{"weaknesses":["no baseline comparison"]}}'
+```
+
+#### `polish` — improve clarity, flow, and academic voice
+
+| Argument | Meaning |
+|---|---|
+| `--text TEXT` | prose to polish (inline) |
+| `--text-file FILE` | file holding the prose to polish |
+| `--voice TEXT` | target voice, e.g. `concise` or `formal` |
+| `--target FILE` | file (under harness root) to apply the polished text to |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys |
+| `--out FILE` | save the result |
+
+```bash
 CLIO_LLM=claude uv run clio-author polish \
-  --text-file clio-out/2601.23265/paper.md --voice concise --format prose
+  --text-file clio-out/mypaper/sections/01-introduction.md --voice concise --format prose
+```
 
-# Check cross-section consistency of a manuscript:
+#### `coherence` — check cross-section consistency
+
+Finds terminology drift, contradictions, undefined terms, and broken flow.
+
+| Argument | Meaning |
+|---|---|
+| `--sections-json JSON` | inline list of `{title, draft}` |
+| `--sections-file FILE` | same format as a JSON file |
+| `--markdown-file FILE` | full Markdown manuscript to split |
+| `--text TEXT` | single passage (inline fallback) |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys |
+| `--out FILE` | save the result |
+
+```bash
 CLIO_LLM=claude uv run clio-author coherence \
-  --markdown-file clio-out/2601.23265/paper.md --format prose
+  --markdown-file clio-out/mypaper/paper.md --format prose
+```
 
-# Draft a WHOLE paper from an idea (outline → cite → write per section → assemble):
+#### `compose` — draft a whole paper from an idea
+
+One call: idea → outline → cite → (plan) → write each section → (review) → assemble. Use `--latex`
+to also emit `paper.tex`; add `--pdf` to compile `paper.pdf` (requires a LaTeX engine).
+
+| Argument | Meaning |
+|---|---|
+| `--idea TEXT` | research idea / thesis (inline) |
+| `--idea-file FILE` | file holding the idea text |
+| `--log TEXT` | experimental log / results notes (inline) |
+| `--log-file FILE` | file holding the experimental log |
+| `--outline-json JSON` | a `PaperOutline` to use instead of generating one |
+| `--outline-file FILE` | same format as a JSON file |
+| `--candidates-file FILE` | JSON citation candidates to verify and cite |
+| `--review` | run a per-section writer/reviewer refine loop |
+| `--max-rounds N` | max refine rounds per section when `--review` is set (default 3) |
+| `--out-dir DIR` | persist `paper.md` + per-section files |
+| `--latex` | also export `paper.tex` (+ `references.bib`) |
+| `--pdf` | compile `paper.pdf` from the LaTeX (implies `--latex`; needs a LaTeX engine) |
+| `--plan` | plan each section before drafting |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys |
+| `--out FILE` | save the result |
+
+```bash
+# Draft and export to LaTeX + PDF in one call:
 CLIO_LLM=claude uv run clio-author compose \
   --idea "Propose a new attention mechanism for long-range dependencies." \
   --log "Ran experiments on WikiText-103; BLEU +2.1 over baseline." \
-  --review --out-dir clio-out/mypaper --format prose
-
-# Same, but also emit paper.tex + references.bib:
-CLIO_LLM=claude uv run clio-author compose \
-  --idea-file idea.txt --log-file log.txt \
-  --candidates-file refs.json \
-  --review --out-dir clio-out/mypaper --latex
-
-# Export an existing paper.md to LaTeX directly:
-uv run clio-author export \
-  --markdown-file clio-out/mypaper/paper.md \
-  --bibtex-file clio-out/mypaper/references.bib \
-  --out-dir clio-out/mypaper
+  --review --out-dir clio-out/mypaper --latex --pdf
 ```
 
 After `compose`, the output directory contains:
@@ -232,40 +513,129 @@ clio-out/mypaper/
 ├── paper.md               # assembled Markdown manuscript
 ├── paper.tex              # (with --latex) standalone LaTeX document
 ├── references.bib         # (with --latex and citations) BibTeX entries
+├── paper.pdf              # (with --pdf and a LaTeX engine) compiled PDF
 └── sections/
     ├── 01-introduction.md
     ├── 02-methods.md
     └── …
 ```
 
-### Figures
+#### `write_review` — writer ↔ reviewer critic-refine loop
+
+Reached via the `run` escape hatch. Payload: `outline`, `section_plan`, `blocks`, `source`,
+`max_rounds`.
 
 ```bash
-# Generate matplotlib plot code (code text only; never executed by default):
-CLIO_LLM=claude uv run clio-author run plot \
-  --json '{"spec": {"kind": "plot", "intent": "training loss vs epoch"}}'
+CLIO_LLM=claude uv run clio-author run write_review \
+  --json '{"outline":{"title":"Introduction","goal":"introduce AUTHOR"},"source":"...","max_rounds":1}'
+```
 
-# Describe figures in a paper's memory blocks:
+---
+
+### Illustrate (figures) — generate and describe figures
+
+#### `plot` — generate matplotlib code or a diagram image
+
+Reached via the `run` escape hatch. With `CLIO_VISION=gemini` and `spec.kind="diagram"`, generates
+a real PNG instead of code. Payload: `spec`, `out_path`.
+
+```bash
+CLIO_LLM=claude uv run clio-author run plot \
+  --json '{"spec":{"kind":"plot","intent":"training loss vs epoch"}}'
+```
+
+#### `describe` (action: `describe_figures`) — caption figures from blocks
+
+With `CLIO_VISION=gemini`, looks at actual figure images.
+
+| Argument | Meaning |
+|---|---|
+| `--blocks-json JSON` | inline MemoryBlocks dump |
+| `--blocks-file FILE` | path to `blocks.json` |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys |
+| `--out FILE` | save the result |
+
+```bash
 CLIO_LLM=claude uv run clio-author describe \
   --blocks-file clio-out/2601.23265/blocks.json --format prose
 ```
 
-### Goal-driven orchestration
+#### `figure_refine` — figure visualizer ↔ critic refine loop
+
+Reached via the `run` escape hatch. Payload: `spec`, `out_path`, `max_rounds`.
 
 ```bash
-# Plan and run a sequence of actions from a natural-language goal:
+CLIO_LLM=claude uv run clio-author run figure_refine \
+  --json '{"spec":{"kind":"plot","intent":"line chart of loss vs epochs"},"max_rounds":1}'
+```
+
+---
+
+### Export & ship — produce LaTeX and PDF
+
+#### `export` — convert Markdown to compilable LaTeX
+
+Converts a `paper.md` or sections list into `paper.tex` + `references.bib`. Add `--pdf` to also
+compile `paper.pdf` (needs `--out-dir` and a LaTeX engine: tectonic, latexmk, or pdflatex; never
+fails the export if compilation fails).
+
+| Argument | Meaning |
+|---|---|
+| `--title TEXT` | manuscript title (optional) |
+| `--sections-json JSON` | inline list of `{title, draft}` |
+| `--sections-file FILE` | same format as a JSON file |
+| `--markdown-file FILE` | full Markdown manuscript to split and export |
+| `--bibtex-file FILE` | BibTeX file to emit as `references.bib` |
+| `--out-dir DIR` | persist `paper.tex` (+ `references.bib`, + `paper.pdf` with `--pdf`) |
+| `--pdf` | compile `paper.pdf` (needs `--out-dir` and a LaTeX engine) |
+| `--json '{...}'` | merge payload keys |
+| `--out FILE` | save the result |
+
+Note: `export` has no `--format` flag.
+
+```bash
+# Export Markdown to LaTeX and compile PDF:
+uv run clio-author export \
+  --markdown-file clio-out/mypaper/paper.md \
+  --bibtex-file clio-out/mypaper/references.bib \
+  --out-dir clio-out/mypaper --pdf
+```
+
+`compose --latex` / `compose --pdf` produce both Markdown and LaTeX in one pipeline call:
+
+```bash
+CLIO_LLM=claude uv run clio-author compose \
+  --idea-file idea.txt --log-file log.txt \
+  --candidates-file refs.json \
+  --review --out-dir clio-out/mypaper --latex --pdf
+```
+
+---
+
+### Drive (orchestration) — hand it a goal
+
+#### `orchestrate` — plan and run a sequence of actions from a natural-language goal
+
+| Argument | Meaning |
+|---|---|
+| `--goal TEXT` | the goal to achieve (inline) |
+| `--goal-file FILE` | file holding the goal text |
+| `--inputs-json JSON` | named inputs dict (inline), e.g. `{"source":"2601.23265"}` |
+| `--inputs-file FILE` | same format as a JSON file |
+| `--max-steps N` | maximum planned steps to execute (default 6) |
+| `--out-dir DIR` | persist `orchestrate.json` |
+| `--format structured\|prose` | default `structured` |
+| `--json '{...}'` | merge payload keys |
+| `--out FILE` | save the result |
+
+```bash
 CLIO_LLM=claude uv run clio-author orchestrate \
   --goal "Ingest 2601.23265 then produce a peer review." \
   --inputs-json '{"source":"2601.23265"}' --max-steps 4 --out-dir clio-out/orchestrate
 ```
 
-### Generic escape hatch
-
-```bash
-# Any action by name (edit, write_review, figure_refine, …):
-uv run clio-author run write_review \
-  --json '{"outline": {"title": "Methods"}, "source": "...", "max_rounds": 2}'
-```
+---
 
 **Single-file rule.** Every `--*-file` flag reads exactly **one** file. To supply several files as
 context, concatenate them first or `ingest` each one and pass the resulting `blocks.json`.
@@ -273,18 +643,10 @@ context, concatenate them first or `ingest` each one and pass the resulting `blo
 **Saving results to a file.** Every action accepts `--out FILE`. A `.json` extension saves the
 full indented JSON result; any other extension (`.md`, `.txt`, …) saves the prose `content` when
 present, otherwise the full JSON. On success, `[saved to FILE]` is printed to stderr so stdout
-stays clean JSON:
+stays clean JSON.
 
-```bash
-# Save a prose review to review.md:
-CLIO_LLM=claude uv run clio-author review \
-  --paper-file clio-out/2601.23265/paper.md --format prose --out review.md
-
-# Save the full JSON result to a .json file:
-CLIO_LLM=claude uv run clio-author ask \
-  --question "What is the main contribution?" \
-  --blocks-file clio-out/2601.23265/blocks.json --out answer.json
-```
+**Run-only actions.** `edit`, `meta_review`, `plot`, `write_review`, and `figure_refine` have no
+dedicated subcommand; reach them with `clio-author run <action> --json '{...}'`.
 
 The complete payload reference for every action is in [`docs/USAGE.md`](docs/USAGE.md).
 
@@ -331,6 +693,9 @@ Other useful variables:
 
 For polite no-key usage, set `OPENALEX_MAILTO` and/or `CROSSREF_MAILTO` to an email address.
 
+`CLIO_SCHOLAR` is used by `cite`, `discover`, `review --ground`, and `research` (when scholar
+grounding or `discover` seeding is enabled).
+
 ### Gemini vision (`CLIO_VISION=gemini`)
 
 When `CLIO_VISION=gemini` is set and a `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) is in the
@@ -373,7 +738,7 @@ from clio_author.llm.providers import resolve_llm
 # Build the subagent. resolve_llm("claude") | "codex" | "ollama" | None (offline echo).
 sub = ClioAuthorSubagent(llm=resolve_llm("claude"))
 
-# 1) Discover what it can do (24 actions).
+# 1) Discover what it can do (25 actions).
 for a in sub.capabilities()["actions"]:
     print(a["action"], "—", a["description"])
 
@@ -390,12 +755,17 @@ print(answer["content"])
 review = sub.run("review", {"paper": ingested["content"]})
 print(review["metadata"].get("decision"), review["structured"])
 
-# 5) Draft a whole paper from an idea.
+# 5) Discover candidate papers for a topic (needs CLIO_SCHOLAR configured).
+discovered = sub.run("discover", {"query": "retrieval augmented generation", "limit": 5})
+print(discovered["metadata"]["count"], "papers found")
+
+# 6) Draft a whole paper from an idea.
 result = sub.run("compose", {
     "idea": "Propose a new attention mechanism for long-range dependencies.",
     "experimental_log": "Ran experiments on WikiText-103; BLEU +2.1 over baseline.",
     "review": True,
     "out_dir": "clio-out/mypaper",
+    "latex": True,
 })
 print("sections:", result["metadata"]["num_sections"])
 print("wrote:", result["metadata"]["wrote"])
@@ -417,34 +787,35 @@ CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper
 
 ---
 
-## 5. The 24 actions at a glance
+## 5. The 25 actions at a glance
 
-| # | Action | What it's for — use it to… | Subcommand |
-|---|--------|-----------------------------|------------|
-| 1 | `ingest` | **Read a paper.** Turn an arXiv id / URL / PDF / title into clean Markdown + structured memory blocks + extracted figures — the substrate every other action builds on. | `clio-author ingest <source>` |
-| 2 | `ask` | **Understand a paper.** Get an answer to a question, grounded only in the paper's blocks, with the blocks it used cited. | `clio-author ask` |
-| 3 | `cite` | **Check the scholarship.** Verify citation candidates against scholarly databases and get BibTeX *suggestions* — never edits your refs; fights fabricated citations. | `clio-author cite` |
-| 4 | `review` | **Judge a paper.** Produce a peer review: an Accept/Reject decision, 1–10 + per-axis scores, and a structured critique (add `--ground` to cite real related work; add `--figures-json`/`--figures-file` with `CLIO_VISION=gemini` for a multimodal review that looks at the actual figure images). | `clio-author review` |
-| 5 | `meta_review` | **Decide as a panel.** Aggregate several reviews into one area-chair decision (offline, no model). | `clio-author run meta_review` |
-| 6 | `rebuttal` | **Respond to a review.** Draft an author rebuttal addressing each weakness and question point by point, grounded strictly in the paper, inventing nothing. | `clio-author rebuttal` |
-| 7 | `plan` | **Blueprint a section.** Turn an idea/outline into per-section writing plans — tasks, claims, sources, word budgets — before any prose is written. Each `SectionOutline` in the returned plan carries `research_needed` and `research_topics` fields the `research` action can act on. | `clio-author plan` |
-| 8 | `research` | **Survey the literature.** Produce a grounded brief for a topic or section: foundational/recent/competing sources, gaps, synthesis, confidence. When `CLIO_SCHOLAR` is set, proposed titles are verified against a scholar backend (`metadata.grounded`). | `clio-author research` |
-| 9 | `verify_work` | **Audit your draft.** Goal-backward check: given a written section and its plan/claims, determine whether each intended claim is actually made AND supported — returns VERIFIED or GAPS per claim. | `clio-author verify-work` |
-| 10 | `write` | **Draft a section.** Write one section grounded strictly in supplied source material (optionally following a `plan`). | `clio-author write` |
-| 11 | `edit` | **Revise to feedback.** Rewrite existing prose to address specific reviewer weaknesses, preserving citations/claims. | `clio-author run edit` |
-| 12 | `polish` | **Improve the prose.** Tighten clarity, flow, and academic voice (optional target voice) without changing meaning. | `clio-author polish` |
-| 13 | `coherence` | **Catch contradictions.** Check a manuscript's sections for terminology drift, contradictions, undefined terms, and broken flow. | `clio-author coherence` |
-| 14 | `check_refs` | **Lint the bibliography.** Deterministically audit a BibTeX file for malformed/duplicate entries and cross-check `\cite{}` keys in the prose against it — no model needed; suggestions only. | `clio-author check-refs` |
-| 15 | `section_review` | **Review one section.** Three-layer review of a single section: L1 reference check → L2 coherence → L3 persona peer review, with a deterministic severity summary (critical / major). | `clio-author section-review` |
-| 16 | `audit` | **Pre-submission checklist.** Deterministic manuscript completeness check: required sections present, per-section word-count vs budget, unresolved `[TODO]`/`[CITE:]`/empty `\cite{}` placeholders, citation coverage — no model needed. | `clio-author audit` |
-| 17 | `kg` | **Map a paper's content.** Extract a knowledge graph of claims/methods/datasets/results + relations (distinct from a citation graph). Add `--full` to run the 6-stage pipeline (metadata→ontology→extraction→coref→verify→summary) with checkpoint/resume. | `clio-author kg` |
-| 18 | `describe_figures` | **Caption figures.** Fill in figure descriptions (Gemini vision *looks at* the image when enabled) for context injection. | `clio-author describe` |
-| 19 | `plot` | **Make a plot/diagram.** Generate matplotlib code (or, with vision, a real diagram image). | `clio-author run plot` |
-| 20 | `compose` | **Write a whole paper.** One call: idea → outline → cite → (plan) → write each section → (review) → assemble. | `clio-author compose` |
-| 21 | `export` | **Ship LaTeX.** Convert a Markdown manuscript into a compilable `paper.tex` (+ `references.bib`). | `clio-author export` |
-| 22 | `write_review` | **Self-improve a draft.** Writer↔reviewer loop: draft → critique → revise, to better prose. | `clio-author run write_review` |
-| 23 | `figure_refine` | **Self-improve a figure.** Visualizer↔critic loop on a figure spec. | `clio-author run figure_refine` |
-| 24 | `orchestrate` | **Hand it a goal.** Plan and run a sequence of the above actions to achieve a natural-language goal (dynamic multi-step). | `clio-author orchestrate` |
+| # | Action | What it's for | Subcommand |
+|---|--------|---------------|------------|
+| 1 | `ingest` | **Read a paper.** arXiv id / URL / PDF / title → Markdown + blocks + figures. | `clio-author ingest <source>` |
+| 2 | `ask` | **Question answering.** Grounded answer from the paper's memory blocks. | `clio-author ask` |
+| 3 | `kg` | **Map content.** Claims/methods/datasets/results graph; `--full` for the 6-stage pipeline. | `clio-author kg` |
+| 4 | `discover` | **Find real papers.** Scholarly search (S2/OpenAlex/Crossref/arXiv); no LLM. | `clio-author discover` |
+| 5 | `cite` | **Verify citations.** Check candidates against scholarly backends; suggestions only. | `clio-author cite` |
+| 6 | `check_refs` | **Lint bibliography.** Malformed/duplicate entries, missing/uncited keys; no LLM. | `clio-author check-refs` |
+| 7 | `research` | **Survey literature.** Foundational/recent/competing sources, gaps, synthesis. | `clio-author research` |
+| 8 | `review` | **Peer review.** Accept/Reject + scores + critique; optional grounding and vision. | `clio-author review` |
+| 9 | `meta_review` | **Area-chair decision.** Aggregate several reviews; offline arithmetic. | `clio-author run meta_review` |
+| 10 | `section_review` | **Section review.** L1 refs → L2 coherence → L3 persona; severity summary. | `clio-author section-review` |
+| 11 | `rebuttal` | **Author rebuttal.** Point-by-point response grounded in the paper. | `clio-author rebuttal` |
+| 12 | `verify_work` | **Claim audit.** Per-claim made/supported check → VERIFIED/GAPS verdict. | `clio-author verify-work` |
+| 13 | `audit` | **Manuscript checklist.** Sections, word counts, placeholders, coverage; no LLM. | `clio-author audit` |
+| 14 | `plan` | **Section blueprints.** Tasks, claims, sources, word budgets before drafting. | `clio-author plan` |
+| 15 | `write` | **Draft a section.** Grounded in supplied source material. | `clio-author write` |
+| 16 | `edit` | **Revise to feedback.** Rewrite prose to address reviewer weaknesses. | `clio-author run edit` |
+| 17 | `polish` | **Improve prose.** Clarity, flow, academic voice; preserves citations. | `clio-author polish` |
+| 18 | `coherence` | **Consistency check.** Terminology drift, contradictions, broken flow. | `clio-author coherence` |
+| 19 | `compose` | **Write a whole paper.** idea → outline → cite → write → assemble; `--latex`/`--pdf`. | `clio-author compose` |
+| 20 | `write_review` | **Self-improve a draft.** Writer ↔ reviewer critic-refine loop. | `clio-author run write_review` |
+| 21 | `plot` | **Make a plot/diagram.** Matplotlib code (or real PNG with vision). | `clio-author run plot` |
+| 22 | `describe_figures` | **Caption figures.** Text or Gemini vision descriptions. | `clio-author describe` |
+| 23 | `figure_refine` | **Self-improve a figure.** Visualizer ↔ critic refine loop. | `clio-author run figure_refine` |
+| 24 | `export` | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF. | `clio-author export` |
+| 25 | `orchestrate` | **Goal-driven.** Plan and run a sequence of actions from a natural-language goal. | `clio-author orchestrate` |
 
 Actions without a dedicated subcommand are reachable via `clio-author run <action> --json '...'`.
 
@@ -486,15 +857,17 @@ uv run python scripts/real_test.py   # full real end-to-end run; set CLIO_TEST_L
 - **First `ingest` is slow** — Docling downloads ~500 MB of models once; subsequent runs are fast.
 - **`review`/`ask`/`write`/`compose` output looks like a placeholder** — you're on the default echo
   model; set `CLIO_LLM=claude` (or `codex`/`ollama`).
-- **`cite` returns nothing** — try `CLIO_SCHOLAR=openalex` or `CLIO_SCHOLAR=arxiv`; for Semantic
-  Scholar specifically, set `SEMANTIC_SCHOLAR_API_KEY` to reduce rate limits.
+- **`cite` or `discover` returns nothing** — try `CLIO_SCHOLAR=openalex` or `CLIO_SCHOLAR=arxiv`;
+  for Semantic Scholar specifically, set `SEMANTIC_SCHOLAR_API_KEY` to reduce rate limits.
 - **`torchvision::nms` error after installing `rag`/`pdf`** — reinstall the matching CPU wheel:
   `uv pip install --reinstall torchvision --index-url https://download.pytorch.org/whl/cpu`.
 - **`compose` / `export` produce no `.tex` file** — `--latex` requires `--out-dir` to be set so a
   `SafeFiles` can be rooted there; or use `export --markdown-file` to convert an existing `paper.md`.
+- **`--pdf` reports a `pdf_error`** — no LaTeX engine (tectonic, latexmk, or pdflatex) was found on
+  the PATH. The export still succeeds; install one of those tools to compile PDF.
 - **A host invoking AUTHOR hangs** — don't point AUTHOR's nested model at the *same* host (e.g.
   `CLIO_LLM=codex` while the host is Codex) — it recurses. For grounding inside a host, prefer a
-  no-LLM action like `cite`, or set the nested `CLIO_LLM` to a different provider.
+  no-LLM action like `cite` or `discover`, or set the nested `CLIO_LLM` to a different provider.
 
 ---
 

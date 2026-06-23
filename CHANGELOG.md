@@ -7,6 +7,14 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`discover` action (25th)** — find real candidate papers for a topic via scholarly search
+  (Semantic Scholar → OpenAlex → Crossref → arXiv `search_query` + cascade merge/dedupe); writes
+  `discovered.json`/`.bib`; `research` gains a `discover` flag to seed its brief from real results.
+  Pure API, no LLM, no new deps.
+- **PDF compilation** — `export --pdf` and `compose --pdf` compile `paper.tex` → `paper.pdf`
+  (tectonic/latexmk/pdflatex; best-effort, `metadata.pdf_error` when no engine, never fails export).
+- **README reorganized by workflow** — capabilities grouped (read · understand · discover/verify ·
+  review · write/compose · illustrate · export · orchestrate), each with arguments + examples.
 - **Full multi-stage knowledge-graph pipeline** (`kg --full`) — re-implements protoneo/knowledge's
   6 stages (metadata → ontology → extraction → coref → verification → summary) clean-room (AGPL-3.0;
   no code copied), with checkpoint/resume (`--stages`, `--resume`). Simple single-shot `kg` stays default.
