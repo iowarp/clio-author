@@ -24,40 +24,40 @@ Two things shape the whole design:
 
 ## The story of an author
 
-> **Maya** has a folder of experimental results and a hunch they're worth a paper.
+> You have a folder of experimental results and a hunch they're worth a paper.
 >
-> **① She frames it.** What's the story, and what's already out there? She runs
-> `research` for a grounded literature brief, `discover` to pull *real* candidate
-> papers, and — because she wants a competitive evaluation — `experiment` to
-> extract how the top related papers designed *their* experiments. She `ask`s
-> questions against them and builds a `kg` of the concept landscape.
+> **① Frame it.** What's the story, and what's already out there? Run `research`
+> for a grounded literature brief, `discover` to pull *real* candidate papers, and
+> — for a competitive evaluation — `experiment` to extract how the top related
+> papers designed *their* experiments. `ask` questions against them and build a
+> `kg` of the concept landscape.
 >
-> **② She gathers.** She pulls in everything she'll build on — results notes, the
-> related PDFs, even her code repo — with `gather` (one merged context), or a
-> single paper with `ingest`.
+> **② Gather.** Pull in everything you'll build on — results notes, the related
+> PDFs, even a code repo — with `gather` (one merged context), or a single paper
+> with `ingest`.
 >
-> **③ She plans.** `plan` turns her idea into per-section blueprints (claims,
-> evidence, word budgets); `experiment` recreates a grounded **evaluation plan**
-> (datasets / baselines / metrics / ablations) for her new method.
+> **③ Plan.** `plan` turns the idea into per-section blueprints (claims, evidence,
+> word budgets); `experiment` recreates a grounded **evaluation plan** (datasets /
+> baselines / metrics / ablations) for the new method.
 >
-> **④ She drafts.** `write` section by section, or `compose` the whole paper at
-> once — grounded in the context from ②. Figures via `plot`, captions via
+> **④ Draft.** `write` section by section, or `compose` the whole paper at once —
+> grounded in the context from ②. Figures via `plot`, captions via
 > `describe_figures`, a key diagram tightened with `figure_refine`.
 >
-> **⑤ She strengthens it — before anyone sees it.** `revise` for clarity,
-> `coherence` for cross-section consistency, `verify_work` to confirm every
-> planned claim is made and supported, `check_refs` + `cite` for the bibliography,
-> an `audit` for completeness, and she even `review`s her own draft as a hostile
-> referee (or loops it with `write_review` / `section_review`).
+> **⑤ Strengthen it — before anyone sees it.** `revise` for clarity, `coherence`
+> for cross-section consistency, `verify_work` to confirm every planned claim is
+> made and supported, `check_refs` + `cite` for the bibliography, an `audit` for
+> completeness — and `review` the draft as a hostile referee (or loop it with
+> `write_review` / `section_review`).
 >
-> **⑥ Separately, she referees.** A venue asks her to review submissions. She
-> pastes each into `review` (optionally vision-grounded on its figures), does a
-> focused `section_review`, and as an area chair aggregates with `meta_review`.
+> **⑥ Separately, referee.** A venue asks you to review submissions. Paste each
+> into `review` (optionally vision-grounded on its figures), do a focused
+> `section_review`, and as an area chair aggregate with `meta_review`.
 >
-> **⑦ Her reviews come back.** She drafts a point-by-point `rebuttal`, then
-> `revise`s the manuscript to incorporate it and re-runs `audit`.
+> **⑦ Reviews come back.** Draft a point-by-point `rebuttal`, then `revise` the
+> manuscript to incorporate it and re-run `audit`.
 >
-> **⑧ She ships.** `export` → `paper.tex` + `references.bib`; `--pdf` for the
+> **⑧ Ship.** `export` → `paper.tex` + `references.bib`; `--pdf` for the
 > camera-ready (or `compose --pdf` end to end).
 >
 > Whenever a job spans phases, `orchestrate` drives the sequence from one line.

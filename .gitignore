@@ -39,3 +39,12 @@ dist/
 
 # extra audit scratch
 /audit-out2/
+
+# Internal artifacts
+/docs/AUTHOR.pdf
+/docs/AUTHOR.pptx
+/docs/ABLATION.md
+/docs/BENCHMARK-PLAN.md
+/docs/SOURCE-COVERAGE.md
+/docs/INTEGRATION.md
+/eval/agentic/

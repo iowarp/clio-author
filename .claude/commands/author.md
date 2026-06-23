@@ -24,6 +24,6 @@ Rules:
   you are running under if that would nest the same CLI (it can deadlock) — for grounding use the
   no-LLM `cite` action.
 - Each command prints a JSON result on stdout (add `2>/dev/null` for clean JSON); read it and report
-  the relevant fields. Full reference: `docs/RUNBOOK.md`, `docs/INTEGRATION.md`.
+  the relevant fields. Full reference: `docs/RUNBOOK.md`.
 
 Run the needed `clio-author` command(s), then summarize the result for me.
