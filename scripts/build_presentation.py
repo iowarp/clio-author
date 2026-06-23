@@ -29,7 +29,7 @@ SLIDES: list[dict] = [
             "One host-invocable package across the whole scientific-paper lifecycle:\n"
             "read -> understand -> verify citations -> review -> plan -> write -> illustrate -> export"
         ),
-        "footer": "Invoked by the CLIO agent as a subagent   .   26 actions   .   grounded, not hallucinated",
+        "footer": "Invoked by the CLIO agent as a subagent   .   27 actions   .   grounded, not hallucinated",
     },
     {
         "type": "bullets",
@@ -49,7 +49,7 @@ SLIDES: list[dict] = [
             ),
             (
                 0,
-                "Status: built end-to-end - 26 actions, ~579 hermetic tests, CI green; validated live (Claude / Codex / Ollama / Gemini vision / live citation backends).",
+                "Status: built end-to-end - 27 actions, ~587 hermetic tests, CI green; validated live (Claude / Codex / Ollama / Gemini vision / live citation backends).",
             ),
         ],
     },
@@ -186,7 +186,7 @@ SLIDES: list[dict] = [
     },
     {
         "type": "bullets",
-        "title": "5 . What we built - the 26 actions",
+        "title": "5 . What we built - the 27 actions",
         "bullets": [
             (
                 0,
@@ -335,7 +335,7 @@ SLIDES: list[dict] = [
         "bullets": [
             (
                 0,
-                "Done: 26 actions . ~579 hermetic tests + CI . live-validated (Claude/Codex/Ollama/Gemini, real citation backends) . motivation + benchmark plan . dynamic orchestrate.",
+                "Done: 27 actions . ~587 hermetic tests + CI . live-validated (Claude/Codex/Ollama/Gemini, real citation backends) . motivation + benchmark plan . dynamic orchestrate.",
             ),
             (0, "Next:"),
             (

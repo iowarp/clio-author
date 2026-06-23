@@ -36,7 +36,7 @@ cd clio-author
 uv sync
 ```
 
-**Step 3. Confirm it works** (prints the list of 26 things it can do — no model or network needed):
+**Step 3. Confirm it works** (prints the list of 27 things it can do — no model or network needed):
 
 ```bash
 uv run clio-author capabilities
@@ -91,7 +91,7 @@ That is the whole loop: **ingest → read → review.** Everything below is vari
 
 ---
 
-## 2. Capabilities — 26 actions, grouped by intent
+## 2. Capabilities — 27 actions, grouped by intent
 
 Pick the workflow that matches what you want to do. Add `--format prose` for human-readable text;
 omit it to get JSON (the default, handy for programs). Text actions need a real model (`CLIO_LLM=…`,
@@ -99,7 +99,7 @@ see §3); `ingest`, `gather`, `cite`, `discover`, `check_refs`, `audit`, and `me
 without one.
 
 > **Grounding shortcut — `--sources`.** Every writing/reading action that grounds on memory blocks
-> (`ask`, `plan`, `write`, `compose`, `research`, `kg`, `review`) accepts `--sources` (and
+> (`ask`, `plan`, `write`, `compose`, `research`, `kg`, `review`, `experiment`) accepts `--sources` (and
 > `--sources-file`): point it at any mix of files, folders, globs, git repo URLs, and PDFs/arXiv ids
 > and they are auto-ingested and merged into the grounding context before the action runs — no
 > separate `ingest`/`gather` step needed. Use the standalone `gather` action when you want to build
@@ -458,6 +458,39 @@ CLIO_LLM=claude uv run clio-author plan \
   --out-dir clio-out/mypaper
 ```
 
+#### `experiment` — recreate an evaluation plan from reference papers
+
+Reads the **design / architecture / experiments** of one or more reference papers (PDFs are
+auto-ingested; or pass `--sources`/`--blocks-file`/`--markdown-file`) and extracts each paper's
+empirical design (research questions, architecture, datasets, baselines, metrics, ablations,
+protocol, compute, limitations). When you also give your **new paper's `--idea`**, it *recreates* a
+grounded **evaluation plan** — which datasets to use, baselines to compare against, metrics to
+report, ablations to run, the protocol, and threats to validity — each recommendation tagged with the
+reference paper it came from. Writes `experiment_designs.json/.md` and (with an idea)
+`evaluation_plan.json/.md` (a drop-in evaluation section).
+
+| Argument | Meaning |
+|---|---|
+| `--sources S [S ...]` | reference papers/folders/globs/git/PDFs (auto-ingested; multi-paper) |
+| `--sources-file FILE` | file listing sources (one per line, or a JSON array) |
+| `--blocks-file FILE` | a pre-ingested/`gather`ed MemoryBlocks JSON of the reference paper(s) |
+| `--blocks-json JSON` | inline MemoryBlocks dump |
+| `--markdown-file FILE` | a single reference paper's Markdown (alternative to blocks) |
+| `--text TEXT` | a single reference paper's text inline |
+| `--idea TEXT` / `--idea-file FILE` | the **new** paper's idea — supplying it recreates the eval plan |
+| `--out-dir DIR` | persist `experiment_designs.*` + `evaluation_plan.*` |
+| `--format structured\|prose` | `prose` prints the rendered evaluation plan |
+| `--json '{...}'` | merge payload keys |
+| `--out FILE` | save the result |
+
+```bash
+# Read two reference papers and recreate an evaluation plan for a new idea:
+CLIO_LLM=claude uv run --extra pdf clio-author experiment \
+  --sources 2106.09685 ./related/fastcache.pdf \
+  --idea "An RL cache-eviction policy for scientific data workloads" \
+  --out-dir clio-out/eval --format prose
+```
+
 #### `write` — draft one section from source material
 
 | Argument | Meaning |
@@ -787,7 +820,7 @@ from clio_author.llm.providers import resolve_llm
 # Build the subagent. resolve_llm("claude") | "codex" | "ollama" | None (offline echo).
 sub = ClioAuthorSubagent(llm=resolve_llm("claude"))
 
-# 1) Discover what it can do (26 actions).
+# 1) Discover what it can do (27 actions).
 for a in sub.capabilities()["actions"]:
     print(a["action"], "—", a["description"])
 
@@ -836,7 +869,7 @@ CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper
 
 ---
 
-## 5. The 26 actions at a glance
+## 5. The 27 actions at a glance
 
 | # | Action | What it's for | Subcommand |
 |---|--------|---------------|------------|
@@ -855,17 +888,18 @@ CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper
 | 13 | `verify_work` | **Claim audit.** Per-claim made/supported check → VERIFIED/GAPS verdict. | `clio-author verify-work` |
 | 14 | `audit` | **Manuscript checklist.** Sections, word counts, placeholders, coverage; no LLM. | `clio-author audit` |
 | 15 | `plan` | **Section blueprints.** Tasks, claims, sources, word budgets before drafting. | `clio-author plan` |
-| 16 | `write` | **Draft a section.** Grounded in supplied source material. | `clio-author write` |
-| 17 | `edit` | **Revise to feedback.** Rewrite prose to address reviewer weaknesses. | `clio-author run edit` |
-| 18 | `polish` | **Improve prose.** Clarity, flow, academic voice; preserves citations. | `clio-author polish` |
-| 19 | `coherence` | **Consistency check.** Terminology drift, contradictions, broken flow. | `clio-author coherence` |
-| 20 | `compose` | **Write a whole paper.** idea → outline → cite → write → assemble; `--latex`/`--pdf`. | `clio-author compose` |
-| 21 | `write_review` | **Self-improve a draft.** Writer ↔ reviewer critic-refine loop. | `clio-author run write_review` |
-| 22 | `plot` | **Make a plot/diagram.** Matplotlib code (or real PNG with vision). | `clio-author run plot` |
-| 23 | `describe_figures` | **Caption figures.** Text or Gemini vision descriptions. | `clio-author describe` |
-| 24 | `figure_refine` | **Self-improve a figure.** Visualizer ↔ critic refine loop. | `clio-author run figure_refine` |
-| 25 | `export` | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF. | `clio-author export` |
-| 26 | `orchestrate` | **Goal-driven.** Plan and run a sequence of actions from a natural-language goal. | `clio-author orchestrate` |
+| 16 | `experiment` | **Recreate evaluation.** Extract reference papers' design/experiments → grounded eval plan (datasets/baselines/metrics/ablations). | `clio-author experiment` |
+| 17 | `write` | **Draft a section.** Grounded in supplied source material. | `clio-author write` |
+| 18 | `edit` | **Revise to feedback.** Rewrite prose to address reviewer weaknesses. | `clio-author run edit` |
+| 19 | `polish` | **Improve prose.** Clarity, flow, academic voice; preserves citations. | `clio-author polish` |
+| 20 | `coherence` | **Consistency check.** Terminology drift, contradictions, broken flow. | `clio-author coherence` |
+| 21 | `compose` | **Write a whole paper.** idea → outline → cite → write → assemble; `--latex`/`--pdf`. | `clio-author compose` |
+| 22 | `write_review` | **Self-improve a draft.** Writer ↔ reviewer critic-refine loop. | `clio-author run write_review` |
+| 23 | `plot` | **Make a plot/diagram.** Matplotlib code (or real PNG with vision). | `clio-author run plot` |
+| 24 | `describe_figures` | **Caption figures.** Text or Gemini vision descriptions. | `clio-author describe` |
+| 25 | `figure_refine` | **Self-improve a figure.** Visualizer ↔ critic refine loop. | `clio-author run figure_refine` |
+| 26 | `export` | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF. | `clio-author export` |
+| 27 | `orchestrate` | **Goal-driven.** Plan and run a sequence of actions from a natural-language goal. | `clio-author orchestrate` |
 
 Actions without a dedicated subcommand are reachable via `clio-author run <action> --json '...'`.
 

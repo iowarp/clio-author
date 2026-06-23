@@ -36,6 +36,15 @@ ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["sources", "out_dir", "max_files", "max_text_chars"],
     },
     {
+        "action": "experiment",
+        "description": (
+            "Read the design/architecture/experiments of one or more reference "
+            "papers and (with a new-paper idea) recreate a grounded evaluation "
+            "plan: datasets, baselines, metrics, ablations, protocol, threats."
+        ),
+        "payload_keys": ["blocks", "sources", "markdown", "text", "idea", "out_dir"],
+    },
+    {
         "action": "ask",
         "description": "Answer a question grounded only in the provided memory blocks.",
         "payload_keys": ["question", "blocks", "sources"],

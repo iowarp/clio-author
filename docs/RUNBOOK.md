@@ -62,17 +62,17 @@ GEMINI_API_KEY=...
 
 ```bash
 uv run ruff check clio_author tests        # -> All checks passed!
-uv run mypy clio_author                    # -> Success: no issues found in 72 source files
-uv run pytest -q                           # -> 579 passed, 3 skipped, 12 deselected
-uv run clio-author capabilities            # -> name=clio-author, 26 actions
+uv run mypy clio_author                    # -> Success: no issues found in 74 source files
+uv run pytest -q                           # -> 587 passed, 3 skipped, 12 deselected
+uv run clio-author capabilities            # -> name=clio-author, 27 actions
 ```
 
-> **23 subcommands** have dedicated flags: `capabilities, ingest, gather, ask, review, cite, discover,
-> plan, write, compose, export, polish, coherence, kg, describe, orchestrate, rebuttal, research,
-> verify-work, check-refs, section-review, audit, run`. The other **5 actions**
+> **24 subcommands** have dedicated flags: `capabilities, ingest, gather, ask, experiment, review,
+> cite, discover, plan, write, compose, export, polish, coherence, kg, describe, orchestrate,
+> rebuttal, research, verify-work, check-refs, section-review, audit, run`. The other **5 actions**
 > (`edit`, `meta_review`, `plot`, `write_review`, `figure_refine`) have **no dedicated subcommand**
 > — reach them with `clio-author run <action> --json '{...}'`. `run <action>` works for *any* of
-> the 26 actions.
+> the 27 actions.
 
 ---
 
@@ -474,6 +474,37 @@ CLIO_LLM=claude uv run clio-author plan --idea "cooperating agents for the paper
 **Expect:** `num_sections`, `num_tasks`, `plan_errors=0`; each plan has tasks/claims/sources + a word budget.
 **Artifacts:** `runbook-out/plan-out/plan.json`.
 
+**`experiment`** — read reference papers' design/architecture/experiments and recreate an
+evaluation plan for your new paper. Phase 1 extracts each paper's `PaperDesign` (research questions,
+architecture, datasets, baselines, metrics, ablations, protocol, compute, limitations); phase 2 (when
+`--idea` is given) synthesises an `EvaluationPlan` grounded in those references and adapted to the new
+idea. Multi-paper input comes from a `gather` `context.json` (or `--sources`); a single paper can be
+given as `--markdown-file`/`--text`.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--sources` | one or more strings | reference papers/folders/globs/git/PDFs (auto-ingested, multi-paper) |
+| `--sources-file` | one file | sources one per line, or a JSON array |
+| `--blocks-json` | JSON string | inline MemoryBlocks of the reference paper(s) |
+| `--blocks-file` | one file | a `gather` `context.json` / `blocks.json` of the reference paper(s) |
+| `--markdown-file` | one file | a single reference paper's Markdown |
+| `--text` | string | a single reference paper's text inline |
+| `--idea` / `--idea-file` | string / file | the **new** paper's idea — supplying it recreates the eval plan |
+| `--out-dir` | directory | persist `experiment_designs.*` + `evaluation_plan.*` |
+| `--format` | `structured`\|`prose` | `prose` prints the rendered evaluation plan |
+| `--json` | JSON object | merge any additional payload key |
+| `--out` | file path | save result |
+
+```bash
+# Read two reference papers and recreate an evaluation plan for a new idea:
+CLIO_LLM=claude uv run --extra pdf clio-author experiment \
+  --sources 2106.09685 ./related/fastcache.pdf \
+  --idea "An RL cache-eviction policy for scientific data workloads" \
+  --json '{"out_dir":"runbook-out/experiment"}' --format prose
+```
+**Expect:** `num_papers`, `has_plan=true`; per-paper designs + a grounded evaluation plan.
+**Artifacts:** `runbook-out/experiment/experiment_designs.{json,md}` + `evaluation_plan.{json,md}`.
+
 **`research`** — produce a grounded literature brief for a topic or section.
 
 | Flag | Takes | Meaning |
@@ -801,7 +832,7 @@ All other actions have dedicated subcommands — see Appendix A.
   `ClioAuthorSubagent(llm=…).run("review", {"paper": "..."})`.
 - See a subcommand's exact flags anytime: `clio-author <cmd> --help`.
 
-## Appendix A — all 26 actions at a glance
+## Appendix A — all 27 actions at a glance
 
 | # | Action | Dedicated subcommand |
 |---|---|---|
