@@ -1,6 +1,7 @@
 <p align="center">
   <strong>AUTHOR</strong><br>
-  <em>Agentic Understanding for Thesis, Hypothesis, and Objective Research.</em>
+  <em>Agentic Understanding for Thesis, Hypothesis, and Objective Research</em><br>
+  <em>The whole scientific-paper lifecycle — read, review, write, and ship — in one AI subagent.</em>
 </p>
 
 <p align="center">
@@ -13,10 +14,11 @@
 </p>
 
 ---
-The whole scientific-paper lifecycle — read, review, write, and ship — in one AI subagent.
-AUTHOR is a standalone, pure-Python multi-agent harness for the scientific-paper lifecycle. It turns a paper — an arXiv link,a PDF, or just a title — into clean Markdown, then puts specialized AI agents to work: answering
-questions, verifying citations, reviewing, planning, drafting, illustrating, and exporting. It runs
-on its own, and a larger agent (such as CLIO) can call it as a **subagent**.
+
+AUTHOR is a standalone, pure-Python multi-agent harness for the scientific-paper lifecycle. It turns
+a paper — an arXiv link, a PDF, or just a title — into clean Markdown, then puts specialized AI agents
+to work: answering questions, verifying citations, reviewing, planning, drafting, illustrating, and
+exporting. It runs on its own, and a larger agent (such as CLIO) can call it as a **subagent**.
 
 Think of it as a research collaborator that never sleeps. Hand it your idea and results, and it
 plans, drafts, and self-reviews a paper. Hand it someone else's PDF, and it gives you the kind of
@@ -151,84 +153,57 @@ Actions without a dedicated subcommand are reachable via `clio-author run <actio
 
 ---
 
-## Commands — copy & paste
+## Commands & arguments
 
-One runnable command per action, grouped by lifecycle phase. Swap the placeholder paths/ids for your
-own. `CLIO_LLM=claude` is shown where a real model is needed (see [below](#use-a-real-model)); the
-rest run offline. Add `--format prose` for human-readable text, `--out FILE` to also save the result.
+Three flags are available on (almost) every command and are omitted below for brevity:
+`--format {structured,prose}` (JSON vs. human-readable text), `--json '{...}'` (merge extra payload
+keys), and `--out FILE` (also save the result). `A | B` means "either"; `…` means repeatable.
 
 **Read & gather**
-
-```bash
-uv run --extra pdf clio-author ingest 2601.23265
-uv run --extra pdf clio-author gather --sources ./notes/ ./refs/ https://github.com/me/proj --out-dir clio-out/context
-```
+- `ingest <source>` — `<source>` = arXiv id / URL / local PDF path / paper title
+- `gather [--sources S … | --sources-file FILE] [--out-dir DIR] [--max-files N] [--max-text-chars N]`
 
 **Understand**
-
-```bash
-CLIO_LLM=claude uv run clio-author ask --question "What is the main contribution?" --blocks-file clio-out/2601.23265/blocks.json --format prose
-CLIO_LLM=claude uv run clio-author kg --blocks-file clio-out/2601.23265/blocks.json --full --out-dir clio-out/kg
-CLIO_LLM=claude uv run --extra pdf clio-author experiment --sources 2106.09685 ./refs/fastcache.pdf --idea "An RL cache-eviction policy" --out-dir clio-out/eval --format prose
-```
+- `ask --question Q [--blocks-file FILE | --blocks-json JSON] [--sources S … | --sources-file FILE]`
+- `kg [--blocks-file FILE | --blocks-json JSON] [--full] [--stages LIST] [--resume DIR] [--out-dir DIR] [--sources …]`
+- `experiment [--sources S … | --blocks-file FILE | --markdown-file FILE | --text T] [--idea I | --idea-file FILE] [--out-dir DIR]`
 
 **Sources & citations**
-
-```bash
-CLIO_SCHOLAR=auto uv run clio-author discover --query "learned cache eviction" --limit 8 --out-dir clio-out/lit
-uv run clio-author cite --candidates-json '[{"title":"Attention Is All You Need"}]'
-uv run clio-author check-refs --bibtex-file clio-out/paper/references.bib --markdown-file clio-out/paper/paper.md
-CLIO_LLM=claude uv run clio-author research --topic "learned cache eviction" --depth deep --format prose
-```
+- `discover [--query Q | --query-file FILE] [--limit N] [--cutoff-date YYYY-MM] [--out-dir DIR]`
+- `cite [--candidates-json JSON | --candidates-file FILE]`
+- `check-refs [--bibtex TEXT | --bibtex-file FILE] [--markdown-file FILE | --text T]`
+- `research [--topic T | --topic-file FILE] [--blocks-file FILE] [--depth {standard,deep}] [--sources …]`
 
 **Plan & write**
-
-```bash
-CLIO_LLM=claude uv run clio-author plan --idea "An RL cache-eviction policy" --blocks-file clio-out/context/context.json --out-dir clio-out/plan
-CLIO_LLM=claude uv run clio-author write --outline "Introduction" --source-file clio-out/2601.23265/paper.md --format prose
-CLIO_LLM=claude uv run clio-author compose --idea "An RL cache-eviction policy" --plan --review --latex --pdf --out-dir clio-out/paper
-CLIO_LLM=claude uv run clio-author revise --mode style --text-file clio-out/paper/sections/01-introduction.md --voice concise --format prose
-CLIO_LLM=claude uv run clio-author revise --text "We propose X." --review-json '{"weaknesses":["no baseline comparison"]}'
-CLIO_LLM=claude uv run clio-author coherence --markdown-file clio-out/paper/paper.md --format prose
-```
+- `plan [--idea I | --idea-file FILE] [--log L | --log-file FILE] [--outline-json JSON | --outline-file FILE] [--blocks-file FILE] [--candidates-file FILE] [--out-dir DIR] [--sources …]`
+- `write [--source T | --source-file FILE] [--outline TITLE] [--sources …]`
+- `compose [--idea I | --idea-file FILE] [--log L | --log-file FILE] [--outline-json JSON | --outline-file FILE] [--candidates-file FILE] [--review] [--max-rounds N] [--plan] [--latex] [--pdf] [--out-dir DIR] [--sources …]`
+- `revise [--mode {feedback,style}] [--text T | --text-file FILE] [--review-json JSON | --review-file FILE] [--critic-notes TEXT] [--voice V] [--target FILE]`
+- `polish [--text T | --text-file FILE] [--voice V] [--target FILE]` — alias of `revise --mode style`
+- `coherence [--sections-json JSON | --sections-file FILE] [--markdown-file FILE | --text T]`
 
 **Review & verify**
+- `review [--paper T | --paper-file FILE] [--ground] [--figures-json JSON | --figures-file FILE] [--sources …]`
+- `section-review [--text T | --text-file FILE] [--bibtex-file FILE] [--persona-json JSON]`
+- `verify-work [--text T | --text-file FILE] [--section-plan-json JSON | --section-plan-file FILE] [--claims-json JSON]`
+- `audit [--sections-json JSON | --sections-file FILE] [--markdown-file FILE] [--bibtex-file FILE]`
+- `rebuttal [--paper T | --paper-file FILE] [--review-json JSON | --review-file FILE]`
+- `run meta_review --json '{"reviews":[ … ]}'`
+- `run write_review --json '{"outline":{…},"section_plan":{…},"blocks":{…},"max_rounds":N}'` — also `source` / `sources`
 
-```bash
-CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper.md --format prose --out review.md
-CLIO_LLM=claude uv run clio-author section-review --text-file clio-out/paper/sections/03-method.md --format prose
-CLIO_LLM=claude uv run clio-author verify-work --text-file clio-out/paper/sections/03-method.md --section-plan-file clio-out/plan/plan.json
-uv run clio-author audit --markdown-file clio-out/paper/paper.md --bibtex-file clio-out/paper/references.bib
-CLIO_LLM=claude uv run clio-author rebuttal --paper-file clio-out/paper/paper.md --review-json '{"weaknesses":["unclear ablation"]}' --format prose
-uv run clio-author run meta_review --json '{"reviews":[{"overall":6},{"overall":7}]}'
-CLIO_LLM=claude uv run clio-author run write_review --json '{"outline":{"title":"Introduction"},"max_rounds":2}'
-```
-
-**Illustrate**
-
-```bash
-CLIO_VISION=gemini uv run clio-author describe --blocks-file clio-out/2601.23265/blocks.json
-CLIO_LLM=claude uv run clio-author run plot --json '{"spec":{"kind":"line","title":"Hit-rate vs cache size"}}'
-CLIO_LLM=claude uv run clio-author run figure_refine --json '{"spec":{"kind":"line","title":"Loss"},"max_rounds":2}'
-```
+**Figures**
+- `describe [--blocks-file FILE | --blocks-json JSON]` — fills figure descriptions (`describe_figures`)
+- `run plot --json '{"spec":{…},"out_path":"…"}'`
+- `run figure_refine --json '{"spec":{…},"out_path":"…","max_rounds":N}'`
 
 **Ship & drive**
+- `export [--title T] [--markdown-file FILE | --sections-json JSON | --sections-file FILE] [--bibtex-file FILE] [--out-dir DIR] [--pdf]`
+- `orchestrate [--goal G | --goal-file FILE] [--inputs-json JSON | --inputs-file FILE] [--max-steps N] [--out-dir DIR]`
 
-```bash
-uv run clio-author export --markdown-file clio-out/paper/paper.md --bibtex-file clio-out/paper/references.bib --out-dir clio-out/camera-ready --pdf
-CLIO_LLM=claude uv run clio-author orchestrate --goal "ingest 2106.09685, then review it and verify its claims" --out-dir clio-out/run
-```
-
-**Discover what's available**
-
-```bash
-uv run clio-author capabilities     # every action + its lifecycle phase / needs_source
-uv run clio-author lifecycle        # the phase -> actions map
-uv run clio-author run <action> --json '{...}'   # dispatch any action by name
-```
-
-`edit` ≡ `revise --mode feedback` and `polish` ≡ `revise --mode style` (both still work). Every flag
-of every command is in [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
+**Discovery**
+- `capabilities` — list every action (with lifecycle `phase` + `needs_source` metadata)
+- `lifecycle` — print the phase → actions map
+- `run <action> [--json '{...}']` — dispatch any action by name (the generic escape hatch)
 
 ---
 
