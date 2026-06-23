@@ -1,16 +1,20 @@
-# AUTHOR
+<p align="center">
+  <strong>AUTHOR</strong><br>
+  <em>Agentic Understanding for Thesis, Hypothesis, and Objective Research.</em>
+</p>
 
-**The whole scientific-paper lifecycle — read, review, write, illustrate, and ship — in one AI subagent.**
+<p align="center">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-blue" />
+  <img alt="Python" src="https://img.shields.io/badge/python-%E2%89%A53.12-3776ab" />
+  <img alt="License" src="https://img.shields.io/badge/license-BSD--3--Clause-green" />
+  <img alt="Actions" src="https://img.shields.io/badge/actions-26-orange" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-602%20passing-brightgreen" />
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey" />
+</p>
 
-![Python](https://img.shields.io/badge/python-3.12%2B-blue)
-![License](https://img.shields.io/badge/license-BSD--3--Clause-green)
-![Actions](https://img.shields.io/badge/actions-26-orange)
-![Tests](https://img.shields.io/badge/tests-602%20passing-brightgreen)
-![Offline](https://img.shields.io/badge/runs-offline%20out%20of%20the%20box-lightgrey)
-
-AUTHOR (*Agentic Understanding for Thesis, Hypothesis, and Objective Research*) is a standalone,
-pure-Python multi-agent harness for the scientific-paper lifecycle. It turns a paper — an arXiv link,
-a PDF, or just a title — into clean Markdown, then puts specialized AI agents to work: answering
+---
+The whole scientific-paper lifecycle — read, review, write, and ship — in one AI subagent.
+AUTHOR is a standalone, pure-Python multi-agent harness for the scientific-paper lifecycle. It turns a paper — an arXiv link,a PDF, or just a title — into clean Markdown, then puts specialized AI agents to work: answering
 questions, verifying citations, reviewing, planning, drafting, illustrating, and exporting. It runs
 on its own, and a larger agent (such as CLIO) can call it as a **subagent**.
 
@@ -20,9 +24,19 @@ feedback a program committee would — scores, strengths, weaknesses, and revisi
 don't have to start from scratch, and you don't have to start with ingestion: **enter at whatever
 phase of the work you're in.**
 
-> Runs **offline out of the box** with a built-in echo model (good for trying the plumbing). Add a
-> real model (Claude / Codex / Ollama) for real output. Requires **Python ≥ 3.12**. BSD-3-Clause.
-> Why one package instead of a dozen tools? → [`docs/MOTIVATION.md`](docs/MOTIVATION.md).
+## What You Get
+
+- **26 actions across the author lifecycle** — frame · gather · plan · draft · strengthen · referee · respond · ship, all behind one interface
+- **PDF/arXiv → clean scientific Markdown** with structured memory blocks (sections, figures, equations)
+- **Grounded peer review** — Accept/Reject, per-axis scores, strengths/weaknesses, optional vision on figures
+- **Source-grounded writing** — outline → plan → draft → self-review → LaTeX/PDF, with verified citations
+- **Citations that are real** — a 4-backend scholarly cascade (Semantic Scholar / OpenAlex / Crossref / arXiv); never fabricated
+- **A content knowledge graph** of a paper's claims/methods/datasets/results (6-stage pipeline)
+- **Runs offline out of the box** (built-in echo model); add Claude / Codex / Ollama for real output
+- **Callable as a subagent** in-process, over the CLI, or via an MCP bridge — imports nothing from the host
+
+> Requires **Python ≥ 3.12** · BSD-3-Clause. Why one package instead of a dozen tools? →
+> [`docs/MOTIVATION.md`](docs/MOTIVATION.md).
 
 ---
 
@@ -102,38 +116,119 @@ The full story, with copy-paste recipes per phase, is in **[`docs/LIFECYCLE.md`]
 
 ### The 26 actions at a glance
 
-| Action | What it's for | Subcommand |
-|--------|---------------|------------|
-| `ingest` | **Read a paper.** arXiv id / URL / PDF / title → Markdown + blocks + figures. | `clio-author ingest <source>` |
-| `gather` | **Build context.** Many sources (files/folders/globs/git/PDFs) → one merged `context.json`. | `clio-author gather` |
-| `ask` | **Question answering.** Grounded answer from the paper's memory blocks. | `clio-author ask` |
-| `kg` | **Map content.** Claims/methods/datasets/results graph; `--full` for the 6-stage pipeline. | `clio-author kg` |
-| `discover` | **Find real papers.** Scholarly search (S2/OpenAlex/Crossref/arXiv); no LLM. | `clio-author discover` |
-| `cite` | **Verify citations.** Check candidates against scholarly backends; suggestions only. | `clio-author cite` |
-| `check_refs` | **Lint bibliography.** Malformed/duplicate entries, missing/uncited keys; no LLM. | `clio-author check-refs` |
-| `research` | **Survey literature.** Foundational/recent/competing sources, gaps, synthesis. | `clio-author research` |
-| `experiment` | **Recreate evaluation.** Extract reference papers' design/experiments → grounded eval plan. | `clio-author experiment` |
-| `plan` | **Section blueprints.** Tasks, claims, sources, word budgets before drafting. | `clio-author plan` |
-| `write` | **Draft a section.** Grounded in supplied source material. | `clio-author write` |
-| `compose` | **Write a whole paper.** idea → outline → cite → write → assemble; `--latex`/`--pdf`. | `clio-author compose` |
-| `revise` | **Revise prose.** `--mode feedback` (address review) or `style` (polish). Aliases: `edit`, `polish`. | `clio-author revise` |
-| `coherence` | **Consistency check.** Terminology drift, contradictions, broken flow. | `clio-author coherence` |
-| `verify_work` | **Claim audit.** Per-claim made/supported check → VERIFIED/GAPS verdict. | `clio-author verify-work` |
-| `audit` | **Manuscript checklist.** Sections, word counts, placeholders, coverage; no LLM. | `clio-author audit` |
-| `review` | **Peer review.** Accept/Reject + scores + critique; optional grounding and vision. | `clio-author review` |
-| `section_review` | **Section review.** L1 refs → L2 coherence → L3 persona; severity summary. | `clio-author section-review` |
-| `meta_review` | **Area-chair decision.** Aggregate several reviews; offline arithmetic. | `clio-author run meta_review` |
-| `rebuttal` | **Author rebuttal.** Point-by-point response grounded in the paper. | `clio-author rebuttal` |
-| `write_review` | **Self-improve a draft.** Writer ↔ reviewer critic-refine loop. | `clio-author run write_review` |
-| `plot` | **Make a plot/diagram.** Matplotlib code (or real PNG with vision). | `clio-author run plot` |
-| `describe_figures` | **Caption figures.** Text or Gemini vision descriptions. | `clio-author describe` |
-| `figure_refine` | **Self-improve a figure.** Visualizer ↔ critic refine loop. | `clio-author run figure_refine` |
-| `export` | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF. | `clio-author export` |
-| `orchestrate` | **Goal-driven.** Plan and run a sequence of actions from a natural-language goal. | `clio-author orchestrate` |
+| Action | What it's for |
+|--------|---------------|
+| `ingest` | **Read a paper.** arXiv id / URL / PDF / title → Markdown + blocks + figures. |
+| `gather` | **Build context.** Many sources (files/folders/globs/git/PDFs) → one merged `context.json`. |
+| `ask` | **Question answering.** Grounded answer from the paper's memory blocks. |
+| `kg` | **Map content.** Claims/methods/datasets/results graph; `--full` for the 6-stage pipeline. |
+| `discover` | **Find real papers.** Scholarly search (S2/OpenAlex/Crossref/arXiv); no LLM. |
+| `cite` | **Verify citations.** Check candidates against scholarly backends; suggestions only. |
+| `check_refs` | **Lint bibliography.** Malformed/duplicate entries, missing/uncited keys; no LLM. |
+| `research` | **Survey literature.** Foundational/recent/competing sources, gaps, synthesis. |
+| `experiment` | **Recreate evaluation.** Extract reference papers' design/experiments → grounded eval plan. |
+| `plan` | **Section blueprints.** Tasks, claims, sources, word budgets before drafting. |
+| `write` | **Draft a section.** Grounded in supplied source material. |
+| `compose` | **Write a whole paper.** idea → outline → cite → write → assemble; `--latex`/`--pdf`. |
+| `revise` | **Revise prose.** `--mode feedback` (address review) or `style` (polish). Aliases: `edit`, `polish`. |
+| `coherence` | **Consistency check.** Terminology drift, contradictions, broken flow. |
+| `verify_work` | **Claim audit.** Per-claim made/supported check → VERIFIED/GAPS verdict. |
+| `audit` | **Manuscript checklist.** Sections, word counts, placeholders, coverage; no LLM. |
+| `review` | **Peer review.** Accept/Reject + scores + critique; optional grounding and vision. |
+| `section_review` | **Section review.** L1 refs → L2 coherence → L3 persona; severity summary. |
+| `meta_review` | **Area-chair decision.** Aggregate several reviews; offline arithmetic. |
+| `rebuttal` | **Author rebuttal.** Point-by-point response grounded in the paper. |
+| `write_review` | **Self-improve a draft.** Writer ↔ reviewer critic-refine loop. |
+| `plot` | **Make a plot/diagram.** Matplotlib code (or real PNG with vision). |
+| `describe_figures` | **Caption figures.** Text or Gemini vision descriptions. |
+| `figure_refine` | **Self-improve a figure.** Visualizer ↔ critic refine loop. |
+| `export` | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF. |
+| `orchestrate` | **Goal-driven.** Plan and run a sequence of actions from a natural-language goal. |
 
 Every flag of every subcommand is documented in **[`docs/RUNBOOK.md`](docs/RUNBOOK.md)**; the action +
 payload-key reference (for calling AUTHOR as a library) is in **[`docs/USAGE.md`](docs/USAGE.md)**.
 Actions without a dedicated subcommand are reachable via `clio-author run <action> --json '...'`.
+
+---
+
+## Commands — copy & paste
+
+One runnable command per action, grouped by lifecycle phase. Swap the placeholder paths/ids for your
+own. `CLIO_LLM=claude` is shown where a real model is needed (see [below](#use-a-real-model)); the
+rest run offline. Add `--format prose` for human-readable text, `--out FILE` to also save the result.
+
+**Read & gather**
+
+```bash
+uv run --extra pdf clio-author ingest 2601.23265
+uv run --extra pdf clio-author gather --sources ./notes/ ./refs/ https://github.com/me/proj --out-dir clio-out/context
+```
+
+**Understand**
+
+```bash
+CLIO_LLM=claude uv run clio-author ask --question "What is the main contribution?" --blocks-file clio-out/2601.23265/blocks.json --format prose
+CLIO_LLM=claude uv run clio-author kg --blocks-file clio-out/2601.23265/blocks.json --full --out-dir clio-out/kg
+CLIO_LLM=claude uv run --extra pdf clio-author experiment --sources 2106.09685 ./refs/fastcache.pdf --idea "An RL cache-eviction policy" --out-dir clio-out/eval --format prose
+```
+
+**Sources & citations**
+
+```bash
+CLIO_SCHOLAR=auto uv run clio-author discover --query "learned cache eviction" --limit 8 --out-dir clio-out/lit
+uv run clio-author cite --candidates-json '[{"title":"Attention Is All You Need"}]'
+uv run clio-author check-refs --bibtex-file clio-out/paper/references.bib --markdown-file clio-out/paper/paper.md
+CLIO_LLM=claude uv run clio-author research --topic "learned cache eviction" --depth deep --format prose
+```
+
+**Plan & write**
+
+```bash
+CLIO_LLM=claude uv run clio-author plan --idea "An RL cache-eviction policy" --blocks-file clio-out/context/context.json --out-dir clio-out/plan
+CLIO_LLM=claude uv run clio-author write --outline "Introduction" --source-file clio-out/2601.23265/paper.md --format prose
+CLIO_LLM=claude uv run clio-author compose --idea "An RL cache-eviction policy" --plan --review --latex --pdf --out-dir clio-out/paper
+CLIO_LLM=claude uv run clio-author revise --mode style --text-file clio-out/paper/sections/01-introduction.md --voice concise --format prose
+CLIO_LLM=claude uv run clio-author revise --text "We propose X." --review-json '{"weaknesses":["no baseline comparison"]}'
+CLIO_LLM=claude uv run clio-author coherence --markdown-file clio-out/paper/paper.md --format prose
+```
+
+**Review & verify**
+
+```bash
+CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper.md --format prose --out review.md
+CLIO_LLM=claude uv run clio-author section-review --text-file clio-out/paper/sections/03-method.md --format prose
+CLIO_LLM=claude uv run clio-author verify-work --text-file clio-out/paper/sections/03-method.md --section-plan-file clio-out/plan/plan.json
+uv run clio-author audit --markdown-file clio-out/paper/paper.md --bibtex-file clio-out/paper/references.bib
+CLIO_LLM=claude uv run clio-author rebuttal --paper-file clio-out/paper/paper.md --review-json '{"weaknesses":["unclear ablation"]}' --format prose
+uv run clio-author run meta_review --json '{"reviews":[{"overall":6},{"overall":7}]}'
+CLIO_LLM=claude uv run clio-author run write_review --json '{"outline":{"title":"Introduction"},"max_rounds":2}'
+```
+
+**Illustrate**
+
+```bash
+CLIO_VISION=gemini uv run clio-author describe --blocks-file clio-out/2601.23265/blocks.json
+CLIO_LLM=claude uv run clio-author run plot --json '{"spec":{"kind":"line","title":"Hit-rate vs cache size"}}'
+CLIO_LLM=claude uv run clio-author run figure_refine --json '{"spec":{"kind":"line","title":"Loss"},"max_rounds":2}'
+```
+
+**Ship & drive**
+
+```bash
+uv run clio-author export --markdown-file clio-out/paper/paper.md --bibtex-file clio-out/paper/references.bib --out-dir clio-out/camera-ready --pdf
+CLIO_LLM=claude uv run clio-author orchestrate --goal "ingest 2106.09685, then review it and verify its claims" --out-dir clio-out/run
+```
+
+**Discover what's available**
+
+```bash
+uv run clio-author capabilities     # every action + its lifecycle phase / needs_source
+uv run clio-author lifecycle        # the phase -> actions map
+uv run clio-author run <action> --json '{...}'   # dispatch any action by name
+```
+
+`edit` ≡ `revise --mode feedback` and `polish` ≡ `revise --mode style` (both still work). Every flag
+of every command is in [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 
 ---
 
