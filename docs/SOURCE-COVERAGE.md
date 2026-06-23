@@ -9,7 +9,7 @@ wtf-p (MIT) → concepts re-expressed (JS→Python). AUTHOR itself is BSD-3-Clau
 > One-line verdict: AUTHOR has the **analytical core** of all five — and *unifies* them behind one
 > interface — but deliberately omits each project's **product shell** (standalone CLIs, FastAPI/MCP
 > services, Streamlit UIs, bundled benchmarks, git/state machinery) and the heaviest infra
-> (async/streaming, web-search discovery, PDF compilation, VLM-as-Judge eval suites).
+> (async/streaming, VLM-as-Judge eval suites, bundled benchmarks).
 
 ---
 
@@ -83,7 +83,7 @@ wtf-p (MIT) → concepts re-expressed (JS→Python). AUTHOR itself is BSD-3-Clau
 | Conference templates (CVPR/ICLR) | ✗ |
 | Autoraters (Citation-F1, lit-review-quality, side-by-side) + PaperWritingBench (200) | ✗ |
 
-**Similar:** the discover→verify citation pattern + AgentReview + section-isolated writing + compose flow. **Different:** AUTHOR broadens citations to a 4-source cascade and stays hermetic/offline-testable, but omits web discovery, PDF compile, the autorater suite, the benchmark, and the anti-reward-hacking directives.
+**Similar:** the discover→verify citation pattern + AgentReview + section-isolated writing + compose flow. **Different:** AUTHOR broadens citations to a 4-source cascade and stays hermetic/offline-testable, but omits the autorater suite, the benchmark, and the anti-reward-hacking directives (it adds `discover` for scholarly search and `--pdf` for PDF compilation).
 
 ## 5. protoneo/knowledge (AGPL-3.0 — clean-room) — KG + harness
 
@@ -113,6 +113,6 @@ wtf-p (MIT) → concepts re-expressed (JS→Python). AUTHOR itself is BSD-3-Clau
 
 **In AUTHOR (the union, behind one interface — 25 actions):** ingest (Docling + post-process + figures), memory blocks + Q&A + RAG, **web/scholarly discovery** + citation verification (4-source cascade), review + meta-review + rebuttal + 3-layer section review, plan/research/write/edit/polish/coherence/verify_work/check_refs/audit, compose (whole paper) + LaTeX export **+ PDF compilation**, figures (code + Gemini image + critic loop) + vision describe, a full 6-stage content **knowledge graph**, the harness (BaseAgent + 4 patterns + sessions), `orchestrate` (goal→plan→run), and three host transports (in-process / CLI / MCP bridge).
 
-**Not in AUTHOR (deliberately):** each source's **product shell** — standalone CLIs, FastAPI/REST/WebSocket services, Streamlit UIs, git/state machinery, multi-runtime packaging, bundled benchmarks (PaperBananaBench, PaperWritingBench); and the heaviest infra — async/streaming, web-search discovery, PDF compilation, the VLM-as-Judge / autorater evaluation suites, protoneo's tool-registry + visual-evidence + IndependentSynthesis, and PaperBanana's Retriever/Stylist + style-guide synthesis.
+**Not in AUTHOR (deliberately):** each source's **product shell** — standalone CLIs, FastAPI/REST/WebSocket services, Streamlit UIs, git/state machinery, multi-runtime packaging, bundled benchmarks (PaperBananaBench, PaperWritingBench); and the heaviest infra — async/streaming, the VLM-as-Judge / autorater evaluation suites, protoneo's tool-registry + visual-evidence + IndependentSynthesis, and PaperBanana's Retriever/Stylist + style-guide synthesis.
 
 **Why:** AUTHOR's job was to *unify the capabilities* into one grounded, host-invocable package — not to reproduce five separate products. The omitted items are either (a) host/product concerns a caller supplies, (b) evaluation harnesses (see `docs/BENCHMARK-PLAN.md`), or (c) noted follow-ups. See `docs/MOTIVATION.md` for the gap argument and the cross-system capability matrix.
