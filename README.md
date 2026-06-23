@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-blue" />
+  <img alt="Version" src="https://img.shields.io/badge/version-0.4.0-blue" />
   <img alt="Python" src="https://img.shields.io/badge/python-%E2%89%A53.12-3776ab" />
   <img alt="License" src="https://img.shields.io/badge/license-BSD--3--Clause-green" />
   <img alt="Actions" src="https://img.shields.io/badge/actions-26-orange" />
@@ -240,9 +240,19 @@ automatically. Never paste keys into commands, issues, or commits. See
 
 ---
 
-## Use it as a subagent
+## Invoke it from a host — Codex · Claude · CLIO
 
-AUTHOR is meant to be **called by a host agent**. In-process (Python) is the recommended path:
+AUTHOR is meant to be **driven by a host agent**, four ways. Full setup for each is in
+**[`integration/README.md`](integration/README.md)**.
+
+| Mode | Best for | Entry point |
+|---|---|---|
+| **Subagent** (in-process Python) | CLIO, any Python host | `ClioAuthorSubagent` |
+| **Tool** (CLI / subprocess) | any language, any host | the `clio-author` console script |
+| **Slash command** | Codex, Claude Code | `integration/codex/author.md`, `integration/claude/author.md` |
+| **MCP** | MCP-only hosts | `clio_author.integration.mcp_bridge` (`uv sync --extra mcp`) |
+
+### As a subagent (in-process Python) — recommended for CLIO
 
 ```python
 from clio_author.integration.clio_adapter import ClioAuthorSubagent
@@ -259,20 +269,36 @@ for a in sub.capabilities()["actions"]:
 ingested = sub.run("ingest", {"source": "2601.23265", "out_dir": "clio-out/demo"})
 answer   = sub.run("ask", {"question": "What is the main contribution?", "blocks": ingested["structured"]})
 review   = sub.run("review", {"paper": ingested["content"]})
-
-# Draft a whole paper from an idea.
-paper = sub.run("compose", {
-    "idea": "Propose a new attention mechanism for long-range dependencies.",
-    "experimental_log": "Ran on WikiText-103; BLEU +2.1 over baseline.",
-    "review": True, "out_dir": "clio-out/mypaper", "latex": True,
-})
 ```
 
 Every `sub.run(action, payload)` returns a JSON-serializable
 `{"action", "content", "structured", "metadata"}` and **never raises** — failures surface in
-`metadata["error"]` (or a top-level `"error"`). The adapter imports nothing from the host, so the
-coupling is one-directional. Any language can also call the CLI and read JSON from stdout
-(exit `0` = ok, `1` = error). MCP-only hosts can use the bridge — `uv sync --extra mcp`.
+`metadata["error"]`. The adapter imports nothing from the host, so the coupling is one-directional.
+
+### As a tool (CLI / subprocess) — any language
+
+```bash
+uv run clio-author run review --json '{"paper":"# My paper\n..."}'   # JSON on stdout; exit 0 ok / 1 error
+```
+
+### As a slash command (Codex / Claude Code)
+
+Both files are ready-to-use command prompts that drive the CLI and report the result — install, then
+run `/author <task>`:
+
+- **Codex** — install `integration/codex/author.md` as a Codex prompt/command.
+- **Claude Code** — copy `integration/claude/author.md` to `.claude/commands/author.md` (project) or
+  `~/.claude/commands/author.md` (user).
+
+### Over MCP (MCP-only hosts, e.g. CLIO's tool gateway)
+
+```bash
+uv sync --extra mcp
+uv run python -m clio_author.integration.mcp_bridge          # stdio; CLIO_MCP_TRANSPORT=http for HTTP
+```
+
+> **Avoid nesting deadlock:** don't set AUTHOR's nested `CLIO_LLM` to the *same* provider as the host
+> (e.g. `CLIO_LLM=codex` under Codex). Use a no-LLM action (`cite`/`discover`) or a different provider.
 
 ---
 

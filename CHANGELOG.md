@@ -6,7 +6,14 @@ All notable changes to clio-author are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-06-23
+
 ### Added
+- **Host integration docs + Claude command.** New `integration/claude/author.md` (`/author` slash
+  command for Claude Code) alongside the existing `integration/codex/author.md`, plus
+  `integration/README.md` documenting all four invocation modes (in-process subagent · CLI tool ·
+  slash command · MCP) and the host nesting-deadlock rule. README gains an "Invoke it from a host —
+  Codex · Claude · CLIO" section.
 - **Author-lifecycle framing.** Every manifest action now carries author-lifecycle metadata —
   a `phase` list (Frame · Gather · Plan · Draft · Strengthen · Referee · Respond · Ship · Drive) and
   a `needs_source` flag — surfaced in `capabilities()` alongside a new `lifecycle` phase catalog, so
