@@ -6,6 +6,15 @@ All notable changes to clio-author are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Author-lifecycle framing.** Every manifest action now carries author-lifecycle metadata —
+  a `phase` list (Frame · Gather · Plan · Draft · Strengthen · Referee · Respond · Ship · Drive) and
+  a `needs_source` flag — surfaced in `capabilities()` alongside a new `lifecycle` phase catalog, so
+  a host (or CLIO) can route by *what the author needs to do* rather than by action name. New
+  `clio-author lifecycle` command prints the phase → actions map; new
+  [`docs/LIFECYCLE.md`](docs/LIFECYCLE.md) tells the author's story with copy-paste recipes per phase;
+  README §2 is reframed around the lifecycle. No behavior change to any action (metadata + docs only).
+
 ### Changed
 - **Consolidated `edit` + `polish` into one `revise` action** (`mode: feedback|style`) to remove the
   near-duplicate prose-revision surface. `revise --mode feedback` (default) addresses reviewer

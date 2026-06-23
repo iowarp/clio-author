@@ -22,7 +22,7 @@ from uuid import uuid4
 
 from clio_author.agent import ClioAuthorAgent
 from clio_author.harness.types import Task
-from clio_author.integration.manifest import ACTIONS
+from clio_author.integration.manifest import ACTIONS, lifecycle_overview
 from clio_author.llm.client import LLMClient
 from clio_author.llm.vision import VisionClient
 from clio_author.retrieval.scholar import ScholarClient
@@ -68,11 +68,18 @@ class ClioAuthorSubagent:
         )
 
     def capabilities(self) -> dict[str, Any]:
-        """Return a JSON-serializable discovery manifest of the supported actions."""
+        """Return a JSON-serializable discovery manifest of the supported actions.
+
+        Each action carries author-lifecycle metadata (``phase`` list and
+        ``needs_source``); ``lifecycle`` is the ordered phase catalog mapping each
+        phase to the actions that serve it, so a host can route by what the author
+        needs to do rather than by action name.
+        """
         return {
             "name": "clio-author",
             "version": _package_version(),
             "actions": [dict(action) for action in _ACTIONS],
+            "lifecycle": lifecycle_overview(),
         }
 
     def run(self, action: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:

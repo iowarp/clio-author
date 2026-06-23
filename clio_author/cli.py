@@ -77,6 +77,10 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("capabilities", help="Print the subagent capability manifest.")
+    sub.add_parser(
+        "lifecycle",
+        help="Print the author-lifecycle phase map (phases -> the actions that serve each).",
+    )
 
     def _add_json(p: argparse.ArgumentParser) -> None:
         p.add_argument(
@@ -1298,6 +1302,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     _load_cli_env()
+
+    # The lifecycle map is pure metadata -- print it without building any client.
+    if args.command == "lifecycle":
+        from clio_author.integration.manifest import lifecycle_overview
+
+        result_lc: dict[str, Any] = {"name": "clio-author", "lifecycle": lifecycle_overview()}
+        out_file_lc = getattr(args, "out_file", None)
+        if out_file_lc:
+            try:
+                _write_out(out_file_lc, result_lc)
+            except OSError as exc:
+                print(f"[warning: could not write {out_file_lc}: {exc}]", file=sys.stderr)
+        print(json.dumps(result_lc, indent=2))
+        return 0
 
     # Lazy import so `--help`/parsing never pays the import cost.
     from clio_author.integration.clio_adapter import ClioAuthorSubagent
