@@ -720,9 +720,51 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_gather)
     _add_json(p_gather)
 
+    p_experiment = sub.add_parser(
+        "experiment",
+        help="Extract reference papers' design/experiments and recreate an evaluation plan.",
+    )
+    p_experiment.add_argument(
+        "--blocks-json",
+        dest="blocks_json",
+        default=None,
+        help="Inline MemoryBlocks dump of the reference paper(s).",
+    )
+    p_experiment.add_argument(
+        "--blocks-file",
+        dest="blocks_file",
+        default=None,
+        help="Path to a JSON MemoryBlocks file (e.g. a gather context.json for multi-paper).",
+    )
+    p_experiment.add_argument(
+        "--markdown-file",
+        dest="markdown_file",
+        default=None,
+        help="Path to a single paper's Markdown (alternative to blocks).",
+    )
+    p_experiment.add_argument(
+        "--text", default=None, help="A single paper's text inline (alternative to blocks)."
+    )
+    p_experiment.add_argument(
+        "--idea",
+        default=None,
+        help="The NEW paper's idea/thesis; supplying it recreates an evaluation plan.",
+    )
+    p_experiment.add_argument(
+        "--idea-file", dest="idea_file", default=None, help="Path to a file holding the idea text."
+    )
+    p_experiment.add_argument(
+        "--out-dir",
+        dest="out_dir",
+        default=None,
+        help="Directory to persist experiment_designs.json/.md + evaluation_plan.json/.md.",
+    )
+    _add_format(p_experiment)
+    _add_json(p_experiment)
+
     # `--sources` on the grounding subcommands: auto-gather files/folders/globs/
     # git repos/PDFs into `blocks` before the action runs (no pre-ingest needed).
-    for _name in ("ask", "review", "write", "compose", "plan", "research", "kg"):
+    for _name in ("ask", "review", "write", "compose", "plan", "research", "kg", "experiment"):
         _gp = sub.choices[_name]
         _gp.add_argument(
             "--sources",
@@ -1155,11 +1197,28 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
             payload["blocks"] = blocks
         payload["format"] = args.fmt
         return "describe_figures", payload
+    elif command == "experiment":
+        blocks = _json_input(
+            args.blocks_file, args.blocks_json, field="blocks (--blocks-json/--blocks-file)"
+        )
+        if blocks is not None:
+            payload["blocks"] = blocks
+        if args.markdown_file is not None:
+            payload["markdown"] = _read_file(args.markdown_file, field="--markdown-file")
+        elif args.text is not None:
+            payload["text"] = args.text
+        if args.idea_file is not None:
+            payload["idea"] = _read_file(args.idea_file, field="--idea-file")
+        elif args.idea is not None:
+            payload["idea"] = args.idea
+        if args.out_dir is not None:
+            payload["out_dir"] = args.out_dir
+        payload["format"] = args.fmt
 
     # Grounding subcommands accept `--sources`/`--sources-file`: pass the list
     # through so the agent auto-gathers it into `blocks` before dispatch (unless
     # explicit blocks were already supplied).
-    if command in ("ask", "review", "write", "compose", "plan", "research", "kg"):
+    if command in ("ask", "review", "write", "compose", "plan", "research", "kg", "experiment"):
         sources = _sources_from_args(args)
         if sources is not None and "blocks" not in payload:
             payload["sources"] = sources

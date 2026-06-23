@@ -152,7 +152,7 @@ def test_cli_clio_llm_env_accepted_for_capabilities(
     monkeypatch.setenv("CLIO_LLM", "claude")
     code, result = _run(capsys, ["capabilities"])
     assert code == 0
-    assert len(result["actions"]) == 26
+    assert len(result["actions"]) == 27
 
 
 def test_cli_invalid_clio_llm_degrades_to_error(
@@ -344,6 +344,27 @@ def test_sources_from_args_json_array(tmp_path) -> None:
         sources_file = str(listing)
 
     assert _sources_from_args(_NS()) == ["x.md", "y.md"]
+
+
+def test_experiment_command_routes(capsys: pytest.CaptureFixture[str], tmp_path) -> None:
+    ref = tmp_path / "ref.md"
+    ref.write_text("# Ref\n\n## Experiments\n\nWe test on X with metric Y.\n", encoding="utf-8")
+    code, result = _run(
+        capsys,
+        [
+            "experiment",
+            "--sources",
+            str(ref),
+            "--idea",
+            "a new method",
+            "--out-dir",
+            str(tmp_path / "e"),
+        ],
+    )
+    assert code == 0
+    assert result["action"] == "experiment"
+    assert result["metadata"]["num_papers"] == 1
+    assert result["metadata"]["has_plan"] is True
 
 
 def test_plan_action_with_outline_prints_json(capsys: pytest.CaptureFixture[str]) -> None:

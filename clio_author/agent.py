@@ -33,6 +33,7 @@ from clio_author.experts.context import ContextExpert
 from clio_author.experts.discover import DiscoverExpert
 from clio_author.experts.echo import EchoExpert
 from clio_author.experts.editor import EditorExpert
+from clio_author.experts.experiment import ExperimentExpert
 from clio_author.experts.figure_agent import FigureAgentExpert, run_figure_refine
 from clio_author.experts.ingestor import IngestorExpert
 from clio_author.experts.kg import KGExpert
@@ -62,7 +63,7 @@ from clio_author.tools.files import SafeFiles
 # Actions that ground on memory ``blocks`` and so accept a ``sources`` list which
 # is auto-gathered into blocks before dispatch (see ``_resolve_sources``).
 _GROUNDING_ACTIONS: frozenset[str] = frozenset(
-    {"ask", "plan", "write", "compose", "write_review", "research", "kg", "review"}
+    {"ask", "plan", "write", "compose", "write_review", "research", "kg", "review", "experiment"}
 )
 
 
@@ -116,6 +117,7 @@ class ClioAuthorAgent:
         self.research = ResearchExpert(self.llm, scholar_client=scholar_client)
         self.discover = DiscoverExpert(self.llm, scholar_client=scholar_client)
         self.context = ContextExpert(self.llm, out_dir=files.root if files else None)
+        self.experiment_expert = ExperimentExpert(self.llm, files=files)
         self.verify_work = VerifyWorkExpert(self.llm)
         self.check_refs = CheckRefsExpert(self.llm)
         self.audit = AuditExpert(self.llm)
@@ -173,6 +175,8 @@ class ClioAuthorAgent:
             return self.ingestor.run(task, session)
         if action == "gather":
             return self.context.run(task, session)
+        if action == "experiment":
+            return self.experiment_expert.run(task, session)
         if action == "ask":
             return self.paper_qa.run(task, session)
         if action == "review":
@@ -355,6 +359,13 @@ class ClioAuthorAgent:
     def gather(self, sources: Any, **kw: Any) -> AgentOutput:
         """Gather many ``sources`` (files/folders/globs/git/PDFs) into merged blocks."""
         return self._invoke("gather", {"sources": sources, **kw})
+
+    def experiment(self, *, idea: Any = None, **kw: Any) -> AgentOutput:
+        """Extract reference paper designs and (with ``idea``) recreate an eval plan."""
+        payload: dict[str, Any] = dict(kw)
+        if idea is not None:
+            payload["idea"] = idea
+        return self._invoke("experiment", payload)
 
     def review(self, paper: Any, persona: Any = None) -> AgentOutput:
         """Produce a structured peer review of ``paper``."""

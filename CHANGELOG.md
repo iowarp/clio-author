@@ -7,6 +7,15 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`experiment` action (27th) — design extraction + evaluation recreation.** New
+  `clio_author/experts/experiment.py` + `experiment_models.py`: reads the design / architecture /
+  experiments of one or more reference papers (multi-paper recovered from `gather`'s `[label]`
+  section prefixes; or raw Markdown/text) and extracts each `PaperDesign` (research questions,
+  architecture, datasets, baselines, metrics, ablations, protocol, compute, limitations). With a new
+  paper `idea` it recreates a grounded `EvaluationPlan` — datasets/baselines/metrics/ablations (each
+  tagged with the reference paper it came from), protocol, and threats to validity — and renders a
+  drop-in `evaluation_plan.md`. Accepts `--sources` (auto-ingest), persists `experiment_designs.*` +
+  `evaluation_plan.*`. Never-raise; offline-safe.
 - **`gather` action (26th) + multi-source context.** New `clio_author/ingest/gather.py`
   (`gather_context`) ingests a heterogeneous source set — files, folders, globs, **git repo URLs**,
   PDFs/arXiv ids — and merges them into one `MemoryBlocks` (`context.json`, a drop-in `--blocks-file`,

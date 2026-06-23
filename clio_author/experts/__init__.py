@@ -5,6 +5,7 @@ from clio_author.experts.coherence import CoherenceExpert
 from clio_author.experts.context import ContextExpert
 from clio_author.experts.echo import EchoExpert
 from clio_author.experts.editor import EditorExpert
+from clio_author.experts.experiment import ExperimentExpert
 from clio_author.experts.figure_agent import (
     FigureAgentExpert,
     render_plot_code,
@@ -27,6 +28,7 @@ __all__ = [
     "ContextExpert",
     "EchoExpert",
     "EditorExpert",
+    "ExperimentExpert",
     "FigureAgentExpert",
     "IngestorExpert",
     "KGExpert",
