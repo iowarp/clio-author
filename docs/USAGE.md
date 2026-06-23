@@ -71,7 +71,7 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 
 ---
 
-## Action catalog (27 actions)
+## Action catalog (26 actions)
 
 Payload keys below are exactly the keys each expert reads. Keys marked *(optional)* have a fallback.
 
@@ -566,53 +566,41 @@ agent.write(outline={"title": "Methods"}, source="...")
 
 ---
 
-### 14. `edit`
+### 14. `revise`
 
-Revise existing prose to address reviewer feedback (one-shot).
+Revise existing prose. **`mode='feedback'`** (default) addresses reviewer feedback/critique and may
+change content; **`mode='style'`** polishes clarity, flow, and academic voice *without changing
+meaning or removing citations*. Routes to the editor (feedback) or polish (style) expert.
 
-- **Reads:** `draft` *(optional — falls back to `session.data["draft"]`, then `files.read(target)`)*;
-  feedback from `review` (a `PaperReview`) or `critic_notes` *(optional — falls back to
-  `session.data["critic_feedback"]`)*; `target` *(optional)* — when set with a `SafeFiles`, applies
-  the revision to that file via a whole-body diff edit.
-- **Returns:** `content` = revised text; `structured` = `{revised, target, word_count}`; `metadata` =
-  `{wrote}`.
+- **Reads:** prose from `draft` or `text` *(optional — falls back to `session.data["draft"]`, then
+  `files.read(target)` / `task.description`)*; `mode` *(optional, default `feedback`)*; for feedback
+  mode, `review` (a `PaperReview`) and/or `critic_notes`; for style mode, `voice` (e.g. `"concise"`);
+  `target` *(optional)* — when set with a `SafeFiles`, applies the revision to that file (whole-body
+  replace).
+- **Returns:** `content` = the revised/polished text; `structured` = the underlying expert's payload
+  (`{revised, target, word_count}` for feedback, `{polished, voice}` for style); `metadata` = `{wrote}`.
+- **Invariants (style mode):** every `\cite{key}` and figure reference is preserved; no facts added.
 - **Extra:** none; needs a real `LLMClient`. File edits require a `SafeFiles`.
-
-```python
-sub.run("edit", {"draft": "...", "review": review_dump})
-agent.edit("...", review_dump)
-```
-
----
-
-### 15. `polish`
-
-Polish existing prose for clarity, flow, and academic voice **without changing meaning or removing
-citations**.
-
-- **Reads:** prose from `text` (inline string) or `draft` *(optional — falls back to
-  `session.data["draft"]`, then `task.description`)*; `voice` *(optional)* — a target voice
-  directive (e.g. `"concise"`, `"formal"`); `target` *(optional)* — when set with a `SafeFiles`,
-  applies the polished text to that file (whole-body replace).
-- **Returns:** `content` = the polished prose; `structured` = `{polished, voice}`; `metadata` =
-  `{wrote}`.
-- **Invariants:** every `\cite{key}` placeholder and every figure reference is preserved exactly.
-  The expert never adds facts or changes claims.
-- **Extra:** none; needs a real `LLMClient` to produce improved prose.
-- **File inputs:** `--text-file clio-out/mypaper/sections/01-introduction.md`.
+- **Aliases:** `edit` ≡ `revise` with `mode='feedback'`; `polish` ≡ `revise` with `mode='style'`.
+  Both legacy actions still work (and `polish` keeps its CLI subcommand) but are no longer listed in
+  the capability manifest.
 
 ```bash
-clio-author polish --text-file clio-out/mypaper/sections/01-introduction.md \
+# style polish:
+clio-author revise --mode style --text-file clio-out/mypaper/sections/01-introduction.md \
   --voice concise --format prose
+# feedback-driven revision:
+clio-author revise --text "We propose X." --review-json '{"weaknesses":["no baseline"]}'
 ```
 ```python
-sub.run("polish", {"text": "...", "voice": "concise"})
-sub.run("polish", {"text": "...", "target": "sections/01-introduction.md"})
+sub.run("revise", {"draft": "...", "mode": "feedback", "review": review_dump})
+sub.run("revise", {"text": "...", "mode": "style", "voice": "concise"})
+agent.revise("...", mode="style", voice="concise")
 ```
 
 ---
 
-### 16. `coherence`
+### 15. `coherence`
 
 Check **cross-section consistency** of a manuscript — terminology drift, contradictions, undefined
 terms, duplication, and broken narrative flow.
@@ -639,7 +627,7 @@ sub.run("coherence", {"sections": [{"title": "Introduction", "draft": "..."}, ..
 
 ---
 
-### 17. `check_refs`
+### 16. `check_refs`
 
 Deterministically lint a BibTeX bibliography and cross-check it against the `\cite{}` keys used in
 the manuscript prose. Flags malformed entries, duplicate entries, cited-but-missing keys, and
@@ -672,7 +660,7 @@ sub.run("check_refs", {"bibtex": bibtex_string, "markdown": manuscript_text})
 
 ---
 
-### 18. `section_review`
+### 17. `section_review`
 
 Three-layer review of a **single section**: L1 deterministic reference/citation checking
 (`check_refs`) → L2 single-section coherence (`coherence`) → L3 persona-conditioned peer review
@@ -713,7 +701,7 @@ sub.run("section_review", {
 
 ---
 
-### 19. `audit`
+### 18. `audit`
 
 Deterministic manuscript completeness audit: required sections present, per-section word-count vs
 budget, unresolved `[TODO]`/`[CITE:]`/empty `\cite{}` placeholders, and citation coverage. **No
@@ -756,7 +744,7 @@ sub.run("audit", {
 
 ---
 
-### 20. `kg`
+### 19. `kg`
 
 Extract a content knowledge graph of a paper -- its claims, methods, datasets, results, metrics,
 concepts, and tasks plus the relations between them -- from the paper's memory blocks. This is the
@@ -816,7 +804,7 @@ sub.run("kg", {
 
 ---
 
-### 21. `describe_figures`
+### 20. `describe_figures`
 
 Fill in descriptions/captions for figures in memory blocks.
 
@@ -842,7 +830,7 @@ agent.describe_figures(blocks_dump)
 
 ---
 
-### 22. `plot`
+### 21. `plot`
 
 Generate matplotlib plot **code** (text only; never executed on this path).
 
@@ -868,7 +856,7 @@ agent.plot({"kind": "plot", "intent": "bar chart of accuracy by model"})
 
 ---
 
-### 23. `compose`
+### 22. `compose`
 
 **Whole-paper orchestration.** Drafts a full multi-section manuscript from an idea and optional
 experimental log, chaining the existing experts in sequence.
@@ -945,7 +933,7 @@ print("section errors:", result["metadata"]["section_errors"])
 
 ---
 
-### 24. `export`
+### 23. `export`
 
 Export a composed Markdown manuscript to a standalone LaTeX document (`paper.tex` + optional
 `references.bib`).
@@ -1010,7 +998,7 @@ print(result["metadata"]["wrote"])
 
 ---
 
-### 25. `write_review`
+### 24. `write_review`
 
 Run a writer ↔ reviewer **critic-refine** loop and return the final output.
 
@@ -1032,7 +1020,7 @@ sub.run("write_review", {"outline": {"title": "Methods"}, "source": "...", "max_
 
 ---
 
-### 26. `figure_refine`
+### 25. `figure_refine`
 
 Run a figure visualizer ↔ critic **critic-refine** loop and return the final output.
 
@@ -1052,7 +1040,7 @@ sub.run("figure_refine", {"spec": {"kind": "plot", "intent": "line chart of loss
 
 ---
 
-### 27. `orchestrate`
+### 26. `orchestrate`
 
 Plan and run a sequence of the other actions to achieve a natural-language **goal** (dynamic
 multi-step). An LLM proposes a minimal ordered plan of action calls, which are executed through the

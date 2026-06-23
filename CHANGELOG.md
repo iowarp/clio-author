@@ -6,6 +6,15 @@ All notable changes to clio-author are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Consolidated `edit` + `polish` into one `revise` action** (`mode: feedback|style`) to remove the
+  near-duplicate prose-revision surface. `revise --mode feedback` (default) addresses reviewer
+  critique (the old `edit`); `revise --mode style` polishes voice while preserving meaning/citations
+  (the old `polish`). **`edit` and `polish` are retained as fully working back-compat aliases** (and
+  `polish` keeps its CLI subcommand) but no longer appear in the capability manifest — the advertised
+  surface drops from 27 to 26 actions with zero breakage. Added docs clarifying when to use each
+  quality check (`review` / `section_review` / `verify_work` / `check_refs` / `audit` / `coherence`).
+
 ### Added
 - **`experiment` action (27th) — design extraction + evaluation recreation.** New
   `clio_author/experts/experiment.py` + `experiment_models.py`: reads the design / architecture /

@@ -63,16 +63,17 @@ GEMINI_API_KEY=...
 ```bash
 uv run ruff check clio_author tests        # -> All checks passed!
 uv run mypy clio_author                    # -> Success: no issues found in 74 source files
-uv run pytest -q                           # -> 587 passed, 3 skipped, 12 deselected
-uv run clio-author capabilities            # -> name=clio-author, 27 actions
+uv run pytest -q                           # -> 595 passed, 3 skipped, 12 deselected
+uv run clio-author capabilities            # -> name=clio-author, 26 actions
 ```
 
-> **24 subcommands** have dedicated flags: `capabilities, ingest, gather, ask, experiment, review,
-> cite, discover, plan, write, compose, export, polish, coherence, kg, describe, orchestrate,
-> rebuttal, research, verify-work, check-refs, section-review, audit, run`. The other **5 actions**
-> (`edit`, `meta_review`, `plot`, `write_review`, `figure_refine`) have **no dedicated subcommand**
-> — reach them with `clio-author run <action> --json '{...}'`. `run <action>` works for *any* of
-> the 27 actions.
+> **Dedicated subcommands** with their own flags: `capabilities, ingest, gather, ask, experiment,
+> review, cite, discover, plan, write, compose, revise, export, polish, coherence, kg, describe,
+> orchestrate, rebuttal, research, verify-work, check-refs, section-review, audit, run`. The other
+> actions (`edit`, `meta_review`, `plot`, `write_review`, `figure_refine`) have **no dedicated
+> subcommand** — reach them with `clio-author run <action> --json '{...}'`. `edit` and `polish` are
+> **aliases** of the unified `revise` action (`edit` ≡ `revise --mode feedback`, `polish` ≡
+> `revise --mode style`); both still work and `polish` keeps its own subcommand.
 
 ---
 
@@ -643,32 +644,35 @@ with `--pdf`: also `paper.tex`, `references.bib`, `paper.pdf` (if a LaTeX engine
 
 ## Act VI · Refine the prose
 
-**`edit`** *(run-only)* — revise prose to address reviewer feedback (preserves citations).
-
-Payload keys: `draft`, `review`, `critic_notes`, `target`.
-```bash
-CLIO_LLM=claude uv run clio-author run edit \
-  --json '{"draft":"We propose a system. It is good.","review":{"weaknesses":["no baseline comparison","unclear evaluation"]}}'
-```
-
-**`polish`** — polish prose for clarity, flow, and academic voice.
+**`revise`** — one revision action with two modes. `--mode feedback` (default) addresses reviewer
+critique and may change content; `--mode style` polishes clarity/flow/voice while preserving meaning
+and `\cite{}` placeholders. (Subsumes the legacy `edit` / `polish` aliases — see below.)
 
 | Flag | Takes | Meaning |
 |---|---|---|
-| `--text` | string | prose to polish (inline) |
-| `--text-file` | one file | file holding the prose to polish |
-| `--voice` | string | target voice, e.g. `concise` or `formal` |
-| `--target` | one file | file (under harness root) to apply the polished text to |
+| `--mode` | `feedback`\|`style` | `feedback` = address review (may change content); `style` = polish voice |
+| `--text` / `--text-file` | string / one file | the prose to revise |
+| `--review-json` / `--review-file` | JSON / one file | reviewer feedback to address (feedback mode) |
+| `--critic-notes` | string | free-form directive feedback (feedback mode) |
+| `--voice` | string | target voice, e.g. `concise` or `formal` (style mode) |
+| `--target` | one file | file (under harness root) to apply the revision to |
 | `--format` | `structured`\|`prose` | default `structured` |
-| `--json` | JSON object | merge payload keys; also reads `draft` via `--json` |
+| `--json` | JSON object | merge payload keys |
 | `--out` | file path | save result |
 
 ```bash
-CLIO_LLM=claude uv run clio-author polish \
-  --text "We propose a method. It is good. It does many useful things." \
-  --voice concise --format prose
-# --target FILE applies the polished text to a file under the harness root.
+# Style polish:
+CLIO_LLM=claude uv run clio-author revise --mode style \
+  --text "We propose a method. It is good. It does many useful things." --voice concise --format prose
+# Feedback-driven revision:
+CLIO_LLM=claude uv run clio-author revise \
+  --text "We propose a system. It is good." \
+  --review-json '{"weaknesses":["no baseline comparison","unclear evaluation"]}'
 ```
+
+> **Aliases (back-compat).** `polish` ≡ `revise --mode style` (keeps its own subcommand);
+> `edit` ≡ `revise --mode feedback` (run-only: `clio-author run edit --json '{"draft":"…","review":{…}}'`).
+> Both still work unchanged.
 
 ---
 
@@ -832,7 +836,7 @@ All other actions have dedicated subcommands — see Appendix A.
   `ClioAuthorSubagent(llm=…).run("review", {"paper": "..."})`.
 - See a subcommand's exact flags anytime: `clio-author <cmd> --help`.
 
-## Appendix A — all 27 actions at a glance
+## Appendix A — all 26 actions at a glance
 
 | # | Action | Dedicated subcommand |
 |---|---|---|

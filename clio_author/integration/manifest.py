@@ -86,16 +86,22 @@ ACTIONS: list[dict[str, Any]] = [
         ],
     },
     {
-        "action": "edit",
-        "description": "Revise existing prose to address reviewer feedback.",
-        "payload_keys": ["draft", "review", "critic_notes", "target"],
-    },
-    {
-        "action": "polish",
+        "action": "revise",
         "description": (
-            "Polish prose for clarity, flow, and academic voice (preserves citations/claims)."
+            "Revise existing prose. mode='feedback' (default) addresses reviewer "
+            "feedback/critique and may change content; mode='style' polishes "
+            "clarity/flow/academic voice while preserving meaning and citations. "
+            "(Subsumes the 'edit' and 'polish' aliases.)"
         ),
-        "payload_keys": ["text", "draft", "voice", "target"],
+        "payload_keys": [
+            "draft",
+            "text",
+            "mode",
+            "review",
+            "critic_notes",
+            "voice",
+            "target",
+        ],
     },
     {
         "action": "coherence",
