@@ -6,6 +6,16 @@ All notable changes to clio-author are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Three OpenAI-compatible LLM providers** — `CLIO_LLM=lmstudio` (local LM Studio server),
+  `openrouter` (hosted gateway, `OPENROUTER_API_KEY`), and `litellm` (a LiteLLM proxy), all via a new
+  stdlib `OpenAICompatLLMClient` (`/chat/completions`). Per-provider URLs/keys via
+  `CLIO_LMSTUDIO_URL` / `CLIO_OPENROUTER_URL` / `CLIO_LITELLM_URL` and the matching key vars.
+
+### Changed
+- Scrubbed personal-repository references ahead of an org transfer (clone URL, scholar User-Agent,
+  OpenRouter referer, changelog release links); removed the internal conversation-handoff note.
+
 ## [0.4.0] — 2026-06-23
 
 ### Added
