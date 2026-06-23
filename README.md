@@ -150,8 +150,61 @@ The full story, with copy-paste recipes per phase, is in **[`docs/LIFECYCLE.md`]
 Every action's **full command, every flag, and a runnable example** is in
 **[`docs/RUNBOOK.md`](docs/RUNBOOK.md)** (copy-paste, grouped by lifecycle phase). The action +
 payload-key reference for calling AUTHOR as a library is in **[`docs/USAGE.md`](docs/USAGE.md)**.
-Actions without a dedicated subcommand are reachable via `clio-author run <action> --json '...'`;
-`edit`/`polish` are aliases of `revise`.
+
+---
+
+## Commands & arguments
+
+Three flags are available on (almost) every command and are omitted below for brevity:
+`--format {structured,prose}` (JSON vs. human-readable text), `--json '{...}'` (merge extra payload
+keys), and `--out FILE` (also save the result). `A | B` means "either"; `…` means repeatable. Actions
+without a dedicated subcommand are reached with `clio-author run <action> --json '{...}'`.
+
+**Read & gather**
+- `ingest <source>` — `<source>` = arXiv id / URL / local PDF path / paper title
+- `gather [--sources S … | --sources-file FILE] [--out-dir DIR] [--max-files N] [--max-text-chars N]`
+
+**Understand**
+- `ask --question Q [--blocks-file FILE | --blocks-json JSON] [--sources S … | --sources-file FILE]`
+- `kg [--blocks-file FILE | --blocks-json JSON] [--full] [--stages LIST] [--resume DIR] [--out-dir DIR] [--sources …]`
+- `experiment [--sources S … | --blocks-file FILE | --markdown-file FILE | --text T] [--idea I | --idea-file FILE] [--out-dir DIR]`
+
+**Sources & citations**
+- `discover [--query Q | --query-file FILE] [--limit N] [--cutoff-date YYYY-MM] [--out-dir DIR]`
+- `cite [--candidates-json JSON | --candidates-file FILE]`
+- `check-refs [--bibtex TEXT | --bibtex-file FILE] [--markdown-file FILE | --text T]`
+- `research [--topic T | --topic-file FILE] [--blocks-file FILE] [--depth {standard,deep}] [--sources …]`
+
+**Plan & write**
+- `plan [--idea I | --idea-file FILE] [--log L | --log-file FILE] [--outline-json JSON | --outline-file FILE] [--blocks-file FILE] [--candidates-file FILE] [--out-dir DIR] [--sources …]`
+- `write [--source T | --source-file FILE] [--outline TITLE] [--sources …]`
+- `compose [--idea I | --idea-file FILE] [--log L | --log-file FILE] [--outline-json JSON | --outline-file FILE] [--candidates-file FILE] [--review] [--max-rounds N] [--plan] [--latex] [--pdf] [--out-dir DIR] [--sources …]`
+- `revise [--mode {feedback,style}] [--text T | --text-file FILE] [--review-json JSON | --review-file FILE] [--critic-notes TEXT] [--voice V] [--target FILE]`
+- `polish [--text T | --text-file FILE] [--voice V] [--target FILE]` — alias of `revise --mode style`
+- `coherence [--sections-json JSON | --sections-file FILE] [--markdown-file FILE | --text T]`
+
+**Review & verify**
+- `review [--paper T | --paper-file FILE] [--ground] [--figures-json JSON | --figures-file FILE] [--sources …]`
+- `section-review [--text T | --text-file FILE] [--bibtex-file FILE] [--persona-json JSON]`
+- `verify-work [--text T | --text-file FILE] [--section-plan-json JSON | --section-plan-file FILE] [--claims-json JSON]`
+- `audit [--sections-json JSON | --sections-file FILE] [--markdown-file FILE] [--bibtex-file FILE]`
+- `rebuttal [--paper T | --paper-file FILE] [--review-json JSON | --review-file FILE]`
+- `run meta_review --json '{"reviews":[ … ]}'`
+- `run write_review --json '{"outline":{…},"section_plan":{…},"blocks":{…},"max_rounds":N}'` — also `source` / `sources`
+
+**Figures**
+- `describe [--blocks-file FILE | --blocks-json JSON]` — fills figure descriptions (`describe_figures`)
+- `run plot --json '{"spec":{…},"out_path":"…"}'`
+- `run figure_refine --json '{"spec":{…},"out_path":"…","max_rounds":N}'`
+
+**Ship & drive**
+- `export [--title T] [--markdown-file FILE | --sections-json JSON | --sections-file FILE] [--bibtex-file FILE] [--out-dir DIR] [--pdf]`
+- `orchestrate [--goal G | --goal-file FILE] [--inputs-json JSON | --inputs-file FILE] [--max-steps N] [--out-dir DIR]`
+
+**Discovery**
+- `capabilities` — list every action (with lifecycle `phase` + `needs_source` metadata)
+- `lifecycle` — print the phase → actions map
+- `run <action> [--json '{...}']` — dispatch any action by name (the generic escape hatch)
 
 ---
 
