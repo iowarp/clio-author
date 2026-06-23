@@ -263,6 +263,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Also export paper.tex (+ references.bib) when --out-dir is reachable.",
     )
     p_compose.add_argument(
+        "--pdf",
+        action="store_true",
+        help="Also compile paper.pdf from the LaTeX (implies --latex; needs a LaTeX engine).",
+    )
+    p_compose.add_argument(
         "--plan",
         action="store_true",
         help="Plan each section (tasks/claims/sources) before drafting it.",
@@ -342,6 +347,38 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_format(p_research)
     _add_json(p_research)
+
+    p_discover = sub.add_parser(
+        "discover",
+        help="Find real candidate papers for a topic via scholarly search.",
+    )
+    p_discover.add_argument("--query", default=None, help="The topic/query to search for (inline).")
+    p_discover.add_argument(
+        "--query-file",
+        dest="query_file",
+        default=None,
+        help="Path to a file holding the query text.",
+    )
+    p_discover.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="Maximum number of candidate papers to return (default 10).",
+    )
+    p_discover.add_argument(
+        "--cutoff-date",
+        dest="cutoff_date",
+        default=None,
+        help='Optional "YYYY-MM" recency gate; only papers strictly before it are kept.',
+    )
+    p_discover.add_argument(
+        "--out-dir",
+        dest="out_dir",
+        default=None,
+        help="Directory to persist discovered.json + discovered.bib (optional).",
+    )
+    _add_format(p_discover)
+    _add_json(p_discover)
 
     p_verify = sub.add_parser(
         "verify-work",
@@ -488,6 +525,11 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="out_dir",
         default=None,
         help="Directory to persist paper.tex (+ references.bib) (optional).",
+    )
+    p_export.add_argument(
+        "--pdf",
+        action="store_true",
+        help="Also compile paper.pdf from the .tex (needs --out-dir and a LaTeX engine).",
     )
     _add_json(p_export)
 
@@ -832,6 +874,8 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         if args.out_dir is not None:
             payload["out_dir"] = args.out_dir
         payload["latex"] = args.latex
+        if args.pdf:
+            payload["pdf"] = True
         payload["plan"] = args.plan
         payload["format"] = args.fmt
     elif command == "plan":
@@ -868,6 +912,18 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         payload["depth"] = args.depth
         payload["format"] = args.fmt
         return "research", payload
+    elif command == "discover":
+        if args.query_file is not None:
+            payload["query"] = _read_file(args.query_file, field="--query-file")
+        elif args.query is not None:
+            payload["query"] = args.query
+        payload["limit"] = args.limit
+        if args.cutoff_date is not None:
+            payload["cutoff_date"] = args.cutoff_date
+        if args.out_dir is not None:
+            payload["out_dir"] = args.out_dir
+        payload["format"] = args.fmt
+        return "discover", payload
     elif command == "verify-work":
         if args.text_file is not None:
             payload["text"] = _read_file(args.text_file, field="--text-file")
@@ -938,6 +994,8 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
             payload["bibtex"] = _read_file(args.bibtex_file, field="--bibtex-file")
         if args.out_dir is not None:
             payload["out_dir"] = args.out_dir
+        if args.pdf:
+            payload["pdf"] = True
     elif command == "polish":
         if args.text_file is not None:
             payload["text"] = _read_file(args.text_file, field="--text-file")

@@ -79,6 +79,33 @@ def test_research_grounds_titles_with_scholar() -> None:
     assert grounded_titles[0]["verified_title"] == "Attention Is All You Need"
 
 
+def test_research_discover_seeds_brief_from_real_papers() -> None:
+    # A fake client whose search_query returns a real record not already in the
+    # LLM brief: with discover=True it is folded into `recent` and pre-grounded.
+    scholar = FakeScholarClient(
+        {
+            "efficient attention": [
+                S2Record(
+                    paper_id="disc1",
+                    title="Discovered Efficient Attention Survey",
+                    authors=["R Searcher"],
+                    year=2023,
+                    abstract="A real survey returned by the index.",
+                )
+            ]
+        }
+    )
+    expert = ResearchExpert(CannedJSONLLMClient(_BRIEF_JSON), scholar_client=scholar)
+    out = _run(expert, topic="efficient attention", discover=True)
+    s = out.structured
+    assert s is not None
+    recent_titles = [n["title"] for n in s["recent"]]
+    assert "Discovered Efficient Attention Survey" in recent_titles
+    seeded = next(n for n in s["recent"] if n["title"] == "Discovered Efficient Attention Survey")
+    assert seeded["grounded"] is True
+    assert seeded["verified_title"] == "Discovered Efficient Attention Survey"
+
+
 def test_research_echo_degrades_to_empty_brief() -> None:
     out = _run(ResearchExpert(), topic="efficient attention")
     assert "parse_error" in out.metadata

@@ -467,6 +467,132 @@ def test_cascade_tries_next_backend_after_empty_or_error() -> None:
     assert cascade.search_title("wanted", None, None) == [early, wanted]
 
 
+# --------------------------------------------------------------------------- #
+# Query-search (discovery) parsing per backend                                #
+# --------------------------------------------------------------------------- #
+def test_search_query_s2_parses(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    captured: dict[str, object] = {}
+
+    class Response:
+        status_code = 200
+
+        def json(self) -> dict[str, object]:
+            return {"data": [{"paperId": "s2", "title": "A Topic Paper", "year": 2020}]}
+
+    class FakeHttpx:
+        @staticmethod
+        def get(url, **kwargs):  # type: ignore[no-untyped-def]
+            captured.update(kwargs.get("params", {}))
+            return Response()
+
+    monkeypatch.setitem(sys.modules, "httpx", FakeHttpx)
+    SemanticScholarClient._last_request_at = None
+    client = SemanticScholarClient(min_interval=0.0)
+    records = client.search_query("efficient attention", limit=5)
+    assert captured["query"] == "efficient attention"
+    assert captured["limit"] == 5
+    assert [r.title for r in records] == ["A Topic Paper"]
+    SemanticScholarClient._last_request_at = None
+
+
+def test_search_query_openalex_uses_search_param(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    captured: dict[str, object] = {}
+
+    def fake_get_json(url, params, *, timeout):  # type: ignore[no-untyped-def]
+        captured.update(params)
+        return {"results": [{"display_name": "OA Topic", "publication_year": 2021}]}
+
+    monkeypatch.setattr(scholar_mod, "_get_json", fake_get_json)
+    records = OpenAlexClient().search_query("graphs", limit=7)
+    assert captured["search"] == "graphs"
+    assert captured["per-page"] == 7
+    assert [r.title for r in records] == ["OA Topic"]
+
+
+def test_search_query_crossref_uses_query_param(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    captured: dict[str, object] = {}
+
+    def fake_get_json(url, params, *, timeout):  # type: ignore[no-untyped-def]
+        captured.update(params)
+        return {"message": {"items": [{"title": ["CR Topic"], "type": "journal-article"}]}}
+
+    monkeypatch.setattr(scholar_mod, "_get_json", fake_get_json)
+    records = CrossrefClient().search_query("kernels", limit=4)
+    assert captured["query"] == "kernels"
+    assert captured["rows"] == 4
+    assert [r.title for r in records] == ["CR Topic"]
+
+
+def test_search_query_arxiv_uses_all_prefix(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    captured: dict[str, object] = {}
+    atom = (
+        '<feed xmlns="http://www.w3.org/2005/Atom"><entry>'
+        "<id>http://arxiv.org/abs/2001.00001v1</id><title>AX Topic</title>"
+        "<summary>s</summary><published>2020-01-01T00:00:00Z</published>"
+        "</entry></feed>"
+    )
+
+    def fake_get_text(url, params, *, timeout, accept=None):  # type: ignore[no-untyped-def]
+        captured.update(params)
+        return atom
+
+    monkeypatch.setattr(scholar_mod, "_get_text", fake_get_text)
+    records = ArxivScholarClient().search_query("attention", limit=3)
+    assert captured["search_query"] == "all:attention"
+    assert captured["max_results"] == 3
+    assert [r.title for r in records] == ["AX Topic"]
+
+
+def test_search_query_degrades_to_empty_on_failure(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    def boom(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(scholar_mod, "_get_json", boom)
+    assert OpenAlexClient().search_query("x") == []
+    assert CrossrefClient().search_query("x") == []
+
+
+def test_cascade_search_query_merges_dedupes_and_limits() -> None:
+    a = S2Record(paper_id="a", title="Shared Title", year=2020)
+    a_dup = S2Record(paper_id="a2", title="shared title", year=2020)  # same title, diff id
+    b = S2Record(paper_id="b", title="Unique B")
+    c = S2Record(paper_id="c", title="Unique C")
+    cascade = CascadeScholarClient(
+        [
+            FakeScholarClient({"topic": [a]}),
+            _RaisingSearchClient(),  # ignored
+            FakeScholarClient({"topic": [a_dup, b, c]}),
+        ]
+    )
+    out = cascade.search_query("topic", limit=2)
+    assert [r.paper_id for r in out] == ["a", "b"]  # dup-by-title dropped, limit respected
+
+
+def test_discover_papers_applies_cutoff_and_dedupes() -> None:
+    from clio_author.retrieval.scholar import discover_papers
+
+    client = FakeScholarClient(
+        {
+            "topic": [
+                S2Record(paper_id="old", title="Old Work", year=2010),
+                S2Record(paper_id="new", title="New Work", year=2024),
+                S2Record(paper_id="new2", title="new work", year=2024),  # dup title
+            ]
+        }
+    )
+    out = discover_papers("topic", client, limit=10, cutoff_date="2020-01")
+    titles = [r.title for r in out]
+    assert "Old Work" in titles
+    assert "New Work" not in titles  # gated by cutoff
+    assert titles.count("Old Work") == 1
+
+
+def test_discover_papers_blank_query_returns_empty() -> None:
+    from clio_author.retrieval.scholar import discover_papers
+
+    assert discover_papers("  ", FakeScholarClient({})) == []
+
+
 def test_resolve_scholar_client() -> None:
     from clio_author.retrieval.scholar import resolve_scholar_client
 

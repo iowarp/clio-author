@@ -116,6 +116,12 @@ class ScholarClient(Protocol):
         """Return up to a few candidate records for ``title`` (empty on miss)."""
         ...
 
+    def search_query(
+        self, query: str, *, limit: int = 10, cutoff_date: str | None = None
+    ) -> list[S2Record]:
+        """Return candidate records matching a free-text ``query`` (``[]`` on miss)."""
+        ...
+
 
 class SemanticScholarClient:
     """Real Semantic Scholar title-search client (``scholar`` extra).
@@ -164,6 +170,49 @@ class SemanticScholarClient:
         params: dict[str, str | int] = {
             "query": title,
             "limit": _S2_LIMIT,
+            "fields": _S2_FIELDS,
+        }
+        for attempt in range(2):
+            try:
+                self._throttle()
+                response = httpx.get(
+                    _S2_SEARCH_URL, headers=headers, params=params, timeout=self.timeout
+                )
+            except Exception:  # noqa: BLE001 - network failures degrade to no results
+                return []
+            if response.status_code == 200:
+                break
+            if response.status_code != 429 or attempt == 1:
+                return []
+        else:  # pragma: no cover - loop always returns or breaks
+            return []
+        try:
+            data = response.json().get("data", [])
+        except Exception:  # noqa: BLE001 - malformed body degrades to no results
+            return []
+        return [_record_from_s2(item) for item in data if item.get("title")]
+
+    def search_query(
+        self, query: str, *, limit: int = 10, cutoff_date: str | None = None
+    ) -> list[S2Record]:
+        """Search the S2 graph endpoint by free-text topic ``query`` (``[]`` on miss).
+
+        Uses the same paper-search endpoint as :meth:`search_title` with the topic
+        as ``query`` and ``limit`` records requested; lazy-imports ``httpx`` so
+        importing this module stays hermetic. Returns ``[]`` on any non-200,
+        empty result, or network error (never raises for those).
+        """
+        try:
+            import httpx
+        except ImportError as exc:  # pragma: no cover - only without the extra
+            raise RetrievalDependencyError(
+                "httpx is required for SemanticScholarClient. Install with: uv sync --extra scholar"
+            ) from exc
+
+        headers = {"X-API-KEY": self.api_key} if self.api_key else {}
+        params: dict[str, str | int] = {
+            "query": query,
+            "limit": max(1, limit),
             "fields": _S2_FIELDS,
         }
         for attempt in range(2):
@@ -308,6 +357,20 @@ class OpenAlexClient:
             return []
         return [_record_from_openalex(item) for item in results if item.get("display_name")]
 
+    def search_query(
+        self, query: str, *, limit: int = 10, cutoff_date: str | None = None
+    ) -> list[S2Record]:
+        """Search OpenAlex works by free-text ``query`` (``[]`` on miss/failure)."""
+        params: dict[str, str | int] = {"search": query, "per-page": max(1, limit)}
+        if self.mailto:
+            params["mailto"] = self.mailto
+        try:
+            data = _get_json(_OPENALEX_WORKS_URL, params, timeout=self.timeout)
+            results = data.get("results", [])
+        except Exception:  # noqa: BLE001 - network failures degrade to no results
+            return []
+        return [_record_from_openalex(item) for item in results if item.get("display_name")]
+
 
 def _record_from_openalex(item: dict[str, Any]) -> S2Record:
     """Map a raw OpenAlex work object to an :class:`S2Record`."""
@@ -389,6 +452,20 @@ class CrossrefClient:
             return []
         return [_record_from_crossref(item) for item in items if item.get("title")]
 
+    def search_query(
+        self, query: str, *, limit: int = 10, cutoff_date: str | None = None
+    ) -> list[S2Record]:
+        """Search Crossref works by free-text ``query`` (``[]`` on miss/failure)."""
+        params: dict[str, str | int] = {"query": query, "rows": max(1, limit)}
+        if self.mailto:
+            params["mailto"] = self.mailto
+        try:
+            data = _get_json(_CROSSREF_WORKS_URL, params, timeout=self.timeout)
+            items = data.get("message", {}).get("items", [])
+        except Exception:  # noqa: BLE001 - network failures degrade to no results
+            return []
+        return [_record_from_crossref(item) for item in items if item.get("title")]
+
 
 def _record_from_crossref(item: dict[str, Any]) -> S2Record:
     """Map a raw Crossref work object to an :class:`S2Record`."""
@@ -435,6 +512,28 @@ class ArxivScholarClient:
             "search_query": f'ti:"{title}"',
             "start": 0,
             "max_results": _S2_LIMIT,
+        }
+        try:
+            raw = _get_text(_ARXIV_QUERY_URL, params, timeout=self.timeout)
+            root = ElementTree.fromstring(raw)
+        except Exception:  # noqa: BLE001 - network/XML failures degrade to no results
+            return []
+        ns = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
+        records: list[S2Record] = []
+        for entry in root.findall("atom:entry", ns):
+            record = _record_from_arxiv(entry, ns)
+            if record.title:
+                records.append(record)
+        return records
+
+    def search_query(
+        self, query: str, *, limit: int = 10, cutoff_date: str | None = None
+    ) -> list[S2Record]:
+        """Search arXiv by free-text ``query`` (``all:<query>``; ``[]`` on miss)."""
+        params: dict[str, str | int] = {
+            "search_query": f"all:{query}",
+            "start": 0,
+            "max_results": max(1, limit),
         }
         try:
             raw = _get_text(_ARXIV_QUERY_URL, params, timeout=self.timeout)
@@ -496,6 +595,34 @@ class CascadeScholarClient:
                 continue
             if records:
                 merged.extend(records)
+        return merged
+
+    def search_query(
+        self, query: str, *, limit: int = 10, cutoff_date: str | None = None
+    ) -> list[S2Record]:
+        """Search backends in order, merging + deduping by normalized title.
+
+        Each backend is tried until ``limit`` distinct records (by lowercased,
+        whitespace-collapsed title) have been collected; a backend failure is
+        ignored so later fallbacks still contribute. Never raises.
+        """
+        merged: list[S2Record] = []
+        seen: set[str] = set()
+        for client in self.clients:
+            if len(merged) >= limit:
+                break
+            try:
+                records = client.search_query(query, limit=limit, cutoff_date=cutoff_date)
+            except Exception:  # noqa: BLE001 - fallback backends should not abort the cascade
+                continue
+            for record in records:
+                key = _normalise_space(record.title).lower()
+                if not key or key in seen:
+                    continue
+                seen.add(key)
+                merged.append(record)
+                if len(merged) >= limit:
+                    break
         return merged
 
 
@@ -607,6 +734,23 @@ class FakeScholarClient:
     ) -> list[S2Record]:
         """Return the canned records for ``title`` (case-insensitive; ``[]`` on miss)."""
         return list(self._by_title.get(title.lower(), []))
+
+    def search_query(
+        self, query: str, *, limit: int = 10, cutoff_date: str | None = None
+    ) -> list[S2Record]:
+        """Return canned records for ``query`` (case-insensitive); ``[]`` on miss.
+
+        Looks the query up in the same mapping as :meth:`search_title`; on a miss
+        the union of all canned records is returned so a topic search still yields
+        candidates in tests. Truncated to ``limit``.
+        """
+        direct = self._by_title.get(query.lower())
+        if direct is not None:
+            return list(direct)[:limit]
+        union: list[S2Record] = []
+        for records in self._by_title.values():
+            union.extend(records)
+        return union[:limit]
 
 
 # --------------------------------------------------------------------------- #
@@ -831,6 +975,44 @@ def verify(
     return dedupe(matched)
 
 
+def discover_papers(
+    query: str,
+    client: ScholarClient,
+    *,
+    limit: int = 10,
+    cutoff_date: str | None = None,
+) -> list[S2Record]:
+    """Discover candidate papers for a free-text ``query`` via ``client``.
+
+    Pure scholarly search (no LLM, no verification): delegates to the client's
+    :meth:`~ScholarClient.search_query`, applies the :func:`is_date_valid`
+    recency gate when ``cutoff_date`` (``"YYYY-MM"``) is given, dedupes by
+    normalized title, and truncates to ``limit``. Returns ``[]`` on any failure
+    or with an empty/blank ``query`` (never raises, never fabricates).
+    """
+    if not query or not query.strip():
+        return []
+    try:
+        records = client.search_query(query.strip(), limit=limit, cutoff_date=cutoff_date)
+    except Exception:  # noqa: BLE001 - discovery is best-effort; degrade to no results
+        return []
+    discovered: list[S2Record] = []
+    seen: set[str] = set()
+    for record in records:
+        if not record.title:
+            continue
+        if not is_date_valid(record.publication_date, record.year, cutoff_date):
+            continue
+        key = _normalise_space(record.title).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        discovered.append(record)
+        if len(discovered) >= limit:
+            break
+    return discovered
+
+
 __all__ = [
     "Reference",
     "Candidate",
@@ -852,6 +1034,7 @@ __all__ = [
     "verified_coverage",
     "to_bibtex",
     "verify",
+    "discover_papers",
     "resolve_scholar_client",
 ]
 

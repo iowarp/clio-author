@@ -29,6 +29,7 @@ from clio_author.experts.check_refs import CheckRefsExpert
 from clio_author.experts.citation import CitationExpert
 from clio_author.experts.coherence import CoherenceExpert
 from clio_author.experts.compose import run_compose
+from clio_author.experts.discover import DiscoverExpert
 from clio_author.experts.echo import EchoExpert
 from clio_author.experts.editor import EditorExpert
 from clio_author.experts.figure_agent import FigureAgentExpert, run_figure_refine
@@ -105,6 +106,7 @@ class ClioAuthorAgent:
         self.planner = PlannerExpert(self.llm, files=files)
         self.figure = FigureAgentExpert(self.llm, files=files, vision=vision)
         self.research = ResearchExpert(self.llm, scholar_client=scholar_client)
+        self.discover = DiscoverExpert(self.llm, scholar_client=scholar_client)
         self.verify_work = VerifyWorkExpert(self.llm)
         self.check_refs = CheckRefsExpert(self.llm)
         self.audit = AuditExpert(self.llm)
@@ -178,6 +180,8 @@ class ClioAuthorAgent:
             return self.planner.run(task, session)
         if action == "research":
             return self.research.run(task, session)
+        if action == "discover":
+            return self.discover.run(task, session)
         if action == "verify_work":
             return self.verify_work.run(task, session)
         if action == "check_refs":
@@ -416,6 +420,21 @@ def _prose_view(action: Any, out: AgentOutput) -> str:
             + _bullets("Competing", _source_titles(s.get("competing")))
             + _bullets("Gaps", s.get("gaps"))
         ).strip() or out.content
+    if action == "discover":
+        papers = s.get("papers") or []
+        head = f"Discovered {s.get('count', len(papers))} candidate paper(s).\n\n"
+        lines = []
+        for paper in papers:
+            if not isinstance(paper, dict):
+                continue
+            title = str(paper.get("title") or "").strip()
+            if not title:
+                continue
+            year = paper.get("year")
+            venue = str(paper.get("venue") or "").strip()
+            suffix = " — ".join(part for part in (str(year) if year else "", venue) if part)
+            lines.append(f"- {title}" + (f" ({suffix})" if suffix else ""))
+        return (head + "\n".join(lines)).strip() or out.content
     if action == "verify_work":
         head = f"Verification: {s.get('status', '?')}.\n\n"
         claim_lines = [
