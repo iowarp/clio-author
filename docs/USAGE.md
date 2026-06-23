@@ -71,7 +71,7 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 
 ---
 
-## Action catalog (24 actions)
+## Action catalog (25 actions)
 
 Payload keys below are exactly the keys each expert reads. Keys marked *(optional)* have a fallback.
 
@@ -346,6 +346,9 @@ rather than fabricated ones.
   - `blocks` *(optional)* — `MemoryBlocks` for grounding context.
   - `source` *(optional)* — raw text grounding context.
   - `depth` *(optional, `"standard"` | `"deep"`)* — `deep` asks for more sources and precise gaps.
+  - `discover` *(optional, bool)* — when `True` and a scholar client is configured, seeds the
+    brief's `recent` bucket from real papers found via `discover_papers` before LLM synthesis. Passes
+    `limit` (default 10) and `cutoff_date` through to the discovery call.
   - `out_dir` *(optional)* — not currently written by the expert; available for future use via
     `--json '{"out_dir":"..."}'`.
 - **Returns:** `content` = a one-line summary (sources, grounded count, gaps, confidence);
@@ -367,6 +370,10 @@ CLIO_SCHOLAR=auto CLIO_LLM=claude clio-author research \
   --topic "transformer self-attention" --depth deep --format prose \
   --out research.md
 
+# Seed the brief from real discovered papers:
+CLIO_SCHOLAR=auto CLIO_LLM=claude clio-author research \
+  --topic "transformer self-attention" --json '{"discover":true}' --format prose
+
 # Section-specific research via --json:
 CLIO_LLM=claude clio-author research \
   --json '{"section":"Related Work","outline":"AUTHOR: multi-agent paper lifecycle"}' \
@@ -376,11 +383,57 @@ CLIO_LLM=claude clio-author research \
 sub.run("research", {"topic": "attention mechanisms for long-range dependencies", "depth": "deep"})
 # With scholar grounding (CLIO_SCHOLAR configured):
 sub.run("research", {"topic": "transformer self-attention", "blocks": blocks_dump})
+# With real papers seeding the recent bucket:
+sub.run("research", {"topic": "transformer self-attention", "discover": True})
 ```
 
 ---
 
-### 9. `verify_work`
+### 9. `discover`
+
+Find real candidate papers for a topic via scholarly search (Semantic Scholar / OpenAlex / Crossref /
+arXiv). Deterministic — no LLM call. Returns only records the search actually returns; never
+fabricates titles, authors, or identifiers. Complements `cite` (which verifies titles you already
+have) and `research` (which has the LLM *propose* plausible titles).
+
+- **Reads:** `query` (or `topic` as a fallback — first non-empty string wins); `limit` *(optional,
+  int, default 10)*; `cutoff_date` *(optional, `"YYYY-MM"` string)*; `out_dir` *(optional)* —
+  when set, writes `discovered.json` and `discovered.bib` there.
+- **Returns:** `content` = a one-line summary ("Discovered N paper(s) for '…'");
+  `structured` = `{papers: [{title, year, authors, venue, abstract, paper_id, url}], count}`;
+  `metadata` = `{count, backends_tried, wrote}`. With no scholar client configured (the default
+  hermetic path) returns an error-flagged output — never raises.
+- **Safety:** never overwrites existing `discovered.json` / `discovered.bib` files (skips on
+  conflict); writes are best-effort.
+- **Backends:** resolved from `CLIO_SCHOLAR` — see the [Citation backends](#citation-backends-clio_scholar)
+  section below. Needs a configured scholar client.
+- **Extra:** the `scholar` extra adds the Semantic Scholar `httpx` path; OpenAlex, Crossref, and
+  arXiv use stdlib HTTP and need no extra.
+- **File inputs:** `--query-file FILE` (query text from file).
+- **CLI flags:** `--query`, `--query-file`, `--limit`, `--cutoff-date`, `--out-dir`, `--format`,
+  `--json`, `--out`.
+
+```bash
+# Find up to 5 real papers:
+CLIO_SCHOLAR=auto clio-author discover \
+  --query "retrieval augmented generation" --limit 5 --out-dir clio-out/discovered
+
+# With a recency gate and arXiv backend:
+CLIO_SCHOLAR=arxiv clio-author discover \
+  --query "large language model evaluation" --limit 10 --cutoff-date 2024-01
+
+# From a file:
+CLIO_SCHOLAR=auto clio-author discover --query-file topic.txt --limit 5
+```
+```python
+sub.run("discover", {"query": "retrieval augmented generation", "limit": 5, "out_dir": "clio-out/discovered"})
+# topic key is accepted as a fallback for query:
+sub.run("discover", {"topic": "transformer self-attention", "limit": 10})
+```
+
+---
+
+### 10. `verify_work`
 
 Goal-backward check of written prose against the claims it was supposed to make. For each intended
 claim, determines whether the prose actually states it (`made`) and whether it is supported with
@@ -424,7 +477,7 @@ sub.run("verify_work", {
 
 ---
 
-### 10. `write`
+### 11. `write`
 
 Draft a single paper section grounded in scoped source material.
 
@@ -449,7 +502,7 @@ agent.write(outline={"title": "Methods"}, source="...")
 
 ---
 
-### 11. `edit`
+### 12. `edit`
 
 Revise existing prose to address reviewer feedback (one-shot).
 
@@ -468,7 +521,7 @@ agent.edit("...", review_dump)
 
 ---
 
-### 12. `polish`
+### 13. `polish`
 
 Polish existing prose for clarity, flow, and academic voice **without changing meaning or removing
 citations**.
@@ -495,7 +548,7 @@ sub.run("polish", {"text": "...", "target": "sections/01-introduction.md"})
 
 ---
 
-### 13. `coherence`
+### 14. `coherence`
 
 Check **cross-section consistency** of a manuscript — terminology drift, contradictions, undefined
 terms, duplication, and broken narrative flow.
@@ -522,7 +575,7 @@ sub.run("coherence", {"sections": [{"title": "Introduction", "draft": "..."}, ..
 
 ---
 
-### 14. `check_refs`
+### 15. `check_refs`
 
 Deterministically lint a BibTeX bibliography and cross-check it against the `\cite{}` keys used in
 the manuscript prose. Flags malformed entries, duplicate entries, cited-but-missing keys, and
@@ -555,7 +608,7 @@ sub.run("check_refs", {"bibtex": bibtex_string, "markdown": manuscript_text})
 
 ---
 
-### 15. `section_review`
+### 16. `section_review`
 
 Three-layer review of a **single section**: L1 deterministic reference/citation checking
 (`check_refs`) → L2 single-section coherence (`coherence`) → L3 persona-conditioned peer review
@@ -596,7 +649,7 @@ sub.run("section_review", {
 
 ---
 
-### 16. `audit`
+### 17. `audit`
 
 Deterministic manuscript completeness audit: required sections present, per-section word-count vs
 budget, unresolved `[TODO]`/`[CITE:]`/empty `\cite{}` placeholders, and citation coverage. **No
@@ -639,7 +692,7 @@ sub.run("audit", {
 
 ---
 
-### 17. `kg`
+### 18. `kg`
 
 Extract a content knowledge graph of a paper -- its claims, methods, datasets, results, metrics,
 concepts, and tasks plus the relations between them -- from the paper's memory blocks. This is the
@@ -699,7 +752,7 @@ sub.run("kg", {
 
 ---
 
-### 18. `describe_figures`
+### 19. `describe_figures`
 
 Fill in descriptions/captions for figures in memory blocks.
 
@@ -725,7 +778,7 @@ agent.describe_figures(blocks_dump)
 
 ---
 
-### 19. `plot`
+### 20. `plot`
 
 Generate matplotlib plot **code** (text only; never executed on this path).
 
@@ -751,7 +804,7 @@ agent.plot({"kind": "plot", "intent": "bar chart of accuracy by model"})
 
 ---
 
-### 20. `compose`
+### 21. `compose`
 
 **Whole-paper orchestration.** Drafts a full multi-section manuscript from an idea and optional
 experimental log, chaining the existing experts in sequence.
@@ -772,9 +825,14 @@ LaTeX. Each section is written in a fresh `SessionContext` so state does not lea
     `SectionPlan` tasks/claims/sources to guide the writer).
   - `out_dir` *(optional)* — when set, persists `paper.md` + `sections/NN-slug.md`.
   - `latex` *(optional, bool)* — also emit `paper.tex` + `references.bib` alongside the Markdown.
+  - `pdf` *(optional, bool)* — compile `paper.pdf` from the written `paper.tex` (implies `latex`;
+    tries `tectonic`, then `latexmk`, then `pdflatex` in order; needs `--out-dir`; on success adds
+    `metadata["pdf"]` = PDF path; on failure adds `metadata["pdf_error"]` = reason; never fails
+    the compose itself).
 - **Returns:** `content` = the assembled Markdown manuscript; `structured` = `{outline, sections,
   citations}`; `metadata` = `{num_sections, reviewed, wrote, section_errors, latex}`.
-  `wrote` lists every file written to disk.
+  `wrote` lists every file written to disk. With `pdf=True`, also `metadata["pdf"]` (path) or
+  `metadata["pdf_error"]` (reason).
 - **Extra:** none; needs a real `LLMClient` for useful drafts. Citation verification needs a
   scholar backend.
 - **File inputs:** `--idea-file idea.txt`, `--log-file log.txt`, `--outline-file outline.json`,
@@ -793,12 +851,17 @@ CLIO_LLM=claude uv run clio-author compose \
   --out-dir clio-out/mypaper \
   --latex
 
-# Outputs:
+# Compile PDF in the same call (needs tectonic/latexmk/pdflatex on PATH):
+CLIO_LLM=claude uv run clio-author compose \
+  --idea "A new attention mechanism for long-range dependencies." \
+  --review --out-dir clio-out/mypaper --pdf
+
+# Outputs (--pdf):
 #   clio-out/mypaper/paper.md
 #   clio-out/mypaper/paper.tex
 #   clio-out/mypaper/references.bib
-#   clio-out/mypaper/sections/01-introduction.md
-#   clio-out/mypaper/sections/02-methods.md  (… etc.)
+#   clio-out/mypaper/paper.pdf        (if a LaTeX engine is found)
+#   clio-out/mypaper/sections/01-introduction.md  (… etc.)
 ```
 ```python
 result = sub.run("compose", {
@@ -809,6 +872,7 @@ result = sub.run("compose", {
     "max_rounds": 2,
     "out_dir": "clio-out/mypaper",
     "latex": True,
+    "pdf": True,      # compile paper.pdf; sets metadata["pdf"] or metadata["pdf_error"]
 })
 print("sections:", result["metadata"]["num_sections"])
 print("wrote:", result["metadata"]["wrote"])
@@ -817,7 +881,7 @@ print("section errors:", result["metadata"]["section_errors"])
 
 ---
 
-### 21. `export`
+### 22. `export`
 
 Export a composed Markdown manuscript to a standalone LaTeX document (`paper.tex` + optional
 `references.bib`).
@@ -836,11 +900,18 @@ bold / italic / inline code, bullet and numbered lists, Markdown links (rendered
   - `bibtex` *(optional, also `suggested_bibtex`)* — BibTeX string appended as `references.bib` and
     referenced via `\bibliography{references}`.
   - `out_dir` *(optional)* — when set, writes `paper.tex` (+ `references.bib` when a bib is present).
+  - `pdf` *(optional, bool)* — compile `paper.pdf` from the written `paper.tex` (needs `out_dir`;
+    tries `tectonic`, then `latexmk`, then `pdflatex`; on success adds `metadata["pdf"]` = PDF path;
+    on failure adds `metadata["pdf_error"]` = reason; never fails the export itself).
 - **Returns:** `content` = the full LaTeX source string; `structured` = `{latex, bibtex}`;
-  `metadata` = `{wrote, format: "latex", num_sections}`.
-- **Extra:** none; pure stdlib conversion.
+  `metadata` = `{wrote, format: "latex", num_sections}`. With `pdf=True`, also `metadata["pdf"]`
+  (path on success) or `metadata["pdf_error"]` (reason on failure).
+- **Extra:** none; pure stdlib conversion. PDF compilation uses an external LaTeX engine (not
+  installed by this package).
 - **File inputs:** `--markdown-file clio-out/mypaper/paper.md`, `--bibtex-file refs.bib`,
   `--sections-file sections.json`.
+- **CLI flags:** `--title`, `--sections-json`, `--sections-file`, `--markdown-file`,
+  `--bibtex-file`, `--out-dir`, `--pdf`, `--json`, `--out`. Note: `export` has no `--format` flag.
 
 ```bash
 # From a composed paper.md:
@@ -854,20 +925,28 @@ clio-author export \
   --sections-file /tmp/sections.json \
   --title "My Paper Title" \
   --out-dir clio-out/mypaper
+
+# Export and compile PDF in one call:
+clio-author export \
+  --markdown-file clio-out/mypaper/paper.md \
+  --bibtex-file clio-out/mypaper/references.bib \
+  --out-dir clio-out/mypaper --pdf
 ```
 ```python
 result = sub.run("export", {
     "markdown": manuscript_text,
     "bibtex": bibtex_string,
     "out_dir": "clio-out/mypaper",
+    "pdf": True,      # compile paper.pdf; sets metadata["pdf"] or metadata["pdf_error"]
 })
 print(result["content"])    # the .tex source
 print(result["metadata"]["wrote"])
+# metadata["pdf"] holds the PDF path when compilation succeeded
 ```
 
 ---
 
-### 22. `write_review`
+### 23. `write_review`
 
 Run a writer ↔ reviewer **critic-refine** loop and return the final output.
 
@@ -889,7 +968,7 @@ sub.run("write_review", {"outline": {"title": "Methods"}, "source": "...", "max_
 
 ---
 
-### 23. `figure_refine`
+### 24. `figure_refine`
 
 Run a figure visualizer ↔ critic **critic-refine** loop and return the final output.
 
@@ -909,7 +988,7 @@ sub.run("figure_refine", {"spec": {"kind": "plot", "intent": "line chart of loss
 
 ---
 
-### 24. `orchestrate`
+### 25. `orchestrate`
 
 Plan and run a sequence of the other actions to achieve a natural-language **goal** (dynamic
 multi-step). An LLM proposes a minimal ordered plan of action calls, which are executed through the

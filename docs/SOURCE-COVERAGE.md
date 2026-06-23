@@ -75,11 +75,11 @@ wtf-p (MIT) → concepts re-expressed (JS→Python). AUTHOR itself is BSD-3-Clau
 | AgentReview rubric + persona + meta-review | ✓ `reviewer.py` + `meta_reviewer.py` |
 | LaTeX manuscript assembly | ✓ `export/latex.py` (pure-stdlib) |
 | Plotting via PaperBanana (parallel with lit-review) | ◑ figures exist, but no parallel Step2‖Step3, no VLM-critic plot loop |
-| **Web-search discovery** (Gemini+Google grounding) | ✗ — AUTHOR verifies supplied candidates, no web crawl |
+| **Web-search discovery** | ✓ `discover` — scholarly search (S2/OpenAlex/Crossref/arXiv); not Google-grounding but real candidate retrieval |
 | Single multimodal section-writing call; tables from experimental log | ◑ per-section writing instead; no table-from-log builder |
 | **≥90% citation coverage enforced** in the writer | ◑ coverage *reported*, not enforced |
 | Content-refinement accept/revert loop + **anti-reward-hacking** directives | ◑ per-section refine loop; no doc-level accept/revert; no anti-gaming prompts |
-| **PDF compilation** (pdflatex/bibtex) | ✗ (out of scope — `.tex` only) |
+| **PDF compilation** (pdflatex/bibtex) | ✓ `export --pdf` / `compose --pdf` (tectonic/latexmk/pdflatex) |
 | Conference templates (CVPR/ICLR) | ✗ |
 | Autoraters (Citation-F1, lit-review-quality, side-by-side) + PaperWritingBench (200) | ✗ |
 
@@ -111,7 +111,7 @@ wtf-p (MIT) → concepts re-expressed (JS→Python). AUTHOR itself is BSD-3-Clau
 
 ## Overall — what's in AUTHOR vs not
 
-**In AUTHOR (the union, behind one interface — 24 actions):** ingest (Docling + post-process + figures), memory blocks + Q&A + RAG, citation verification (4-source cascade), review + meta-review + rebuttal + 3-layer section review, plan/research/write/edit/polish/coherence/verify_work/check_refs/audit, compose (whole paper) + LaTeX export, figures (code + Gemini image + critic loop) + vision describe, a full 6-stage content **knowledge graph**, the harness (BaseAgent + 4 patterns + sessions), `orchestrate` (goal→plan→run), and three host transports (in-process / CLI / MCP bridge).
+**In AUTHOR (the union, behind one interface — 25 actions):** ingest (Docling + post-process + figures), memory blocks + Q&A + RAG, **web/scholarly discovery** + citation verification (4-source cascade), review + meta-review + rebuttal + 3-layer section review, plan/research/write/edit/polish/coherence/verify_work/check_refs/audit, compose (whole paper) + LaTeX export **+ PDF compilation**, figures (code + Gemini image + critic loop) + vision describe, a full 6-stage content **knowledge graph**, the harness (BaseAgent + 4 patterns + sessions), `orchestrate` (goal→plan→run), and three host transports (in-process / CLI / MCP bridge).
 
 **Not in AUTHOR (deliberately):** each source's **product shell** — standalone CLIs, FastAPI/REST/WebSocket services, Streamlit UIs, git/state machinery, multi-runtime packaging, bundled benchmarks (PaperBananaBench, PaperWritingBench); and the heaviest infra — async/streaming, web-search discovery, PDF compilation, the VLM-as-Judge / autorater evaluation suites, protoneo's tool-registry + visual-evidence + IndependentSynthesis, and PaperBanana's Retriever/Stylist + style-guide synthesis.
 

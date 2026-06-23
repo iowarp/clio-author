@@ -29,7 +29,7 @@ SLIDES: list[dict] = [
             "One host-invocable package across the whole scientific-paper lifecycle:\n"
             "read -> understand -> verify citations -> review -> plan -> write -> illustrate -> export"
         ),
-        "footer": "Invoked by the CLIO agent as a subagent   .   24 actions   .   grounded, not hallucinated",
+        "footer": "Invoked by the CLIO agent as a subagent   .   25 actions   .   grounded, not hallucinated",
     },
     {
         "type": "bullets",
@@ -49,7 +49,7 @@ SLIDES: list[dict] = [
             ),
             (
                 0,
-                "Status: built end-to-end - 24 actions, ~530 hermetic tests, CI green; validated live (Claude / Codex / Ollama / Gemini vision / live citation backends).",
+                "Status: built end-to-end - 25 actions, ~556 hermetic tests, CI green; validated live (Claude / Codex / Ollama / Gemini vision / live citation backends).",
             ),
         ],
     },
@@ -186,7 +186,7 @@ SLIDES: list[dict] = [
     },
     {
         "type": "bullets",
-        "title": "5 . What we built - the 24 actions",
+        "title": "5 . What we built - the 25 actions",
         "bullets": [
             (
                 0,
@@ -194,7 +194,7 @@ SLIDES: list[dict] = [
             ),
             (
                 0,
-                "Verify: cite (Semantic Scholar -> OpenAlex -> Crossref -> arXiv cascade; suggestions only, never edits)",
+                "Discover/verify: discover (find real papers via scholarly search), cite (verify; 4-source cascade), check_refs (BibTeX audit)",
             ),
             (
                 0,
@@ -202,7 +202,7 @@ SLIDES: list[dict] = [
             ),
             (
                 0,
-                "Write: plan, write, edit, polish, coherence, compose (whole paper), export (-> LaTeX)",
+                "Write: plan, write, edit, polish, coherence, compose (whole paper), export (-> LaTeX + PDF via --pdf)",
             ),
             (0, "Illustrate: plot, describe_figures (Gemini vision), figure_refine (loop)"),
             (
@@ -335,7 +335,7 @@ SLIDES: list[dict] = [
         "bullets": [
             (
                 0,
-                "Done: 24 actions . ~470 hermetic tests + CI . live-validated (Claude/Codex/Ollama/Gemini, real citation backends) . motivation + benchmark plan . dynamic orchestrate.",
+                "Done: 25 actions . ~470 hermetic tests + CI . live-validated (Claude/Codex/Ollama/Gemini, real citation backends) . motivation + benchmark plan . dynamic orchestrate.",
             ),
             (0, "Next:"),
             (
