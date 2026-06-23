@@ -53,7 +53,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 **2. Get the code and install the core package:**
 
 ```bash
-git clone https://github.com/SIslamMun/clio-author.git
+git clone <repo-url>          # the clio-author repository
 cd clio-author
 uv sync
 ```
@@ -218,16 +218,21 @@ one with `CLIO_LLM`:
 | `echo` *(default)* | nothing — offline placeholder | already works |
 | `claude` | the `claude` CLI (no API key) | install Claude Code so `claude` is on your PATH |
 | `codex` | the `codex` CLI | install the Codex CLI |
-| `ollama` | a local model server | install [Ollama](https://ollama.com), then `ollama pull llama3.1:8b` |
+| `ollama` | a local Ollama server | install [Ollama](https://ollama.com), then `ollama pull llama3.1:8b` |
+| `lmstudio` | a local [LM Studio](https://lmstudio.ai) server (OpenAI-compatible) | load a model in LM Studio, start its server; URL via `CLIO_LMSTUDIO_URL` (default `http://localhost:1234/v1`) |
+| `openrouter` | the hosted [OpenRouter](https://openrouter.ai) gateway | set `OPENROUTER_API_KEY`; pick a model via `CLIO_LLM_MODEL` (default `openai/gpt-4o-mini`) |
+| `litellm` | a [LiteLLM](https://docs.litellm.ai) proxy (OpenAI-compatible) | run the proxy; URL via `CLIO_LITELLM_URL` (default `http://localhost:4000/v1`), optional `LITELLM_API_KEY` |
 
 ```bash
 CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper.md --format prose
+CLIO_LLM=lmstudio CLIO_LLM_MODEL=qwen2.5-7b-instruct uv run clio-author ask --question "..." --blocks-file clio-out/2601.23265/blocks.json
+CLIO_LLM=openrouter CLIO_LLM_MODEL=anthropic/claude-3.5-sonnet OPENROUTER_API_KEY=sk-... uv run clio-author review --paper-file paper.md --format prose
 ```
 
-Other variables: `CLIO_LLM_MODEL` (override model name), `CLIO_OLLAMA_URL` (default
-`http://localhost:11434`), and the Gemini-vision trio `CLIO_VISION` / `CLIO_VISION_MODEL` /
-`CLIO_IMAGE_MODEL` (set `CLIO_VISION=gemini` + `GEMINI_API_KEY` to let `describe_figures` and
-diagram `plot` use real images).
+`lmstudio` / `openrouter` / `litellm` all speak the OpenAI-compatible `/chat/completions` API, so any
+model they serve works. Other variables: `CLIO_LLM_MODEL` (override model name), `CLIO_OLLAMA_URL`,
+and the Gemini-vision trio `CLIO_VISION` / `CLIO_VISION_MODEL` / `CLIO_IMAGE_MODEL` (set
+`CLIO_VISION=gemini` + `GEMINI_API_KEY` to let `describe_figures` and diagram `plot` use real images).
 
 **Citation backends (`CLIO_SCHOLAR`)** — default `auto` cascades Semantic Scholar → OpenAlex →
 Crossref → arXiv; pin one with `semantic`/`s2`, `openalex`, `crossref`, `arxiv`, or disable with

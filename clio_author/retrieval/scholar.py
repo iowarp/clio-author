@@ -638,7 +638,7 @@ def _get_text(
 ) -> str:
     """Fetch text from ``url`` with encoded query params."""
     full_url = f"{url}?{urlencode(params)}"
-    headers = {"User-Agent": "clio-author/0.2 (+https://github.com/SIslamMun/clio-author)"}
+    headers = {"User-Agent": "clio-author/0.4"}
     if accept:
         headers["Accept"] = accept
     req = Request(full_url, headers=headers)  # noqa: S310 - public scholarly metadata APIs
