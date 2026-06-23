@@ -29,6 +29,7 @@ from clio_author.experts.check_refs import CheckRefsExpert
 from clio_author.experts.citation import CitationExpert
 from clio_author.experts.coherence import CoherenceExpert
 from clio_author.experts.compose import run_compose
+from clio_author.experts.context import ContextExpert
 from clio_author.experts.discover import DiscoverExpert
 from clio_author.experts.echo import EchoExpert
 from clio_author.experts.editor import EditorExpert
@@ -56,6 +57,13 @@ from clio_author.llm.client import EchoLLMClient, LLMClient
 from clio_author.llm.vision import VisionClient
 from clio_author.retrieval.scholar import ScholarClient
 from clio_author.tools.files import SafeFiles
+
+
+# Actions that ground on memory ``blocks`` and so accept a ``sources`` list which
+# is auto-gathered into blocks before dispatch (see ``_resolve_sources``).
+_GROUNDING_ACTIONS: frozenset[str] = frozenset(
+    {"ask", "plan", "write", "compose", "write_review", "research", "kg", "review"}
+)
 
 
 class ClioAuthorAgent:
@@ -107,6 +115,7 @@ class ClioAuthorAgent:
         self.figure = FigureAgentExpert(self.llm, files=files, vision=vision)
         self.research = ResearchExpert(self.llm, scholar_client=scholar_client)
         self.discover = DiscoverExpert(self.llm, scholar_client=scholar_client)
+        self.context = ContextExpert(self.llm, out_dir=files.root if files else None)
         self.verify_work = VerifyWorkExpert(self.llm)
         self.check_refs = CheckRefsExpert(self.llm)
         self.audit = AuditExpert(self.llm)
@@ -154,8 +163,16 @@ class ClioAuthorAgent:
         """Dispatch ``task`` for ``action`` against a fresh session."""
         session = SessionContext(id=uuid4().hex)
 
+        # Auto-chain multi-source grounding: a `sources` list on a grounding
+        # action (and no explicit `blocks`) is gathered into merged memory blocks
+        # before dispatch, so `plan`/`write`/`compose`/... can be pointed straight
+        # at files, folders, globs, git repos, or PDFs.
+        task = self._resolve_sources(action, task)
+
         if action == "ingest":
             return self.ingestor.run(task, session)
+        if action == "gather":
+            return self.context.run(task, session)
         if action == "ask":
             return self.paper_qa.run(task, session)
         if action == "review":
@@ -257,6 +274,41 @@ class ClioAuthorAgent:
         outputs = self.engine.run([self.echo_expert], self.pattern, task, session)
         return outputs[-1]
 
+    def _resolve_sources(self, action: Any, task: Task) -> Task:
+        """Gather a ``sources`` list into ``blocks`` for grounding actions.
+
+        When a grounding action carries a non-empty ``sources`` payload key and no
+        explicit ``blocks``, ingest every source (file / folder / glob / git repo /
+        PDF) and inject the merged :class:`MemoryBlocks` dump as ``blocks`` so the
+        expert grounds on it unchanged. Best-effort and never raises: a gather
+        failure or an empty result leaves the task untouched (the expert then
+        reports missing grounding as before). The ``gather`` action is excluded --
+        it consumes ``sources`` directly.
+        """
+        if action not in _GROUNDING_ACTIONS:
+            return task
+        payload = task.payload
+        sources = payload.get("sources")
+        if not sources or payload.get("blocks") is not None:
+            return task
+        try:
+            from clio_author.ingest.gather import gather_context
+
+            result = gather_context(sources, out_dir=self.files.root if self.files else None)
+        except Exception:  # noqa: BLE001 - grounding is best-effort; never abort dispatch
+            return task
+        if not result.blocks.sections and not result.blocks.figures:
+            return task
+        return task.model_copy(
+            update={
+                "payload": {
+                    **payload,
+                    "blocks": result.blocks.model_dump(),
+                    "gathered": {"ingested": result.ingested, "skipped": result.skipped},
+                }
+            }
+        )
+
     def _execute_step(self, action: str, payload: dict[str, Any]) -> AgentOutput:
         """Run ONE routed action for the orchestrator and return its output.
 
@@ -299,6 +351,10 @@ class ClioAuthorAgent:
     def ask(self, question: str, blocks: Any) -> AgentOutput:
         """Answer ``question`` grounded in memory ``blocks``."""
         return self._invoke("ask", {"question": question, "blocks": blocks})
+
+    def gather(self, sources: Any, **kw: Any) -> AgentOutput:
+        """Gather many ``sources`` (files/folders/globs/git/PDFs) into merged blocks."""
+        return self._invoke("gather", {"sources": sources, **kw})
 
     def review(self, paper: Any, persona: Any = None) -> AgentOutput:
         """Produce a structured peer review of ``paper``."""

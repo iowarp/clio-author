@@ -7,6 +7,16 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`gather` action (26th) + multi-source context.** New `clio_author/ingest/gather.py`
+  (`gather_context`) ingests a heterogeneous source set — files, folders, globs, **git repo URLs**,
+  PDFs/arXiv ids — and merges them into one `MemoryBlocks` (`context.json`, a drop-in `--blocks-file`,
+  plus `context.md`). Deterministic, never-raise (per-source failures land in `skipped`); heavy PDF /
+  `git` work stays lazy so the module is hermetic. Directories/repos contribute their docs
+  (`.md`/`.rst`/`.txt`/`.tex` + `README`); explicit file paths ingest as given.
+- **`--sources` auto-chaining.** Grounding actions (`ask`, `plan`, `write`, `compose`, `research`,
+  `kg`, `review`) accept `--sources`/`--sources-file`: the agent auto-gathers them into `blocks`
+  before dispatch (explicit `blocks` still wins), so the writing path can be pointed straight at a
+  repo/folder/PDFs with no separate ingest step. Manifest payload keys updated accordingly.
 - **`discover` action (25th)** — find real candidate papers for a topic via scholarly search
   (Semantic Scholar → OpenAlex → Crossref → arXiv `search_query` + cascade merge/dedupe); writes
   `discovered.json`/`.bib`; `research` gains a `discover` flag to seed its brief from real results.

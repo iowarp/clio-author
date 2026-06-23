@@ -152,7 +152,7 @@ def test_cli_clio_llm_env_accepted_for_capabilities(
     monkeypatch.setenv("CLIO_LLM", "claude")
     code, result = _run(capsys, ["capabilities"])
     assert code == 0
-    assert len(result["actions"]) == 25
+    assert len(result["actions"]) == 26
 
 
 def test_cli_invalid_clio_llm_degrades_to_error(
@@ -298,6 +298,56 @@ def test_out_flag_available_on_ask(capsys: pytest.CaptureFixture[str], tmp_path)
         ],
     )
     assert p.exists()
+
+
+def test_gather_command_routes_and_persists(
+    capsys: pytest.CaptureFixture[str], tmp_path
+) -> None:
+    doc = tmp_path / "a.md"
+    doc.write_text("# Title\n\nbody\n", encoding="utf-8")
+    out_dir = tmp_path / "ctx"
+    code, result = _run(
+        capsys, ["gather", "--sources", str(doc), "--out-dir", str(out_dir)]
+    )
+    assert code == 0
+    assert result["action"] == "gather"
+    assert result["metadata"]["ingested"] == 1
+    assert (out_dir / "context.json").exists()
+
+
+def test_gather_sources_file_newlines(capsys: pytest.CaptureFixture[str], tmp_path) -> None:
+    (tmp_path / "a.md").write_text("# A\n", encoding="utf-8")
+    (tmp_path / "b.md").write_text("# B\n", encoding="utf-8")
+    listing = tmp_path / "srcs.txt"
+    listing.write_text(f"# comment\n{tmp_path / 'a.md'}\n{tmp_path / 'b.md'}\n", encoding="utf-8")
+    code, result = _run(capsys, ["gather", "--sources-file", str(listing)])
+    assert code == 0
+    assert result["metadata"]["ingested"] == 2
+
+
+def test_plan_sources_auto_chains(capsys: pytest.CaptureFixture[str], tmp_path) -> None:
+    doc = tmp_path / "ctx.md"
+    doc.write_text("# Cache\n\nUse LRU eviction.\n", encoding="utf-8")
+    code, result = _run(
+        capsys,
+        ["plan", "--idea", "a fast cache", "--sources", str(doc)],
+    )
+    assert code == 0
+    assert result["action"] == "plan"
+    assert result["structured"]["plans"]
+
+
+def test_sources_from_args_json_array(tmp_path) -> None:
+    from clio_author.cli import _sources_from_args
+
+    listing = tmp_path / "srcs.json"
+    listing.write_text('["x.md", "y.md"]', encoding="utf-8")
+
+    class _NS:
+        sources = None
+        sources_file = str(listing)
+
+    assert _sources_from_args(_NS()) == ["x.md", "y.md"]
 
 
 def test_plan_action_with_outline_prints_json(capsys: pytest.CaptureFixture[str]) -> None:
