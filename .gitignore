@@ -39,3 +39,14 @@ dist/
 
 # extra audit scratch
 /audit-out2/
+
+# Internal artifacts kept out of the public repo (regenerate/keep locally):
+#   - generated presentation deck (rebuild via scripts/build_presentation.py)
+#   - internal research/process docs and evaluation evidence
+/docs/AUTHOR.pdf
+/docs/AUTHOR.pptx
+/docs/ABLATION.md
+/docs/BENCHMARK-PLAN.md
+/docs/SOURCE-COVERAGE.md
+/docs/INTEGRATION.md
+/eval/agentic/

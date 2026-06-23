@@ -1076,7 +1076,7 @@ lazy-imported only when their action needs them:
 | `rag` | `ask`: `SentenceTransformerEmbedder` + `LanceDbRetriever` | deterministic `HashingEmbedder` + in-memory `RagRetriever` |
 | `scholar` | `cite`: Semantic Scholar `httpx` client + `thefuzz` fuzzy match | citation no-key fallbacks still work |
 | `viz` | gated `render_plot_code` (subprocess render) | `plot` emits code text only; never renders |
-| `mcp` | the MCP bridge (`python -m clio_author.integration.mcp_bridge`, `fastmcp`) so MCP-only hosts can invoke AUTHOR — see [`INTEGRATION.md`](INTEGRATION.md) | bridge unavailable; in-process + CLI transports still work |
+| `mcp` | the MCP bridge (`python -m clio_author.integration.mcp_bridge`, `fastmcp`) so MCP-only hosts can invoke AUTHOR (see the subagent section of the README) | bridge unavailable; in-process + CLI transports still work |
 
 Install a subset as needed, e.g. `uv sync --extra pdf --extra scholar`.
 
