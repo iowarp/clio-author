@@ -232,11 +232,4 @@ All notable changes to clio-author are documented here. The format is based on
 - BSD-3-Clause. Adapted from paper-to-md (MIT), PaperBanana/PaperOrchestra (Apache-2.0); protoneo
   concepts re-implemented (not copied). ~300 hermetic tests.
 
-[0.3.0]: https://github.com/SIslamMun/clio-author/releases/tag/v0.3.0
-[0.2.3]: https://github.com/SIslamMun/clio-author/releases/tag/v0.2.3
-[0.2.2]: https://github.com/SIslamMun/clio-author/releases/tag/v0.2.2
-[0.2.1]: https://github.com/SIslamMun/clio-author/releases/tag/v0.2.1
-[0.2.0]: https://github.com/SIslamMun/clio-author/releases/tag/v0.2.0
-[0.1.2]: https://github.com/SIslamMun/clio-author/releases/tag/v0.1.2
-[0.1.1]: https://github.com/SIslamMun/clio-author/releases/tag/v0.1.1
-[0.1.0]: https://github.com/SIslamMun/clio-author/releases/tag/v0.1.0
+<!-- Per-version release links are published on the repository's Releases page. -->

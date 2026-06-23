@@ -353,7 +353,7 @@ SLIDES: list[dict] = [
             ),
             (
                 0,
-                "Repo: github.com/SIslamMun/clio-author  .  docs/MOTIVATION.md, BENCHMARK-PLAN.md, RUNBOOK.md",
+                "Docs: README.md  .  docs/LIFECYCLE.md, docs/MOTIVATION.md, docs/RUNBOOK.md",
             ),
         ],
     },

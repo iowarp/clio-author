@@ -33,9 +33,15 @@ mkdir -p runbook-out
 
 | Variable | Accepted values (default **bold**) | Used by |
 |---|---|---|
-| `CLIO_LLM` | **`echo`** · `claude` · `codex` · `ollama` | all text actions |
+| `CLIO_LLM` | **`echo`** · `claude` · `codex` · `ollama` · `lmstudio` · `openrouter` · `litellm` | all text actions |
 | `CLIO_LLM_MODEL` | any model name (provider-specific) | the chosen `CLIO_LLM` |
 | `CLIO_OLLAMA_URL` | **`http://localhost:11434`** | `CLIO_LLM=ollama` |
+| `CLIO_LMSTUDIO_URL` | **`http://localhost:1234/v1`** | `CLIO_LLM=lmstudio` |
+| `CLIO_OPENROUTER_URL` | **`https://openrouter.ai/api/v1`** | `CLIO_LLM=openrouter` |
+| `OPENROUTER_API_KEY` | your key (**required** for openrouter) | `CLIO_LLM=openrouter` |
+| `CLIO_OPENROUTER_REFERER` | optional attribution URL | `CLIO_LLM=openrouter` |
+| `CLIO_LITELLM_URL` | **`http://localhost:4000/v1`** | `CLIO_LLM=litellm` |
+| `LITELLM_API_KEY` / `LMSTUDIO_API_KEY` | optional bearer key | `litellm` / `lmstudio` |
 | `CLIO_SCHOLAR` | **`auto`** (=`cascade`/`all`) · `semantic`(`s2`) · `openalex`(`oa`) · `crossref`(`cr`) · `arxiv` · `off`(`none`/`offline`/`disabled`) | `cite`, `discover`, `review --ground`, `research` |
 | `CLIO_VISION` | **`off`** (`none`/`offline`/`disabled`) · `gemini`(`google`) | `describe`, `review` (with figures), `plot kind="diagram"` |
 | `CLIO_VISION_MODEL` | **`gemini-2.5-flash`** | vision describe |
