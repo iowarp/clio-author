@@ -552,6 +552,52 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_polish)
     _add_json(p_polish)
 
+    p_revise = sub.add_parser(
+        "revise",
+        help="Revise prose: --mode feedback (address review) or style (polish voice).",
+    )
+    p_revise.add_argument(
+        "--mode",
+        choices=("feedback", "style"),
+        default="feedback",
+        help="feedback = address reviewer critique (may change content); style = polish voice.",
+    )
+    p_revise.add_argument("--text", default=None, help="The prose to revise (inline).")
+    p_revise.add_argument(
+        "--text-file",
+        dest="text_file",
+        default=None,
+        help="Path to a text file holding the prose to revise.",
+    )
+    p_revise.add_argument(
+        "--review-json",
+        dest="review_json",
+        default=None,
+        help="A JSON PaperReview/feedback object (feedback mode).",
+    )
+    p_revise.add_argument(
+        "--review-file",
+        dest="review_file",
+        default=None,
+        help="Path to a JSON review/feedback file (feedback mode).",
+    )
+    p_revise.add_argument(
+        "--critic-notes",
+        dest="critic_notes",
+        default=None,
+        help="Free-form directive feedback (feedback mode).",
+    )
+    p_revise.add_argument(
+        "--voice", default=None, help="Optional target voice (style mode; e.g. concise, formal)."
+    )
+    p_revise.add_argument(
+        "--target",
+        default=None,
+        help="Optional file (under the harness root) to apply the revision to.",
+    )
+    _add_format(p_revise)
+    _add_json(p_revise)
+
     p_coherence = sub.add_parser(
         "coherence", help="Check cross-section consistency across a manuscript."
     )
@@ -1135,6 +1181,22 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
             payload["text"] = _read_file(args.text_file, field="--text-file")
         elif args.text is not None:
             payload["text"] = args.text
+        if args.voice is not None:
+            payload["voice"] = args.voice
+        if args.target is not None:
+            payload["target"] = args.target
+        payload["format"] = args.fmt
+    elif command == "revise":
+        payload["mode"] = args.mode
+        if args.text_file is not None:
+            payload["draft"] = _read_file(args.text_file, field="--text-file")
+        elif args.text is not None:
+            payload["draft"] = args.text
+        review = _json_input(args.review_file, args.review_json, field="review (--review-*)")
+        if review is not None:
+            payload["review"] = review
+        if args.critic_notes is not None:
+            payload["critic_notes"] = args.critic_notes
         if args.voice is not None:
             payload["voice"] = args.voice
         if args.target is not None:

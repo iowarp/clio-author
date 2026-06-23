@@ -36,7 +36,7 @@ cd clio-author
 uv sync
 ```
 
-**Step 3. Confirm it works** (prints the list of 27 things it can do — no model or network needed):
+**Step 3. Confirm it works** (prints the list of 26 things it can do — no model or network needed):
 
 ```bash
 uv run clio-author capabilities
@@ -91,7 +91,7 @@ That is the whole loop: **ingest → read → review.** Everything below is vari
 
 ---
 
-## 2. Capabilities — 27 actions, grouped by intent
+## 2. Capabilities — 26 actions, grouped by intent
 
 Pick the workflow that matches what you want to do. Add `--format prose` for human-readable text;
 omit it to get JSON (the default, handy for programs). Text actions need a real model (`CLIO_LLM=…`,
@@ -311,6 +311,17 @@ CLIO_SCHOLAR=auto CLIO_LLM=claude uv run clio-author research \
 
 ### Review & assess — judge a paper or draft
 
+> **Which check do I want?** These look similar but answer different questions:
+> - **`review`** — LLM peer review of a whole paper (decision, scores, critique).
+> - **`section_review`** — layered review of *one section* (it composes `check_refs` + `coherence` +
+>   a persona review).
+> - **`verify_work`** — does the prose actually *make and support* the claims it planned to? (LLM,
+>   goal-backward).
+> - **`check_refs`** — deterministic bibliography lint + in-text `\cite{}` cross-check (no LLM).
+> - **`audit`** — deterministic manuscript completeness: required sections, word budgets, unresolved
+>   `[TODO]`/`[CITE:]` placeholders (no LLM).
+> - **`coherence`** — cross-section consistency: terminology drift, contradictions, broken flow.
+
 #### `review` — produce a structured peer review
 
 Outputs Accept/Reject decision, 1–10 overall, 7 per-axis scores, and a full critique. Add
@@ -509,30 +520,33 @@ CLIO_LLM=claude uv run clio-author write \
   --outline "Introduction" --source-file clio-out/2601.23265/paper.md --format prose
 ```
 
-#### `edit` — revise prose to address reviewer feedback
+#### `revise` — revise existing prose (feedback or style)
 
-Reached via the `run` escape hatch. Payload: `draft`, `review`, `critic_notes`, `target`.
-
-```bash
-CLIO_LLM=claude uv run clio-author run edit \
-  --json '{"draft":"We propose a system.","review":{"weaknesses":["no baseline comparison"]}}'
-```
-
-#### `polish` — improve clarity, flow, and academic voice
+One revision action with two modes. `--mode feedback` (default) addresses reviewer critique and may
+change content; `--mode style` polishes clarity, flow, and academic voice while preserving meaning
+and `\cite{}` placeholders. (This subsumes the older `edit` and `polish` actions, which remain as
+back-compatible aliases — `edit` ≡ `revise --mode feedback`, `polish` ≡ `revise --mode style`.)
 
 | Argument | Meaning |
 |---|---|
-| `--text TEXT` | prose to polish (inline) |
-| `--text-file FILE` | file holding the prose to polish |
-| `--voice TEXT` | target voice, e.g. `concise` or `formal` |
-| `--target FILE` | file (under harness root) to apply the polished text to |
+| `--mode feedback\|style` | `feedback` = address review (may change content); `style` = polish voice |
+| `--text TEXT` / `--text-file FILE` | the prose to revise |
+| `--review-json JSON` / `--review-file FILE` | reviewer feedback to address (feedback mode) |
+| `--critic-notes TEXT` | free-form directive feedback (feedback mode) |
+| `--voice TEXT` | target voice, e.g. `concise` or `formal` (style mode) |
+| `--target FILE` | file (under harness root) to apply the revision to |
 | `--format structured\|prose` | default `structured` |
 | `--json '{...}'` | merge payload keys |
 | `--out FILE` | save the result |
 
 ```bash
-CLIO_LLM=claude uv run clio-author polish \
+# Style polish:
+CLIO_LLM=claude uv run clio-author revise --mode style \
   --text-file clio-out/mypaper/sections/01-introduction.md --voice concise --format prose
+
+# Feedback-driven revision:
+CLIO_LLM=claude uv run clio-author revise \
+  --text "We propose a system." --review-json '{"weaknesses":["no baseline comparison"]}'
 ```
 
 #### `coherence` — check cross-section consistency
@@ -820,7 +834,7 @@ from clio_author.llm.providers import resolve_llm
 # Build the subagent. resolve_llm("claude") | "codex" | "ollama" | None (offline echo).
 sub = ClioAuthorSubagent(llm=resolve_llm("claude"))
 
-# 1) Discover what it can do (27 actions).
+# 1) Discover what it can do (26 actions).
 for a in sub.capabilities()["actions"]:
     print(a["action"], "—", a["description"])
 
@@ -869,7 +883,7 @@ CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper
 
 ---
 
-## 5. The 27 actions at a glance
+## 5. The 26 actions at a glance
 
 | # | Action | What it's for | Subcommand |
 |---|--------|---------------|------------|
@@ -890,16 +904,15 @@ CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper
 | 15 | `plan` | **Section blueprints.** Tasks, claims, sources, word budgets before drafting. | `clio-author plan` |
 | 16 | `experiment` | **Recreate evaluation.** Extract reference papers' design/experiments → grounded eval plan (datasets/baselines/metrics/ablations). | `clio-author experiment` |
 | 17 | `write` | **Draft a section.** Grounded in supplied source material. | `clio-author write` |
-| 18 | `edit` | **Revise to feedback.** Rewrite prose to address reviewer weaknesses. | `clio-author run edit` |
-| 19 | `polish` | **Improve prose.** Clarity, flow, academic voice; preserves citations. | `clio-author polish` |
-| 20 | `coherence` | **Consistency check.** Terminology drift, contradictions, broken flow. | `clio-author coherence` |
-| 21 | `compose` | **Write a whole paper.** idea → outline → cite → write → assemble; `--latex`/`--pdf`. | `clio-author compose` |
-| 22 | `write_review` | **Self-improve a draft.** Writer ↔ reviewer critic-refine loop. | `clio-author run write_review` |
-| 23 | `plot` | **Make a plot/diagram.** Matplotlib code (or real PNG with vision). | `clio-author run plot` |
-| 24 | `describe_figures` | **Caption figures.** Text or Gemini vision descriptions. | `clio-author describe` |
-| 25 | `figure_refine` | **Self-improve a figure.** Visualizer ↔ critic refine loop. | `clio-author run figure_refine` |
-| 26 | `export` | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF. | `clio-author export` |
-| 27 | `orchestrate` | **Goal-driven.** Plan and run a sequence of actions from a natural-language goal. | `clio-author orchestrate` |
+| 18 | `revise` | **Revise prose.** `--mode feedback` (address review) or `style` (polish voice). Aliases: `edit`, `polish`. | `clio-author revise` |
+| 19 | `coherence` | **Consistency check.** Terminology drift, contradictions, broken flow. | `clio-author coherence` |
+| 20 | `compose` | **Write a whole paper.** idea → outline → cite → write → assemble; `--latex`/`--pdf`. | `clio-author compose` |
+| 21 | `write_review` | **Self-improve a draft.** Writer ↔ reviewer critic-refine loop. | `clio-author run write_review` |
+| 22 | `plot` | **Make a plot/diagram.** Matplotlib code (or real PNG with vision). | `clio-author run plot` |
+| 23 | `describe_figures` | **Caption figures.** Text or Gemini vision descriptions. | `clio-author describe` |
+| 24 | `figure_refine` | **Self-improve a figure.** Visualizer ↔ critic refine loop. | `clio-author run figure_refine` |
+| 25 | `export` | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF. | `clio-author export` |
+| 26 | `orchestrate` | **Goal-driven.** Plan and run a sequence of actions from a natural-language goal. | `clio-author orchestrate` |
 
 Actions without a dedicated subcommand are reachable via `clio-author run <action> --json '...'`.
 

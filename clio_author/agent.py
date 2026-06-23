@@ -189,6 +189,10 @@ class ClioAuthorAgent:
             return self.citation.run(task, session)
         if action == "write":
             return self.writer.run(task, session)
+        if action == "revise":
+            return self._revise(task, session)
+        # `edit` / `polish` are retained as backward-compatible aliases of the
+        # unified `revise` action (edit == feedback mode, polish == style mode).
         if action == "edit":
             return self.editor.run(task, session)
         if action == "polish":
@@ -313,6 +317,25 @@ class ClioAuthorAgent:
             }
         )
 
+    def _revise(self, task: Task, session: SessionContext) -> AgentOutput:
+        """Unified prose revision: route by ``mode`` to the editor or polish expert.
+
+        ``mode='style'`` (or ``'polish'``) runs the style-preserving
+        :class:`PolishExpert`; any other value (default ``'feedback'``) runs the
+        feedback-driven :class:`EditorExpert`. The prose is normalised onto
+        ``draft`` so either expert finds it regardless of whether the caller
+        supplied ``draft`` or ``text``.
+        """
+        payload = task.payload
+        mode = str(payload.get("mode") or "feedback").strip().lower()
+        prose = payload.get("draft") or payload.get("text")
+        if prose is not None:
+            payload = {**payload, "draft": prose, "text": prose}
+            task = task.model_copy(update={"payload": payload})
+        if mode in ("style", "polish"):
+            return self.polish.run(task, session)
+        return self.editor.run(task, session)
+
     def _execute_step(self, action: str, payload: dict[str, Any]) -> AgentOutput:
         """Run ONE routed action for the orchestrator and return its output.
 
@@ -405,8 +428,12 @@ class ClioAuthorAgent:
             payload["outline"] = outline
         return self._invoke("plan", payload)
 
+    def revise(self, draft: Any, *, mode: str = "feedback", **kw: Any) -> AgentOutput:
+        """Revise ``draft``: ``mode='feedback'`` (address review) or ``'style'`` (polish)."""
+        return self._invoke("revise", {"draft": draft, "mode": mode, **kw})
+
     def edit(self, draft: Any, review: Any) -> AgentOutput:
-        """Revise ``draft`` to address ``review`` feedback."""
+        """Revise ``draft`` to address ``review`` feedback (alias of ``revise``)."""
         return self._invoke("edit", {"draft": draft, "review": review})
 
     def describe_figures(self, blocks: Any) -> AgentOutput:

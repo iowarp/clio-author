@@ -145,6 +145,23 @@ def test_write_accepts_outline_flag(capsys: pytest.CaptureFixture[str]) -> None:
     assert result["action"] == "write"
 
 
+def test_revise_command_style_mode(capsys: pytest.CaptureFixture[str]) -> None:
+    code, result = _run(
+        capsys, ["revise", "--mode", "style", "--text", "Our system is fast.", "--voice", "concise"]
+    )
+    assert code == 0
+    assert result["action"] == "revise"
+
+
+def test_revise_command_feedback_mode(capsys: pytest.CaptureFixture[str]) -> None:
+    code, result = _run(
+        capsys,
+        ["revise", "--text", "We propose X.", "--review-json", '{"weaknesses":["no baseline"]}'],
+    )
+    assert code == 0
+    assert result["action"] == "revise"
+
+
 def test_cli_clio_llm_env_accepted_for_capabilities(
     capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -152,7 +169,7 @@ def test_cli_clio_llm_env_accepted_for_capabilities(
     monkeypatch.setenv("CLIO_LLM", "claude")
     code, result = _run(capsys, ["capabilities"])
     assert code == 0
-    assert len(result["actions"]) == 27
+    assert len(result["actions"]) == 26
 
 
 def test_cli_invalid_clio_llm_degrades_to_error(
