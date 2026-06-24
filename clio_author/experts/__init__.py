@@ -11,6 +11,7 @@ from clio_author.experts.figure_agent import (
     render_plot_code,
     run_figure_refine,
 )
+from clio_author.experts.grounding import run_grounding
 from clio_author.experts.ingestor import IngestorExpert
 from clio_author.experts.kg import KGExpert
 from clio_author.experts.meta_reviewer import MetaReviewerExpert, run_panel
@@ -42,6 +43,7 @@ __all__ = [
     "WriterExpert",
     "render_plot_code",
     "run_figure_refine",
+    "run_grounding",
     "run_panel",
     "run_write_review_loop",
 ]

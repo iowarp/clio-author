@@ -145,6 +145,39 @@ def test_write_accepts_outline_flag(capsys: pytest.CaptureFixture[str]) -> None:
     assert result["action"] == "write"
 
 
+def test_ground_command_citation_integrity(capsys: pytest.CaptureFixture[str]) -> None:
+    code, result = _run(
+        capsys,
+        [
+            "ground",
+            "--bibtex",
+            "@article{a,title={X},year={2020}}",
+            "--text",
+            "We build on \\cite{a} and also \\cite{ghost}.",
+        ],
+    )
+    assert code == 0
+    assert result["action"] == "ground"
+    assert result["metadata"]["citation_integrity"] == 0.5
+
+
+def test_compose_verify_attaches_grounding(capsys: pytest.CaptureFixture[str]) -> None:
+    code, result = _run(
+        capsys,
+        [
+            "compose",
+            "--idea",
+            "a study",
+            "--outline-json",
+            '{"title":"T","sections":[{"title":"Intro","goal":"g"}]}',
+            "--verify",
+        ],
+    )
+    assert code == 0
+    assert result["action"] == "compose"
+    assert "grounding" in result["metadata"]
+
+
 def test_revise_command_style_mode(capsys: pytest.CaptureFixture[str]) -> None:
     code, result = _run(
         capsys, ["revise", "--mode", "style", "--text", "Our system is fast.", "--voice", "concise"]
@@ -169,7 +202,7 @@ def test_cli_clio_llm_env_accepted_for_capabilities(
     monkeypatch.setenv("CLIO_LLM", "claude")
     code, result = _run(capsys, ["capabilities"])
     assert code == 0
-    assert len(result["actions"]) == 26
+    assert len(result["actions"]) == 27
 
 
 def test_cli_invalid_clio_llm_degrades_to_error(

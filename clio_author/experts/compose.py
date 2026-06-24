@@ -204,6 +204,35 @@ def _run_compose(
             if want_pdf:
                 _compile_compose_pdf(latex_wrote, wrote, metadata)
 
+    # --- Optional verify gate: score the finished draft's grounding --------- #
+    # The "check while writing" mechanism: compose returns a draft AND a
+    # grounding-integrity number (citations that resolve + claims supported).
+    if payload.get("verify"):
+        from clio_author.experts.check_refs import CheckRefsExpert
+        from clio_author.experts.grounding import run_grounding
+        from clio_author.experts.verify_work import VerifyWorkExpert
+
+        claims = [c for plan in plans.values() for c in getattr(plan, "claims", [])]
+        g_out = run_grounding(
+            Task(
+                id=uuid4().hex,
+                description="ground",
+                payload={
+                    "markdown": manuscript,
+                    "bibtex": suggested_bibtex,
+                    "claims": claims or None,
+                },
+            ),
+            check_refs=CheckRefsExpert(llm),
+            verify_work=VerifyWorkExpert(llm),
+            session=None,
+        )
+        metadata["grounding"] = {
+            "grounding_integrity": g_out.metadata.get("grounding_integrity"),
+            "citation_integrity": g_out.metadata.get("citation_integrity"),
+            "claim_integrity": g_out.metadata.get("claim_integrity"),
+        }
+
     metadata.update(
         {
             "num_sections": len(sections),

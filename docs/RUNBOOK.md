@@ -68,9 +68,9 @@ GEMINI_API_KEY=...
 
 ```bash
 uv run ruff check clio_author tests        # -> All checks passed!
-uv run mypy clio_author                    # -> Success: no issues found in 74 source files
-uv run pytest -q                           # -> 602 passed, 3 skipped, 12 deselected
-uv run clio-author capabilities            # -> name=clio-author, 26 actions
+uv run mypy clio_author                    # -> Success: no issues found in 75 source files
+uv run pytest -q                           # -> 621 passed, 3 skipped, 12 deselected
+uv run clio-author capabilities            # -> name=clio-author, 27 actions
 uv run clio-author lifecycle               # -> the phase -> actions map (see docs/LIFECYCLE.md)
 ```
 
@@ -848,7 +848,7 @@ All other actions have dedicated subcommands — see Appendix A.
   `ClioAuthorSubagent(llm=…).run("review", {"paper": "..."})`.
 - See a subcommand's exact flags anytime: `clio-author <cmd> --help`.
 
-## Appendix A — all 26 actions at a glance
+## Appendix A — all 27 actions at a glance
 
 | # | Action | Dedicated subcommand |
 |---|---|---|

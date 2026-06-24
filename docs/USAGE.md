@@ -71,7 +71,7 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 
 ---
 
-## Action catalog (26 actions)
+## Action catalog (27 actions)
 
 Payload keys below are exactly the keys each expert reads. Keys marked *(optional)* have a fallback.
 

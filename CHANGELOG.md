@@ -7,6 +7,20 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Novelty stack — grounding-integrity metric + cross-stage verification** (positions AUTHOR beyond
+  the single-slice prior work; each piece maps to a 2024–2026 paper):
+  - **`ground` action (27th)** — the flagship *grounding-integrity* number: fraction of in-text
+    `\cite{}` keys that resolve to a real bibliography entry (deterministic) + fraction of intended
+    claims actually made & supported (via `verify_work`). Writes `grounding.{json,md}`. No
+    single-slice tool can compute this because none owns both halves of the same paper.
+  - **Graded citation severity** (CiteCheck) — `cite` now labels each candidate **Exact / Minor /
+    Major** instead of binary verified/unverified, and reports a `citation_integrity` ratio.
+  - **Alternative-valid citations** (CiteGuard) — `cite` surfaces other real titles the search found,
+    so a weak/fabricated citation can be replaced, not just flagged.
+  - **`compose --verify`** — the "check while writing" gate: after drafting, scores the manuscript's
+    grounding integrity and attaches it to the result.
+  - **Review robustness** (AgentReview) — `meta_review` now reports a `robustness` verdict
+    (solid / borderline / split) from reviewer agreement + score spread, flagging shaky decisions.
 - **Three OpenAI-compatible LLM providers** — `CLIO_LLM=lmstudio` (local LM Studio server),
   `openrouter` (hosted gateway, `OPENROUTER_API_KEY`), and `litellm` (a LiteLLM proxy), all via a new
   stdlib `OpenAICompatLLMClient` (`/chat/completions`). Per-provider URLs/keys via

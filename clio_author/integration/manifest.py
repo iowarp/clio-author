@@ -199,6 +199,23 @@ ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["sections", "markdown", "outline", "bibtex", "candidates", "verified"],
     },
     {
+        "action": "ground",
+        "description": (
+            "Score a manuscript's grounding integrity: fraction of in-text "
+            "citations that resolve to a real bibliography entry, and (with "
+            "intended claims) fraction of claims actually made + supported."
+        ),
+        "payload_keys": [
+            "markdown",
+            "text",
+            "sections",
+            "bibtex",
+            "claims",
+            "section_plan",
+            "out_dir",
+        ],
+    },
+    {
         "action": "describe_figures",
         "description": "Fill in descriptions/captions for the figures in memory blocks.",
         "payload_keys": ["blocks", "figures", "context"],
@@ -221,6 +238,7 @@ ACTIONS: list[dict[str, Any]] = [
             "review",
             "max_rounds",
             "plan",
+            "verify",
             "out_dir",
             "pdf",
         ],
@@ -291,6 +309,7 @@ _LIFECYCLE: dict[str, tuple[list[str], bool]] = {
     "check_refs": (["strengthen"], False),
     "section_review": (["strengthen", "referee"], False),
     "audit": (["strengthen", "respond"], False),
+    "ground": (["strengthen"], False),
     "describe_figures": (["draft"], True),
     "plot": (["draft"], False),
     "compose": (["draft", "ship"], False),
