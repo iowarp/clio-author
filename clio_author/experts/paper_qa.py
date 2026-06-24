@@ -18,7 +18,7 @@ from typing import Any
 from clio_author.harness.base import BaseAgent
 from clio_author.harness.session import SessionContext
 from clio_author.harness.types import AgentOutput, Message, Task
-from clio_author.ingest.blocks import MemoryBlocks
+from clio_author.ingest.blocks import MemoryBlocks, SectionBlock
 from clio_author.llm.client import EchoLLMClient, LLMClient
 from clio_author.retrieval.rag import RagRetriever, render_scored
 
@@ -118,14 +118,22 @@ class PaperQAExpert(BaseAgent):
         except Exception as exc:  # noqa: BLE001 - never raise; flag error on output
             return self._error(session, str(exc))
 
+        sources = _sources(scored)
         output = AgentOutput(
             agent=self.name,
             content=answer,
             structured={
                 "cited_block_ids": cited_block_ids,
+                "sources": sources,
                 "retrieved": [item.to_dict() for item in scored],
             },
-            metadata={"k": k, "num_blocks": num_blocks, "whole_paper": k >= num_blocks},
+            metadata={
+                "k": k,
+                "num_blocks": num_blocks,
+                "whole_paper": k >= num_blocks,
+                "sources": sources,
+                "grounded_in": _grounded_in(sources),
+            },
         )
         session.add(output)
         return output
@@ -165,6 +173,37 @@ class PaperQAExpert(BaseAgent):
         if payload.get("all") or k <= 0:
             return max(num_blocks, 1)
         return min(k, num_blocks) if num_blocks else k
+
+
+def _sources(scored: list[Any]) -> list[dict[str, Any]]:
+    """Build the provenance list: which block (section + source line) each came from.
+
+    One entry per retrieved block, ordered by relevance: ``block_id``, the
+    ``section`` path and ``start_line`` (when it's a section block from Markdown),
+    and the retrieval ``score``. This is what tells the reader *where* the answer
+    is grounded.
+    """
+    out: list[dict[str, Any]] = []
+    for item in scored:
+        block = item.block
+        entry: dict[str, Any] = {"block_id": block.block_id, "score": round(item.score, 4)}
+        if isinstance(block, SectionBlock):
+            entry["section"] = block.section_path
+            if block.start_line is not None:
+                entry["start_line"] = block.start_line
+        out.append(entry)
+    return out
+
+
+def _grounded_in(sources: list[dict[str, Any]]) -> str:
+    """A compact one-line provenance string (for the trace), e.g. ``Methods:L42; Results:L88``."""
+    parts: list[str] = []
+    for s in sources:
+        label = s.get("section") or s["block_id"]
+        if "start_line" in s:
+            label = f"{label}:L{s['start_line']}"
+        parts.append(label)
+    return "; ".join(parts)
 
 
 __all__ = ["PaperQAExpert", "PAPER_QA_SYSTEM_PROMPT", "PAPER_QA_USER_TEMPLATE"]

@@ -60,6 +60,29 @@ def test_k_widens_context() -> None:
     assert out.metadata["k"] == min(3, out.metadata["num_blocks"])
 
 
+def test_metadata_reports_source_sections_and_lines() -> None:
+    out = PaperQAExpert().run(
+        _task(question="what experiments?", markdown=_MD), SessionContext(id="s")
+    )
+    sources = out.metadata["sources"]
+    assert sources, "should report which blocks the answer is grounded in"
+    # each source names its section path + the source line of that header
+    by_section = {s.get("section"): s for s in sources}
+    assert "Paper > Experiments" in by_section
+    exp = by_section["Paper > Experiments"]
+    assert exp["start_line"] == 7 and "score" in exp  # "## Experiments" is line 7 of _MD
+    # the compact trace string names section:Line
+    assert "Experiments:L7" in out.metadata["grounded_in"]
+
+
+def test_build_section_blocks_records_start_line() -> None:
+    from clio_author.ingest.blocks import build_section_blocks
+
+    blocks = build_section_blocks("# A\n\nx\n\n## B\n\ny\n")
+    assert blocks[0].start_line == 1  # "# A"
+    assert blocks[1].start_line == 5  # "## B"
+
+
 def test_resolve_rag_retriever() -> None:
     assert resolve_rag_retriever(None) is None
     assert resolve_rag_retriever("off") is None

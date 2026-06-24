@@ -192,6 +192,10 @@ CLIO_RAG=semantic CLIO_LLM=claude uv run --extra rag clio-author ask \
 ```
 **`runbook-out/answer.md`** becomes a log: each entry is `## <question>` + `_trace: action=ask · … · <timestamp>` + the answer, separated by `---`. (Drop `--append` to overwrite instead; the result is always also printed to stdout.)
 
+**Provenance:** every answer reports where it's grounded — `metadata.sources` lists each retrieved
+block's `section` path + `start_line` (source line) + retrieval `score`, and `metadata.grounded_in`
+is a compact string (e.g. `Methods:L42; Results:L88`) that also appears in the `--append` trace line.
+
 **`kg`** — extract a content knowledge graph (claims/methods/datasets/results/metrics/concepts/tasks + relations).
 
 | Flag | Takes | Meaning |

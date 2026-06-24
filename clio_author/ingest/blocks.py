@@ -60,6 +60,9 @@ class SectionBlock(Block):
     title: str
     text: str = ""
     page_range: tuple[int, int] | None = None
+    start_line: int | None = Field(
+        default=None, description="1-based line of this section's header in the source Markdown."
+    )
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -244,7 +247,7 @@ def build_section_blocks(markdown: str) -> list[SectionBlock]:
         if current is not None:
             current.text = "\n".join(body).strip()
 
-    for line in lines:
+    for line_no, line in enumerate(lines, start=1):
         match = header_re.match(line)
         if not match:
             if current is not None:
@@ -261,7 +264,9 @@ def build_section_blocks(markdown: str) -> list[SectionBlock]:
         path_titles = [t for _, t in ancestors] + [title]
         ancestors.append((level, title))
 
-        current = SectionBlock(section_path=" > ".join(path_titles), title=title)
+        current = SectionBlock(
+            section_path=" > ".join(path_titles), title=title, start_line=line_no
+        )
         body = []
         sections.append(current)
 

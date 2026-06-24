@@ -7,6 +7,11 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`ask` answer provenance — which section + line each answer came from.** `ask` now reports
+  `metadata.sources` (per retrieved block: `block_id`, `section` path, `start_line`, retrieval
+  `score`) and a compact `metadata.grounded_in` string (e.g. `Methods:L42; Results:L88`) that also
+  flows into the `--append` trace line. Section blocks now carry `start_line` (the header's 1-based
+  source line), populated by `build_section_blocks`.
 - **`--append` for `--out` (running logs + trace).** Saving with `--out FILE --append` now adds the
   result *after* existing content instead of overwriting — so repeated `ask`s build a Q&A log. Each
   entry gets a `## <question>` header and a `_trace:` line (action · scalar metadata · ISO timestamp);
