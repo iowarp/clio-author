@@ -419,6 +419,8 @@ CLIO_LLM=claude uv run clio-author cite_support \
 
 **`ground`** — one **grounding-integrity** score for a whole manuscript (composes three checks).
 
+> 🔗 **Shortcut** — runs `check_refs` + `verify_work` + `cite_support` and rolls them into one score. It adds no new check; use the three tools directly if you want them separately.
+
 This is the headline "how much of this paper is real?" number — the mean of whichever of these are available:
 - **citation integrity** (deterministic) — fraction of `\cite{}` keys that resolve to a real bib entry (via `check_refs`).
 - **claim integrity** (LLM) — fraction of your *intended* claims actually made + supported by the prose (via `verify_work`).
@@ -563,6 +565,8 @@ CLIO_LLM=claude uv run clio-author coherence \
 ---
 
 **`section_review`** — three-layer review of a single section: L1 reference check → L2 coherence → L3 persona peer review.
+
+> 🔗 **Shortcut** — runs `check_refs` + `coherence` + `review` on one section. It adds no new check; it bundles those three for a single section.
 
 | Flag | Takes | Meaning |
 |---|---|---|
@@ -775,6 +779,8 @@ CLIO_LLM=claude uv run clio-author write \
 
 **`write_review`** *(run-only)* — writer ↔ reviewer critic-refine loop.
 
+> 🔗 **Shortcut** — loops `write` ↔ `review` until the section converges. Same as drafting then reviewing by hand, repeated for you.
+
 Payload keys: `outline`, `section_plan`, `blocks`, `source`, `max_rounds`.
 ```bash
 CLIO_LLM=claude uv run clio-author run write_review \
@@ -784,6 +790,8 @@ CLIO_LLM=claude uv run clio-author run write_review \
 ---
 
 **`compose`** — draft a whole multi-section manuscript (outline → cite → write per section → assemble).
+
+> 🔗 **Shortcut** — runs `plan` + `cite` + `write` for each section + a review loop, then assembles the paper. It is the "write the whole thing" button built from those tools.
 
 | Flag | Takes | Meaning |
 |---|---|---|
@@ -902,6 +910,8 @@ CLIO_VISION=gemini uv run clio-author describe \
 
 **`figure_refine`** *(run-only)* — figure visualizer ↔ critic refine loop.
 
+> 🔗 **Shortcut** — loops `plot` ↔ a critic to improve a figure. Same as `plot` then critique, repeated for you.
+
 Payload keys: `spec`, `out_path`, `max_rounds`.
 ```bash
 CLIO_LLM=claude uv run clio-author run figure_refine \
@@ -966,6 +976,8 @@ CLIO_LLM=claude uv run clio-author compose \
 ## Act IX · Drive it with a goal
 
 **`orchestrate`** — plan and run a sequence of actions to achieve a natural-language goal.
+
+> 🔗 **Shortcut** — plans and runs a sequence of the other actions toward your goal. The most general shortcut: it picks and chains the tools for you.
 
 | Flag | Takes | Meaning |
 |---|---|---|
@@ -1033,36 +1045,39 @@ All other actions have dedicated subcommands — see Appendix A.
 
 Grouped by the Acts above (the order you actually use them in), so this index mirrors the body.
 
-| Act | Action | Subcommand |
-|---|---|---|
-| I · Read | `ingest` | `clio-author ingest <source>` |
-| I · Read | `gather` | `clio-author gather` |
-| II · Understand | `ask` | `clio-author ask` |
-| II · Understand | `kg` | `clio-author kg` |
-| III · Scholarship & grounding | `discover` | `clio-author discover` |
-| III · Scholarship & grounding | `cite` | `clio-author cite` |
-| III · Scholarship & grounding | `check_refs` | `clio-author check-refs` |
-| III · Scholarship & grounding | `cite_support` | `clio-author cite_support` |
-| III · Scholarship & grounding | `ground` | `clio-author ground` |
-| IV · Review & strengthen | `review` | `clio-author review` |
-| IV · Review & strengthen | `meta_review` | `clio-author run meta_review` |
-| IV · Review & strengthen | `rebuttal` | `clio-author rebuttal` |
-| IV · Review & strengthen | `coherence` | `clio-author coherence` |
-| IV · Review & strengthen | `section_review` | `clio-author section-review` |
-| IV · Review & strengthen | `verify_work` | `clio-author verify-work` |
-| IV · Review & strengthen | `audit` | `clio-author audit` |
-| V · Plan & write | `plan` | `clio-author plan` |
-| V · Plan & write | `experiment` | `clio-author experiment` |
-| V · Plan & write | `research` | `clio-author research` |
-| V · Plan & write | `write` | `clio-author write` |
-| V · Plan & write | `write_review` | `clio-author run write_review` |
-| V · Plan & write | `compose` | `clio-author compose` |
-| VI · Refine | `revise` | `clio-author revise` *(aliases: `run edit`, `polish`)* |
-| VII · Illustrate | `plot` | `clio-author run plot` |
-| VII · Illustrate | `describe_figures` | `clio-author describe` |
-| VII · Illustrate | `figure_refine` | `clio-author run figure_refine` |
-| VIII · Ship | `export` | `clio-author export` |
-| IX · Drive | `orchestrate` | `clio-author orchestrate` |
+**Kind:** 🔧 **tool** = does one specific job; 🔗 **shortcut** = adds no new ability, just runs several
+tools together for you (the description says which). There are 22 tools and 6 shortcuts.
+
+| Act | Action | Kind | Subcommand |
+|---|---|---|---|
+| I · Read | `ingest` | 🔧 | `clio-author ingest <source>` |
+| I · Read | `gather` | 🔧 | `clio-author gather` |
+| II · Understand | `ask` | 🔧 | `clio-author ask` |
+| II · Understand | `kg` | 🔧 | `clio-author kg` |
+| III · Scholarship & grounding | `discover` | 🔧 | `clio-author discover` |
+| III · Scholarship & grounding | `cite` | 🔧 | `clio-author cite` |
+| III · Scholarship & grounding | `check_refs` | 🔧 | `clio-author check-refs` |
+| III · Scholarship & grounding | `cite_support` | 🔧 | `clio-author cite_support` |
+| III · Scholarship & grounding | `ground` | 🔗 runs check_refs + verify_work + cite_support | `clio-author ground` |
+| IV · Review & strengthen | `review` | 🔧 | `clio-author review` |
+| IV · Review & strengthen | `meta_review` | 🔧 | `clio-author run meta_review` |
+| IV · Review & strengthen | `rebuttal` | 🔧 | `clio-author rebuttal` |
+| IV · Review & strengthen | `coherence` | 🔧 | `clio-author coherence` |
+| IV · Review & strengthen | `section_review` | 🔗 runs check_refs + coherence + review | `clio-author section-review` |
+| IV · Review & strengthen | `verify_work` | 🔧 | `clio-author verify-work` |
+| IV · Review & strengthen | `audit` | 🔧 | `clio-author audit` |
+| V · Plan & write | `plan` | 🔧 | `clio-author plan` |
+| V · Plan & write | `experiment` | 🔧 | `clio-author experiment` |
+| V · Plan & write | `research` | 🔧 | `clio-author research` |
+| V · Plan & write | `write` | 🔧 | `clio-author write` |
+| V · Plan & write | `write_review` | 🔗 runs write ↔ review loop | `clio-author run write_review` |
+| V · Plan & write | `compose` | 🔗 runs plan + cite + write×N + review | `clio-author compose` |
+| VI · Refine | `revise` | 🔧 | `clio-author revise` *(aliases: `run edit`, `polish`)* |
+| VII · Illustrate | `plot` | 🔧 | `clio-author run plot` |
+| VII · Illustrate | `describe_figures` | 🔧 | `clio-author describe` |
+| VII · Illustrate | `figure_refine` | 🔗 runs plot ↔ critic loop | `clio-author run figure_refine` |
+| VIII · Ship | `export` | 🔧 | `clio-author export` |
+| IX · Drive | `orchestrate` | 🔗 runs any sequence of tools | `clio-author orchestrate` |
 
 ## Appendix B — each action's LLM prompt source (to read/tune)
 | Action | Prompt constant | File |
