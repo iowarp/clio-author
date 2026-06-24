@@ -168,16 +168,20 @@ contributions / experiments?" use **`--all`** to inject the whole paper.
 ```bash
 # from a paper.md, whole paper (no separate ingest, no blocks.json):
 CLIO_LLM=claude uv run clio-author ask --markdown-file runbook-out/ingest/paper.md \
-  --question "What are the contributions and what experiments do they run?" --all --format prose
+  --question "What are the contributions and what experiments do they run?" \
+  --all --format prose --out runbook-out/answer.md
 
 # straight from a PDF / arXiv id (auto-ingests, then answers):
 CLIO_LLM=claude uv run --extra pdf clio-author ask --sources 1706.03762 \
-  --question "What datasets and baselines are used?" --all --format prose
+  --question "What datasets and baselines are used?" \
+  --all --format prose --out runbook-out/answer.md
 
 # from pre-built blocks (top-8 retrieval), with better semantic ranking:
 CLIO_RAG=semantic CLIO_LLM=claude uv run --extra rag clio-author ask \
-  --blocks-file runbook-out/ingest/blocks.json --question "What problem does this solve?" --k 8 --format prose
+  --blocks-file runbook-out/ingest/blocks.json --question "What problem does this solve?" \
+  --k 8 --format prose --out runbook-out/answer.md
 ```
+**Saves to:** `runbook-out/answer.md` (`--out` writes the prose for `.md`/`.txt`, full JSON for `.json`); the result is also printed to stdout.
 
 **`kg`** — extract a content knowledge graph (claims/methods/datasets/results/metrics/concepts/tasks + relations).
 
