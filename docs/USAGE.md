@@ -71,7 +71,7 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 
 ---
 
-## Action catalog (27 actions)
+## Action catalog (28 actions)
 
 Payload keys below are exactly the keys each expert reads. Keys marked *(optional)* have a fallback.
 
@@ -660,7 +660,72 @@ sub.run("check_refs", {"bibtex": bibtex_string, "markdown": manuscript_text})
 
 ---
 
-### 17. `section_review`
+### 17. `cite_support`
+
+Claim-to-source faithfulness: for each `claim … \cite{key}` pair in the prose, decide whether the
+**cited source actually supports the claim** (`supported` / `partial` / `unsupported` /
+`contradicted`). `cite` proves a citation *exists* and `check_refs` proves the key *resolves* — this
+proves the source *substantiates the sentence*, the gap those two leave open. `mode="abstract"`
+(default) judges against the cited abstract `cite` already fetched; `mode="deep"` ingests the cited
+paper's full text (by arXiv id) and judges against that, falling back to the abstract when a source
+can't be fetched.
+
+- **Reads:** `markdown` / `text` / `sections` *(one required)* — the manuscript prose; `citations`
+  *(required)* — `cite`'s verified output (carries titles + abstracts + ids) or a list of
+  `{citation_key, abstract, source?}`; `mode` *(optional)* — `"abstract"` (default) or `"deep"`.
+- **Returns:** `content` = a one-line summary; `structured` = `{items: [{claim, key, verdict,
+  evidence, rationale, source_kind}], support_integrity, counts, mode}`; `metadata` =
+  `{support_integrity, counts, num_pairs, mode}`.
+- **Extra:** needs a real model (`CLIO_LLM`); the echo client returns `unknown` per pair (never a
+  fabricated `supported`). `mode="deep"` additionally ingests each cited paper (network + ingest deps).
+- **File inputs:** `--markdown-file paper.md`; `--citations-file cite.json` (pass `cite`'s saved output
+  as-is — it reads the `verified` list, or `structured.verified`).
+
+```bash
+clio-author cite_support \
+  --markdown-file clio-out/mypaper/paper.md \
+  --citations-file clio-out/mypaper/cite.json \
+  --out-dir clio-out/mypaper/support        # add --deep for full-text checking
+```
+```python
+sub.run("cite_support", {"markdown": manuscript_text, "citations": cite_result["structured"]["verified"]})
+```
+
+---
+
+### 18. `ground`
+
+One **grounding-integrity** score for a whole manuscript — the mean of whichever of three checks are
+available, composed from `check_refs`, `verify_work`, and `cite_support`. The number no single-slice
+tool can produce, because none of them owns the citations, the claims, *and* the cited sources of the
+same paper.
+
+- **Reads:** `markdown` / `text` / `sections` — the prose; `bibtex` *(optional)* → **citation
+  integrity** (fraction of `\cite{}` keys resolving to a real bib entry); `claims` / `section_plan`
+  *(optional)* → **claim integrity** (fraction of intended claims made + supported by the prose);
+  `citations` *(optional)* + `mode` → **support integrity** (fraction of cited claims substantiated by
+  their source). At least one of `bibtex` / `claims` / `citations` is required.
+- **Returns:** `content` = a one-line summary; `structured` = `{grounding_integrity,
+  citation_integrity, claim_integrity, support_integrity, citations, claims, support}`; `metadata`
+  carries the four headline numbers + `wrote`.
+- **Extra:** the citation half is deterministic/offline; the claim + support halves need a real model.
+- **File inputs:** `--markdown-file paper.md`; `--bibtex-file references.bib`; `--citations-file cite.json`.
+
+```bash
+clio-author ground \
+  --markdown-file clio-out/mypaper/paper.md \
+  --bibtex-file clio-out/mypaper/references.bib \
+  --claims-json '["Transformers outperform RNNs on long sequences."]' \
+  --citations-file clio-out/mypaper/cite.json \
+  --out-dir clio-out/mypaper/ground
+```
+```python
+sub.run("ground", {"markdown": manuscript_text, "bibtex": bibtex_string, "citations": verified})
+```
+
+---
+
+### 19. `section_review`
 
 Three-layer review of a **single section**: L1 deterministic reference/citation checking
 (`check_refs`) → L2 single-section coherence (`coherence`) → L3 persona-conditioned peer review
@@ -701,7 +766,7 @@ sub.run("section_review", {
 
 ---
 
-### 18. `audit`
+### 20. `audit`
 
 Deterministic manuscript completeness audit: required sections present, per-section word-count vs
 budget, unresolved `[TODO]`/`[CITE:]`/empty `\cite{}` placeholders, and citation coverage. **No
@@ -744,7 +809,7 @@ sub.run("audit", {
 
 ---
 
-### 19. `kg`
+### 21. `kg`
 
 Extract a content knowledge graph of a paper -- its claims, methods, datasets, results, metrics,
 concepts, and tasks plus the relations between them -- from the paper's memory blocks. This is the
@@ -804,7 +869,7 @@ sub.run("kg", {
 
 ---
 
-### 20. `describe_figures`
+### 22. `describe_figures`
 
 Fill in descriptions/captions for figures in memory blocks.
 
@@ -830,7 +895,7 @@ agent.describe_figures(blocks_dump)
 
 ---
 
-### 21. `plot`
+### 23. `plot`
 
 Generate matplotlib plot **code** (text only; never executed on this path).
 
@@ -856,7 +921,7 @@ agent.plot({"kind": "plot", "intent": "bar chart of accuracy by model"})
 
 ---
 
-### 22. `compose`
+### 24. `compose`
 
 **Whole-paper orchestration.** Drafts a full multi-section manuscript from an idea and optional
 experimental log, chaining the existing experts in sequence.
@@ -933,7 +998,7 @@ print("section errors:", result["metadata"]["section_errors"])
 
 ---
 
-### 23. `export`
+### 25. `export`
 
 Export a composed Markdown manuscript to a standalone LaTeX document (`paper.tex` + optional
 `references.bib`).
@@ -998,7 +1063,7 @@ print(result["metadata"]["wrote"])
 
 ---
 
-### 24. `write_review`
+### 26. `write_review`
 
 Run a writer ↔ reviewer **critic-refine** loop and return the final output.
 
@@ -1020,7 +1085,7 @@ sub.run("write_review", {"outline": {"title": "Methods"}, "source": "...", "max_
 
 ---
 
-### 25. `figure_refine`
+### 27. `figure_refine`
 
 Run a figure visualizer ↔ critic **critic-refine** loop and return the final output.
 
@@ -1040,7 +1105,7 @@ sub.run("figure_refine", {"spec": {"kind": "plot", "intent": "line chart of loss
 
 ---
 
-### 26. `orchestrate`
+### 28. `orchestrate`
 
 Plan and run a sequence of the other actions to achieve a natural-language **goal** (dynamic
 multi-step). An LLM proposes a minimal ordered plan of action calls, which are executed through the

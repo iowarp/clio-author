@@ -72,7 +72,7 @@ GEMINI_API_KEY=...
 uv run ruff check clio_author tests        # -> All checks passed!
 uv run mypy clio_author                    # -> Success: no issues found in 75 source files
 uv run pytest -q                           # -> 621 passed, 3 skipped, 12 deselected
-uv run clio-author capabilities            # -> name=clio-author, 27 actions
+uv run clio-author capabilities            # -> name=clio-author, 28 actions
 uv run clio-author lifecycle               # -> the phase -> actions map (see docs/LIFECYCLE.md)
 ```
 
@@ -82,8 +82,9 @@ uv run clio-author lifecycle               # -> the phase -> actions map (see do
 > [`docs/LIFECYCLE.md`](LIFECYCLE.md) tells the full story with copy-paste recipes.
 
 > **Dedicated subcommands** with their own flags: `capabilities, ingest, gather, ask, experiment,
-> review, cite, discover, plan, write, compose, revise, export, polish, coherence, kg, describe,
-> orchestrate, rebuttal, research, verify-work, check-refs, section-review, audit, run`. The other
+> review, cite, cite_support, ground, discover, plan, write, compose, revise, export, polish,
+> coherence, kg, describe, orchestrate, rebuttal, research, verify-work, check-refs, section-review,
+> audit, run`. The other
 > actions (`edit`, `meta_review`, `plot`, `write_review`, `figure_refine`) have **no dedicated
 > subcommand** — reach them with `clio-author run <action> --json '{...}'`. `edit` and `polish` are
 > **aliases** of the unified `revise` action (`edit` ≡ `revise --mode feedback`, `polish` ≡
@@ -112,6 +113,8 @@ uv run --extra pdf clio-author ingest https://arxiv.org/abs/1706.03762   # url
 uv run --extra pdf clio-author ingest ./mypaper.pdf                      # local PDF
 ```
 **Expect:** `extractor=docling`, ~125 sections, 12 figures. **Artifacts:** `runbook-out/ingest/`.
+
+---
 
 **`gather`** — ingest **many** sources (files / folders / globs / git repos / PDFs) into one merged
 memory-block set. Deterministic (no LLM). Writes `context.json` (a drop-in `--blocks-file` for the
@@ -196,6 +199,8 @@ CLIO_RAG=semantic CLIO_LLM=claude uv run --extra rag clio-author ask \
 block's `section` path + `start_line` (source line) + retrieval `score`, and `metadata.grounded_in`
 is a compact string (e.g. `Methods:L42; Results:L88`) that also appears in the `--append` trace line.
 
+---
+
 **`kg`** — extract a content knowledge graph (claims/methods/datasets/results/metrics/concepts/tasks + relations).
 
 | Flag | Takes | Meaning |
@@ -251,7 +256,7 @@ CLIO_LLM=claude uv run clio-author kg \
 
 ---
 
-## Act III · Discover & verify the scholarship
+## Act III · Scholarship & grounding — find sources, verify them, score how grounded you are
 
 **`discover`** — find real candidate papers for a topic via scholarly search. **No LLM needed.**
 
@@ -339,109 +344,6 @@ CLIO_SCHOLAR=openalex uv run clio-author cite --candidates-json '[{"title":"Atte
 
 ---
 
-## Act IV · Judge it
-
-**`review`** — produce a structured peer review of a paper.
-
-| Flag | Takes | Meaning |
-|---|---|---|
-| `--paper` | string | paper Markdown text (inline) |
-| `--paper-file` | one file | path to a paper Markdown file (e.g. `paper.md`) |
-| `--ground` | flag | retrieve related prior work via `CLIO_SCHOLAR` and ground the review in it |
-| `--figures-json` | JSON string | inline list of figures (`[{figure_id?, image_path, caption?}]`) to look at; needs `CLIO_VISION=gemini`; sets `metadata.vision_review=true` + `metadata.figures_seen` |
-| `--figures-file` | one file | same format, as a JSON file |
-| `--format` | `structured`\|`prose` | default `structured`; `prose` = narrative text |
-| `--json` | JSON object | merge payload keys; use `{"persona":{"label":"..."}}` for reviewer persona |
-| `--out` | file path | save result |
-
-Output: **decision = Accept \| Reject**, **overall 1–10**, **7 axes 1–4** (originality, quality,
-clarity, significance, soundness, presentation, contribution), **confidence 1–5**, + summary/
-strengths/weaknesses/questions/limitations. With `--figures-json`/`--figures-file` and
-`CLIO_VISION=gemini`, figure descriptions are folded into the reviewed text and
-`metadata.vision_review` / `metadata.figures_seen` are set.
-```bash
-# (a) prose review (narrative):
-CLIO_LLM=claude uv run clio-author review --paper-file runbook-out/ingest/paper.md \
-  --format prose --out runbook-out/review.md
-
-# (b) structured — the decision + all scores (default format = JSON):
-CLIO_LLM=claude uv run clio-author review --paper-file runbook-out/ingest/paper.md \
-  2>/dev/null | python3 -m json.tool
-
-# (c) grounded — retrieve real related work and ground the critique in it:
-CLIO_SCHOLAR=auto CLIO_LLM=claude uv run clio-author review \
-  --paper-file runbook-out/ingest/paper.md --ground --format prose
-
-# (d) reviewer persona via --json (the `persona` payload key):
-CLIO_LLM=claude uv run clio-author review --paper-file runbook-out/ingest/paper.md \
-  --json '{"persona":{"label":"harsh reviewer"}}' --format prose
-
-# (e) multimodal review — reviewer sees the actual figure images (needs CLIO_VISION=gemini):
-CLIO_VISION=gemini GEMINI_API_KEY=... CLIO_LLM=claude uv run clio-author review \
-  --paper-file runbook-out/ingest/paper.md \
-  --figures-json '[{"figure_id":1,"image_path":"runbook-out/ingest/img/figure1.png","caption":"Overview"}]' \
-  --format prose
-```
-**Expect:** in (b) `metadata.decision` ∈ {Accept, Reject}, `metadata.overall` 1–10; (c) adds `metadata.related_work`; (e) adds `metadata.vision_review=true`, `metadata.figures_seen`.
-
-**`meta_review`** *(run-only)* — aggregate reviews → one area-chair decision (offline).
-
-Payload keys: `reviews` (list of review dicts).
-```bash
-uv run clio-author run meta_review \
-  --json '{"reviews":[{"Overall":7,"Decision":"Accept"},{"Overall":5,"Decision":"Reject"}]}'
-```
-
-**`rebuttal`** — draft an author rebuttal addressing a review point by point.
-
-| Flag | Takes | Meaning |
-|---|---|---|
-| `--paper` | string | paper/draft Markdown text (inline) |
-| `--paper-file` | one file | path to a paper/draft Markdown file (e.g. `paper.md`) |
-| `--review-json` | JSON string | a `PaperReview` dump (inline) to respond to; also accepts `{"weaknesses":[...],"questions":[...]}` loose dicts |
-| `--review-file` | one file | path to a JSON `PaperReview` file (e.g. a saved `review` result) |
-| `--format` | `structured`\|`prose` | default `structured` |
-| `--json` | JSON object | merge payload keys; also reads `review_text` / `critic_notes` for free-form review text |
-| `--out` | file path | save result |
-
-Reads the manuscript from `paper`/`draft`/`markdown` and the review from `review` (a
-`PaperReview` dump/dict), `review_text`, or `critic_notes`. Returns `content` = the rebuttal prose,
-`structured["rebuttal"]` = same text. When `target` is set (via `--json`), the rebuttal is written
-to that file. Never invents results or citations.
-```bash
-# prose rebuttal to a structured review saved from a prior review run:
-CLIO_LLM=claude uv run clio-author rebuttal \
-  --paper-file runbook-out/ingest/paper.md \
-  --review-file runbook-out/review.json \
-  --format prose --out runbook-out/rebuttal.md
-
-# inline JSON review (loose dict with weaknesses + questions):
-CLIO_LLM=claude uv run clio-author rebuttal \
-  --paper-file runbook-out/ingest/paper.md \
-  --review-json '{"weaknesses":["no baseline comparison","evaluation unclear"],"questions":["how is X measured?"]}' \
-  --format prose
-```
-**Expect:** `content` = a point-by-point rebuttal grounded in the paper; `structured.rebuttal` = same text.
-
-**`coherence`** — check cross-section consistency (terminology, contradictions, undefined terms, duplication, flow).
-
-| Flag | Takes | Meaning |
-|---|---|---|
-| `--sections-json` | JSON string | inline list of `{title, draft}` |
-| `--sections-file` | one file | same format, as a JSON file |
-| `--markdown-file` | one file | a full Markdown manuscript to split into sections |
-| `--text` | string | single passage to check (inline fallback) |
-| `--format` | `structured`\|`prose` | default `structured` |
-| `--json` | JSON object | merge any additional payload key |
-| `--out` | file path | save result |
-
-```bash
-CLIO_LLM=claude uv run clio-author coherence \
-  --sections-json '[{"title":"Introduction","draft":"X improves accuracy by 5%."},{"title":"Results","draft":"X achieves a 12% gain."}]' \
-  --format prose
-# or check a whole manuscript file: --markdown-file runbook-out/compose-out/paper.md
-```
-
 **`check_refs`** — deterministically lint a BibTeX bibliography and cross-check `\cite{}` keys in the prose. **No model needed.**
 
 | Flag | Takes | Meaning |
@@ -460,56 +362,6 @@ uv run clio-author check-refs \
   --markdown-file runbook-out/compose-out/paper.md
 ```
 **Expect:** `structured` = `{malformed[], duplicates[], missing_in_bib[], uncited_entries[], counts}`; emits suggestions only, never modifies files.
-
-**`section_review`** — three-layer review of a single section: L1 reference check → L2 coherence → L3 persona peer review.
-
-| Flag | Takes | Meaning |
-|---|---|---|
-| `--text` | string | the section text (inline) |
-| `--text-file` | one file | file holding the section text |
-| `--bibtex-file` | one file | BibTeX file for the L1 reference check |
-| `--persona-json` | JSON string | a `PersonaSpec` for the L3 reviewer (inline), e.g. `{"label":"harsh reviewer"}` |
-| `--format` | `structured`\|`prose` | default `structured` |
-| `--json` | JSON object | merge payload keys; also reads `section`, `markdown`, `out_dir` |
-| `--out` | file path | save result |
-
-```bash
-CLIO_LLM=claude uv run clio-author section-review \
-  --text-file runbook-out/compose-out/sections/01-introduction.md \
-  --bibtex-file runbook-out/cite-out/suggested.bib \
-  --format prose
-
-# With a custom reviewer persona:
-CLIO_LLM=claude uv run clio-author section-review \
-  --text-file runbook-out/compose-out/sections/01-introduction.md \
-  --persona-json '{"label":"harsh ML reviewer"}' --format prose
-```
-**Expect:** `structured` = `{layer1, layer2, layer3, severity_summary: [{layer, severity, detail}]}`; `metadata` = `{num_findings, max_severity}` where severity ∈ {critical, major, minor}.
-
-**`audit`** — deterministic manuscript completeness checklist. **No model needed.**
-
-| Flag | Takes | Meaning |
-|---|---|---|
-| `--sections-json` | JSON string | inline list of `{title, draft, word_budget?}` |
-| `--sections-file` | one file | same format, as a JSON file |
-| `--markdown-file` | one file | full Markdown manuscript to split and audit |
-| `--bibtex-file` | one file | BibTeX file for citation-coverage checking |
-| `--format` | `structured`\|`prose` | default `structured` |
-| `--json` | JSON object | merge payload keys; also reads `outline`, `candidates`, `verified` |
-| `--out` | file path | save result |
-
-```bash
-uv run clio-author audit \
-  --markdown-file runbook-out/compose-out/paper.md \
-  --bibtex-file runbook-out/cite-out/suggested.bib
-
-# From structured sections with an outline for required-section check:
-uv run clio-author audit \
-  --sections-file runbook-out/compose-out/sections.json \
-  --json '{"outline":{"title":"AUTHOR","sections":[{"title":"Introduction"},{"title":"Method"},{"title":"Experiments"},{"title":"Conclusion"}]}}' \
-  --format prose
-```
-**Expect:** `structured` = `{missing_sections[], word_counts[], placeholders, coverage}`; `metadata` = `{passed, num_sections, num_problems}`.
 
 ---
 
@@ -599,6 +451,200 @@ CLIO_LLM=claude uv run clio-author ground \
 
 ---
 
+## Act IV · Review & strengthen — referee a paper, then harden your own
+
+**`review`** — produce a structured peer review of a paper.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--paper` | string | paper Markdown text (inline) |
+| `--paper-file` | one file | path to a paper Markdown file (e.g. `paper.md`) |
+| `--ground` | flag | retrieve related prior work via `CLIO_SCHOLAR` and ground the review in it |
+| `--figures-json` | JSON string | inline list of figures (`[{figure_id?, image_path, caption?}]`) to look at; needs `CLIO_VISION=gemini`; sets `metadata.vision_review=true` + `metadata.figures_seen` |
+| `--figures-file` | one file | same format, as a JSON file |
+| `--format` | `structured`\|`prose` | default `structured`; `prose` = narrative text |
+| `--json` | JSON object | merge payload keys; use `{"persona":{"label":"..."}}` for reviewer persona |
+| `--out` | file path | save result |
+
+Output: **decision = Accept \| Reject**, **overall 1–10**, **7 axes 1–4** (originality, quality,
+clarity, significance, soundness, presentation, contribution), **confidence 1–5**, + summary/
+strengths/weaknesses/questions/limitations. With `--figures-json`/`--figures-file` and
+`CLIO_VISION=gemini`, figure descriptions are folded into the reviewed text and
+`metadata.vision_review` / `metadata.figures_seen` are set.
+```bash
+# (a) prose review (narrative):
+CLIO_LLM=claude uv run clio-author review --paper-file runbook-out/ingest/paper.md \
+  --format prose --out runbook-out/review.md
+
+# (b) structured — the decision + all scores (default format = JSON):
+CLIO_LLM=claude uv run clio-author review --paper-file runbook-out/ingest/paper.md \
+  2>/dev/null | python3 -m json.tool
+
+# (c) grounded — retrieve real related work and ground the critique in it:
+CLIO_SCHOLAR=auto CLIO_LLM=claude uv run clio-author review \
+  --paper-file runbook-out/ingest/paper.md --ground --format prose
+
+# (d) reviewer persona via --json (the `persona` payload key):
+CLIO_LLM=claude uv run clio-author review --paper-file runbook-out/ingest/paper.md \
+  --json '{"persona":{"label":"harsh reviewer"}}' --format prose
+
+# (e) multimodal review — reviewer sees the actual figure images (needs CLIO_VISION=gemini):
+CLIO_VISION=gemini GEMINI_API_KEY=... CLIO_LLM=claude uv run clio-author review \
+  --paper-file runbook-out/ingest/paper.md \
+  --figures-json '[{"figure_id":1,"image_path":"runbook-out/ingest/img/figure1.png","caption":"Overview"}]' \
+  --format prose
+```
+**Expect:** in (b) `metadata.decision` ∈ {Accept, Reject}, `metadata.overall` 1–10; (c) adds `metadata.related_work`; (e) adds `metadata.vision_review=true`, `metadata.figures_seen`.
+
+---
+
+**`meta_review`** *(run-only)* — aggregate reviews → one area-chair decision (offline).
+
+Payload keys: `reviews` (list of review dicts).
+```bash
+uv run clio-author run meta_review \
+  --json '{"reviews":[{"Overall":7,"Decision":"Accept"},{"Overall":5,"Decision":"Reject"}]}'
+```
+
+---
+
+**`rebuttal`** — draft an author rebuttal addressing a review point by point.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--paper` | string | paper/draft Markdown text (inline) |
+| `--paper-file` | one file | path to a paper/draft Markdown file (e.g. `paper.md`) |
+| `--review-json` | JSON string | a `PaperReview` dump (inline) to respond to; also accepts `{"weaknesses":[...],"questions":[...]}` loose dicts |
+| `--review-file` | one file | path to a JSON `PaperReview` file (e.g. a saved `review` result) |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys; also reads `review_text` / `critic_notes` for free-form review text |
+| `--out` | file path | save result |
+
+Reads the manuscript from `paper`/`draft`/`markdown` and the review from `review` (a
+`PaperReview` dump/dict), `review_text`, or `critic_notes`. Returns `content` = the rebuttal prose,
+`structured["rebuttal"]` = same text. When `target` is set (via `--json`), the rebuttal is written
+to that file. Never invents results or citations.
+```bash
+# prose rebuttal to a structured review saved from a prior review run:
+CLIO_LLM=claude uv run clio-author rebuttal \
+  --paper-file runbook-out/ingest/paper.md \
+  --review-file runbook-out/review.json \
+  --format prose --out runbook-out/rebuttal.md
+
+# inline JSON review (loose dict with weaknesses + questions):
+CLIO_LLM=claude uv run clio-author rebuttal \
+  --paper-file runbook-out/ingest/paper.md \
+  --review-json '{"weaknesses":["no baseline comparison","evaluation unclear"],"questions":["how is X measured?"]}' \
+  --format prose
+```
+**Expect:** `content` = a point-by-point rebuttal grounded in the paper; `structured.rebuttal` = same text.
+
+---
+
+**`coherence`** — check cross-section consistency (terminology, contradictions, undefined terms, duplication, flow).
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--sections-json` | JSON string | inline list of `{title, draft}` |
+| `--sections-file` | one file | same format, as a JSON file |
+| `--markdown-file` | one file | a full Markdown manuscript to split into sections |
+| `--text` | string | single passage to check (inline fallback) |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge any additional payload key |
+| `--out` | file path | save result |
+
+```bash
+CLIO_LLM=claude uv run clio-author coherence \
+  --sections-json '[{"title":"Introduction","draft":"X improves accuracy by 5%."},{"title":"Results","draft":"X achieves a 12% gain."}]' \
+  --format prose
+# or check a whole manuscript file: --markdown-file runbook-out/compose-out/paper.md
+```
+
+---
+
+**`section_review`** — three-layer review of a single section: L1 reference check → L2 coherence → L3 persona peer review.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--text` | string | the section text (inline) |
+| `--text-file` | one file | file holding the section text |
+| `--bibtex-file` | one file | BibTeX file for the L1 reference check |
+| `--persona-json` | JSON string | a `PersonaSpec` for the L3 reviewer (inline), e.g. `{"label":"harsh reviewer"}` |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys; also reads `section`, `markdown`, `out_dir` |
+| `--out` | file path | save result |
+
+```bash
+CLIO_LLM=claude uv run clio-author section-review \
+  --text-file runbook-out/compose-out/sections/01-introduction.md \
+  --bibtex-file runbook-out/cite-out/suggested.bib \
+  --format prose
+
+# With a custom reviewer persona:
+CLIO_LLM=claude uv run clio-author section-review \
+  --text-file runbook-out/compose-out/sections/01-introduction.md \
+  --persona-json '{"label":"harsh ML reviewer"}' --format prose
+```
+**Expect:** `structured` = `{layer1, layer2, layer3, severity_summary: [{layer, severity, detail}]}`; `metadata` = `{num_findings, max_severity}` where severity ∈ {critical, major, minor}.
+
+---
+
+**`verify_work`** — goal-backward check of written prose against the claims it was supposed to make.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--text` | string | the written prose to verify (inline) |
+| `--text-file` | one file | file holding the written prose |
+| `--section-plan-json` | JSON string | a `SectionPlan` whose `claims` to verify (inline) |
+| `--section-plan-file` | one file | path to a JSON `SectionPlan` file |
+| `--claims-json` | JSON string | an explicit list of claim strings to verify (inline) |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys |
+| `--out` | file path | save result |
+
+```bash
+CLIO_LLM=claude uv run clio-author verify-work \
+  --text-file runbook-out/compose-out/sections/01-introduction.md \
+  --claims-json '["AUTHOR unifies ingestion, review, and writing","The harness is grounded; it invents no citations"]' \
+  --format prose
+
+# From a saved section plan (output of plan):
+CLIO_LLM=claude uv run clio-author verify-work \
+  --text-file runbook-out/compose-out/sections/01-introduction.md \
+  --section-plan-file runbook-out/plan-out/plan.json \
+  --format prose
+```
+**Expect:** `structured` = `{claims: [{claim, made, supported, evidence, gap}], gaps[], status}`; `metadata` = `{num_claims, num_gaps, status}` where `status` ∈ {VERIFIED, GAPS}.
+
+---
+
+**`audit`** — deterministic manuscript completeness checklist. **No model needed.**
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--sections-json` | JSON string | inline list of `{title, draft, word_budget?}` |
+| `--sections-file` | one file | same format, as a JSON file |
+| `--markdown-file` | one file | full Markdown manuscript to split and audit |
+| `--bibtex-file` | one file | BibTeX file for citation-coverage checking |
+| `--format` | `structured`\|`prose` | default `structured` |
+| `--json` | JSON object | merge payload keys; also reads `outline`, `candidates`, `verified` |
+| `--out` | file path | save result |
+
+```bash
+uv run clio-author audit \
+  --markdown-file runbook-out/compose-out/paper.md \
+  --bibtex-file runbook-out/cite-out/suggested.bib
+
+# From structured sections with an outline for required-section check:
+uv run clio-author audit \
+  --sections-file runbook-out/compose-out/sections.json \
+  --json '{"outline":{"title":"AUTHOR","sections":[{"title":"Introduction"},{"title":"Method"},{"title":"Experiments"},{"title":"Conclusion"}]}}' \
+  --format prose
+```
+**Expect:** `structured` = `{missing_sections[], word_counts[], placeholders, coverage}`; `metadata` = `{passed, num_sections, num_problems}`.
+
+---
+
 ## Act V · Plan, then write a new paper
 
 **`plan`** — turn an idea or outline into per-section writing plans (tasks, claims, sources, word budgets).
@@ -635,6 +681,8 @@ CLIO_LLM=claude uv run clio-author plan --idea "cooperating agents for the paper
 **Expect:** `num_sections`, `num_tasks`, `plan_errors=0`; each plan has tasks/claims/sources + a word budget.
 **Artifacts:** `runbook-out/plan-out/plan.json`.
 
+---
+
 **`experiment`** — read reference papers' design/architecture/experiments and recreate an
 evaluation plan for your new paper. Phase 1 extracts each paper's `PaperDesign` (research questions,
 architecture, datasets, baselines, metrics, ablations, protocol, compute, limitations); phase 2 (when
@@ -665,6 +713,8 @@ CLIO_LLM=claude uv run --extra pdf clio-author experiment \
 ```
 **Expect:** `num_papers`, `has_plan=true`; per-paper designs + a grounded evaluation plan.
 **Artifacts:** `runbook-out/experiment/experiment_designs.{json,md}` + `evaluation_plan.{json,md}`.
+
+---
 
 **`research`** — produce a grounded literature brief for a topic or section.
 
@@ -703,32 +753,7 @@ CLIO_LLM=claude uv run clio-author research \
 ```
 **Expect:** `structured` = `{topic, foundational[], recent[], competing[], gaps[], synthesis, confidence, recommendations[]}`; `metadata` = `{num_sources, confidence, grounded}`.
 
-**`verify_work`** — goal-backward check of written prose against the claims it was supposed to make.
-
-| Flag | Takes | Meaning |
-|---|---|---|
-| `--text` | string | the written prose to verify (inline) |
-| `--text-file` | one file | file holding the written prose |
-| `--section-plan-json` | JSON string | a `SectionPlan` whose `claims` to verify (inline) |
-| `--section-plan-file` | one file | path to a JSON `SectionPlan` file |
-| `--claims-json` | JSON string | an explicit list of claim strings to verify (inline) |
-| `--format` | `structured`\|`prose` | default `structured` |
-| `--json` | JSON object | merge payload keys |
-| `--out` | file path | save result |
-
-```bash
-CLIO_LLM=claude uv run clio-author verify-work \
-  --text-file runbook-out/compose-out/sections/01-introduction.md \
-  --claims-json '["AUTHOR unifies ingestion, review, and writing","The harness is grounded; it invents no citations"]' \
-  --format prose
-
-# From a saved section plan (output of plan):
-CLIO_LLM=claude uv run clio-author verify-work \
-  --text-file runbook-out/compose-out/sections/01-introduction.md \
-  --section-plan-file runbook-out/plan-out/plan.json \
-  --format prose
-```
-**Expect:** `structured` = `{claims: [{claim, made, supported, evidence, gap}], gaps[], status}`; `metadata` = `{num_claims, num_gaps, status}` where `status` ∈ {VERIFIED, GAPS}.
+---
 
 **`write`** — draft one paper section from an outline and source material.
 
@@ -746,6 +771,8 @@ CLIO_LLM=claude uv run clio-author write \
   --outline "Introduction" --source-file runbook-out/ingest/paper.md --format prose
 ```
 
+---
+
 **`write_review`** *(run-only)* — writer ↔ reviewer critic-refine loop.
 
 Payload keys: `outline`, `section_plan`, `blocks`, `source`, `max_rounds`.
@@ -753,6 +780,8 @@ Payload keys: `outline`, `section_plan`, `blocks`, `source`, `max_rounds`.
 CLIO_LLM=claude uv run clio-author run write_review \
   --json '{"outline":{"title":"Introduction","goal":"introduce AUTHOR"},"source":"AUTHOR reads, reviews, and writes papers.","max_rounds":1}'
 ```
+
+---
 
 **`compose`** — draft a whole multi-section manuscript (outline → cite → write per section → assemble).
 
@@ -849,6 +878,8 @@ CLIO_VISION=gemini CLIO_LLM=claude uv run clio-author run plot \
   --json '{"spec":{"kind":"diagram","intent":"flowchart: ingest -> review -> write"},"out_path":"runbook-out/diagram.png"}'
 ```
 
+---
+
 **`describe`** (action `describe_figures`) — caption figures using vision.
 
 | Flag | Takes | Meaning |
@@ -866,6 +897,8 @@ CLIO_VISION=gemini uv run clio-author describe \
   --format prose
 ```
 **Expect:** `vision_described:[1]` + a real description.
+
+---
 
 **`figure_refine`** *(run-only)* — figure visualizer ↔ critic refine loop.
 
@@ -996,35 +1029,40 @@ All other actions have dedicated subcommands — see Appendix A.
   `ClioAuthorSubagent(llm=…).run("review", {"paper": "..."})`.
 - See a subcommand's exact flags anytime: `clio-author <cmd> --help`.
 
-## Appendix A — all 27 actions at a glance
+## Appendix A — all 28 actions at a glance
 
-| # | Action | Dedicated subcommand |
+Grouped by the Acts above (the order you actually use them in), so this index mirrors the body.
+
+| Act | Action | Subcommand |
 |---|---|---|
-| 1 | `ingest` | `clio-author ingest <source>` |
-| 2 | `ask` | `clio-author ask` |
-| 3 | `kg` | `clio-author kg` |
-| 4 | `discover` | `clio-author discover` |
-| 5 | `cite` | `clio-author cite` |
-| 6 | `check_refs` | `clio-author check-refs` |
-| 7 | `research` | `clio-author research` |
-| 8 | `review` | `clio-author review` |
-| 9 | `meta_review` | `clio-author run meta_review` |
-| 10 | `section_review` | `clio-author section-review` |
-| 11 | `rebuttal` | `clio-author rebuttal` |
-| 12 | `verify_work` | `clio-author verify-work` |
-| 13 | `audit` | `clio-author audit` |
-| 14 | `plan` | `clio-author plan` |
-| 15 | `write` | `clio-author write` |
-| 16 | `edit` | `clio-author run edit` |
-| 17 | `polish` | `clio-author polish` |
-| 18 | `coherence` | `clio-author coherence` |
-| 19 | `compose` | `clio-author compose` |
-| 20 | `write_review` | `clio-author run write_review` |
-| 21 | `plot` | `clio-author run plot` |
-| 22 | `describe_figures` | `clio-author describe` |
-| 23 | `figure_refine` | `clio-author run figure_refine` |
-| 24 | `export` | `clio-author export` |
-| 25 | `orchestrate` | `clio-author orchestrate` |
+| I · Read | `ingest` | `clio-author ingest <source>` |
+| I · Read | `gather` | `clio-author gather` |
+| II · Understand | `ask` | `clio-author ask` |
+| II · Understand | `kg` | `clio-author kg` |
+| III · Scholarship & grounding | `discover` | `clio-author discover` |
+| III · Scholarship & grounding | `cite` | `clio-author cite` |
+| III · Scholarship & grounding | `check_refs` | `clio-author check-refs` |
+| III · Scholarship & grounding | `cite_support` | `clio-author cite_support` |
+| III · Scholarship & grounding | `ground` | `clio-author ground` |
+| IV · Review & strengthen | `review` | `clio-author review` |
+| IV · Review & strengthen | `meta_review` | `clio-author run meta_review` |
+| IV · Review & strengthen | `rebuttal` | `clio-author rebuttal` |
+| IV · Review & strengthen | `coherence` | `clio-author coherence` |
+| IV · Review & strengthen | `section_review` | `clio-author section-review` |
+| IV · Review & strengthen | `verify_work` | `clio-author verify-work` |
+| IV · Review & strengthen | `audit` | `clio-author audit` |
+| V · Plan & write | `plan` | `clio-author plan` |
+| V · Plan & write | `experiment` | `clio-author experiment` |
+| V · Plan & write | `research` | `clio-author research` |
+| V · Plan & write | `write` | `clio-author write` |
+| V · Plan & write | `write_review` | `clio-author run write_review` |
+| V · Plan & write | `compose` | `clio-author compose` |
+| VI · Refine | `revise` | `clio-author revise` *(aliases: `run edit`, `polish`)* |
+| VII · Illustrate | `plot` | `clio-author run plot` |
+| VII · Illustrate | `describe_figures` | `clio-author describe` |
+| VII · Illustrate | `figure_refine` | `clio-author run figure_refine` |
+| VIII · Ship | `export` | `clio-author export` |
+| IX · Drive | `orchestrate` | `clio-author orchestrate` |
 
 ## Appendix B — each action's LLM prompt source (to read/tune)
 | Action | Prompt constant | File |
