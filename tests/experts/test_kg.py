@@ -263,3 +263,19 @@ def test_kg_writes_to_out_dir_without_constructor_files(tmp_path) -> None:
     assert (out / "kg.json").exists(), "kg.json was not written from payload out_dir"
     assert (out / "kg.mmd").exists(), "kg.mmd was not written from payload out_dir"
     assert any(str(out) in p for p in result.metadata["wrote"])
+
+
+def test_to_mermaid_styles_and_caps() -> None:
+    from clio_author.retrieval.kg import KGEdge, KGNode, KnowledgeGraph
+
+    nodes = [KGNode(id=f"n{i}", label=f"N{i}", type="method") for i in range(6)]
+    edges = [KGEdge(source="n0", target=f"n{i}", relation="uses") for i in range(1, 6)]
+    g = KnowledgeGraph(nodes=nodes, edges=edges)
+
+    full = g.to_mermaid(max_edges=0)
+    assert "classDef method" in full and ":::method" in full  # color-coded
+    assert sum("-->" in ln for ln in full.splitlines()) == 5
+
+    capped = g.to_mermaid(max_edges=2)
+    assert sum("-->" in ln for ln in capped.splitlines()) == 2  # edges capped
+    assert "showing 2 of 5 edges" in capped  # truncation noted

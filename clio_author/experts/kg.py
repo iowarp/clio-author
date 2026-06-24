@@ -111,7 +111,12 @@ class KGExpert(BaseAgent):
                     max_sections=int(max_sections) if max_sections is not None else None,
                 )
             num_entities = sum(1 for node in graph.nodes if node.type in _ENTITY_TYPES)
-            mermaid = graph.to_mermaid()
+            raw_max = task.payload.get("max_edges")
+            try:
+                max_edges = int(raw_max) if raw_max is not None else 500
+            except (TypeError, ValueError):
+                max_edges = 500
+            mermaid = graph.to_mermaid(max_edges=max_edges)
             wrote = self._maybe_write(task, graph, mermaid)
         except Exception as exc:  # noqa: BLE001 - experts never raise
             return self._error(session, str(exc))

@@ -207,10 +207,13 @@ is a compact string (e.g. `Methods:L42; Results:L88`) that also appears in the `
 | `--resume` | directory | path to a prior run's `kg_pipeline/*.json` checkpoints to resume from |
 | `--out-dir` | directory | persist `kg.json`/`kg.mmd` and (with `--full`) per-stage pipeline checkpoints under `kg_pipeline/` |
 | `--format` | `structured`\|`prose` | `prose` emits a Mermaid `graph TD` rendering |
+| `--max-edges` | int | cap edges in the `.mmd` view (default **500** — the Mermaid live-editor limit; `0` = no cap, smaller = a more readable overview). `kg.json` always holds the full graph. |
 | `--json` | JSON object | merge payload keys |
 | `--out` | file path | save result |
 
 Plain `kg` (single-shot LLM extraction) is the default. `--full` activates the multi-stage pipeline; `--stages` lets you run a subset; `--resume DIR` feeds prior checkpoints so interrupted runs continue where they left off.
+
+The Mermaid `.mmd` view **color-codes nodes by type** (method · concept · dataset · metric · claim · result · task) and **caps edges at `--max-edges`** so large graphs render in the live editor instead of erroring "Maximum number of edges exceeded". A big paper can exceed 500 edges; drop the cap (e.g. `--max-edges 120`) for a legible overview, and read `kg.json` for the complete graph.
 
 ```bash
 # Single-shot extraction (default):

@@ -7,6 +7,11 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Readable `kg` Mermaid graphs.** `to_mermaid` now **color-codes nodes by type** (method / concept /
+  dataset / metric / claim / result / task via `classDef`) and **caps edges** (default 500, the
+  Mermaid live-editor limit) so a large `kg.mmd` renders instead of erroring "Maximum number of edges
+  exceeded". `kg --max-edges N` sets the cap (`0` = full graph; smaller = a more readable overview);
+  the full graph is always in `kg.json`.
 - **`ask` answer provenance — which section + line each answer came from.** `ask` now reports
   `metadata.sources` (per retrieved block: `block_id`, `section` path, `start_line`, retrieval
   `score`) and a compact `metadata.grounded_in` string (e.g. `Methods:L42; Results:L88`) that also

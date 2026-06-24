@@ -771,6 +771,14 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Directory to persist kg.json/kg.mmd and per-stage pipeline checkpoints.",
     )
+    p_kg.add_argument(
+        "--max-edges",
+        dest="max_edges",
+        type=int,
+        default=None,
+        help="Cap edges in the Mermaid view so it renders (default 500, the live-editor limit); "
+        "0 = no cap (full graph). The JSON always has the full graph.",
+    )
     _add_format(p_kg)
     _add_json(p_kg)
 
@@ -1374,6 +1382,8 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
             payload["stages"] = args.stages
         if args.out_dir is not None:
             payload["out_dir"] = args.out_dir
+        if args.max_edges is not None:
+            payload["max_edges"] = args.max_edges
         if args.resume is not None:
             checkpoints = _load_kg_checkpoints(args.resume)
             if checkpoints:
