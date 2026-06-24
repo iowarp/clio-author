@@ -145,6 +145,40 @@ def test_write_accepts_outline_flag(capsys: pytest.CaptureFixture[str]) -> None:
     assert result["action"] == "write"
 
 
+def test_out_append_builds_a_running_log(capsys: pytest.CaptureFixture[str], tmp_path) -> None:
+    log = tmp_path / "log.md"
+    for q in ("first question?", "second question?"):
+        main(
+            [
+                "ask",
+                "--question",
+                q,
+                "--text",
+                "# P\n\n## S\n\nbody",
+                "--all",
+                "--format",
+                "prose",
+                "--out",
+                str(log),
+                "--append",
+            ]
+        )
+        capsys.readouterr()  # drain stdout between runs
+    text = log.read_text(encoding="utf-8")
+    assert "## first question?" in text and "## second question?" in text  # both entries, headered
+    assert "_trace:" in text and "action=ask" in text  # trace metadata per entry
+    assert "\n---\n" in text  # separator between the two entries
+
+
+def test_out_append_json_is_json_lines(capsys: pytest.CaptureFixture[str], tmp_path) -> None:
+    log = tmp_path / "log.json"  # .json + --append -> JSON Lines (one object per line)
+    for _ in range(2):
+        main(["review", "--paper", "# P\nbody", "--out", str(log), "--append"])
+        capsys.readouterr()
+    lines = [ln for ln in log.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    assert len(lines) == 2 and all(json.loads(ln)["action"] == "review" for ln in lines)
+
+
 def test_ground_command_citation_integrity(capsys: pytest.CaptureFixture[str]) -> None:
     code, result = _run(
         capsys,

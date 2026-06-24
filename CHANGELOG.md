@@ -7,6 +7,10 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`--append` for `--out` (running logs + trace).** Saving with `--out FILE --append` now adds the
+  result *after* existing content instead of overwriting — so repeated `ask`s build a Q&A log. Each
+  entry gets a `## <question>` header and a `_trace:` line (action · scalar metadata · ISO timestamp);
+  a `.json` target appends JSON Lines. Works on every action's `--out`.
 - **`ask` takes a paper in any form + better retrieval.** No more hand-building `blocks.json`: `ask`
   now accepts a `paper.md` (`--markdown-file`/`--text`, split into blocks on the fly) or a **PDF/arXiv
   id via `--sources`** (auto-ingested). New `--k` widens the injected context and `--all` injects the

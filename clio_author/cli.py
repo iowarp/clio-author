@@ -34,6 +34,7 @@ path named by ``CLIO_ENV_FILE``. Existing environment variables take precedence.
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import os
 import re
@@ -43,23 +44,64 @@ from pathlib import Path
 from typing import Any
 
 
-def _write_out(path: str, result: dict[str, Any]) -> None:
-    """Write a CLI result to ``path``.
+def _write_out(
+    path: str, result: dict[str, Any], *, append: bool = False, label: str | None = None
+) -> None:
+    """Write (or append) a CLI result to ``path``.
 
     A ``.json`` path gets the full indented result; any other extension (e.g.
-    ``.md``/``.txt``) gets the human-facing ``content`` when present, falling
-    back to the full JSON when there is no prose content.
+    ``.md``/``.txt``) gets the human-facing ``content`` when present, falling back
+    to the full JSON when there is no prose content.
+
+    With ``append=True`` the result is added *after* existing content instead of
+    overwriting -- so re-running into the same file builds a running log. For a
+    ``.json`` path that means one compact JSON object per line (JSON Lines, which
+    stays append-safe); for prose it adds a ``---`` separator + a ``## label``
+    header (e.g. the question) before the new answer.
     """
-    if path.lower().endswith(".json"):
-        text = json.dumps(result, indent=2)
-    else:
-        content = result.get("content")
-        text = (
-            content
-            if isinstance(content, str) and content.strip()
-            else json.dumps(result, indent=2)
-        )
-    Path(path).write_text(text, encoding="utf-8")
+    is_json = path.lower().endswith(".json")
+    if is_json and not append:
+        Path(path).write_text(json.dumps(result, indent=2), encoding="utf-8")
+        return
+    if is_json:  # append -> JSON Lines (one object per line; valid to append to)
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(result) + "\n")
+        return
+
+    content = result.get("content")
+    body = content if isinstance(content, str) and content.strip() else json.dumps(result, indent=2)
+    if not append:
+        Path(path).write_text(body, encoding="utf-8")
+        return
+    target = Path(path)
+    has_existing = target.exists() and target.stat().st_size > 0
+    parts = [
+        "\n\n---\n\n" if has_existing else "",
+        f"## {label}\n\n" if label else "",
+        _trace_line(result) + "\n\n",
+        body,
+    ]
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write("".join(parts) + "\n")
+
+
+def _trace_line(result: dict[str, Any]) -> str:
+    """A one-line, italic trace for a logged entry: action + key metadata + time.
+
+    Renders e.g. ``_trace: action=ask · k=8 · whole_paper=True · 2026-06-24T18:50:00_``
+    from the result's ``action`` and the scalar fields of its ``metadata``, so each
+    appended answer carries when/how it was produced.
+    """
+    parts = [f"action={result.get('action', '?')}"]
+    meta = result.get("metadata") or {}
+    if isinstance(meta, dict):
+        for key, value in meta.items():
+            if isinstance(value, bool) or isinstance(value, (int, float)):
+                parts.append(f"{key}={value}")
+            elif isinstance(value, str) and value:
+                parts.append(f"{key}={value[:40]}")
+    stamp = datetime.datetime.now().isoformat(timespec="seconds")
+    return "_trace: " + " · ".join(parts) + f" · {stamp}_"
 
 
 def _default_out_dir(source: str) -> str:
@@ -895,12 +937,19 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # `--out FILE` on every subcommand: also save the result (prose `content`
     # for .md/.txt, full JSON for .json) so callers need not redirect stdout.
+    # `--append` turns repeated saves into a running log instead of overwriting.
     for _p in sub.choices.values():
         _p.add_argument(
             "--out",
             dest="out_file",
             default=None,
             help="Also write the result to this file (prose for .md/.txt, full JSON for .json).",
+        )
+        _p.add_argument(
+            "--append",
+            action="store_true",
+            help="Append after existing --out content (a running log, with a question/trace header) "
+            "instead of overwriting.",
         )
 
     return parser
@@ -1440,9 +1489,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     out_file = getattr(args, "out_file", None)
     if out_file:
+        append = getattr(args, "append", False)
+        # Label the appended entry with the question when there is one, else the action.
+        label = getattr(args, "question", None) or result.get("action") or args.command
         try:
-            _write_out(out_file, result)
-            print(f"[saved to {out_file}]", file=sys.stderr)
+            _write_out(out_file, result, append=append, label=label)
+            print(f"[{'appended to' if append else 'saved to'} {out_file}]", file=sys.stderr)
         except OSError as exc:
             print(f"[warning: could not write {out_file}: {exc}]", file=sys.stderr)
 
