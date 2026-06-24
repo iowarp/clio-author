@@ -35,6 +35,7 @@ from clio_author.experts.echo import EchoExpert
 from clio_author.experts.editor import EditorExpert
 from clio_author.experts.experiment import ExperimentExpert
 from clio_author.experts.figure_agent import FigureAgentExpert, run_figure_refine
+from clio_author.experts.grounding import run_grounding
 from clio_author.experts.ingestor import IngestorExpert
 from clio_author.experts.kg import KGExpert
 from clio_author.experts.meta_reviewer import MetaReviewerExpert
@@ -213,6 +214,13 @@ class ClioAuthorAgent:
             return self.check_refs.run(task, session)
         if action == "audit":
             return self.audit.run(task, session)
+        if action == "ground":
+            return run_grounding(
+                task,
+                check_refs=self.check_refs,
+                verify_work=self.verify_work,
+                session=session,
+            )
         if action == "section_review":
             return run_section_review(
                 task,

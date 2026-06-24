@@ -8,8 +8,8 @@
   <img alt="Version" src="https://img.shields.io/badge/version-0.4.0-blue" />
   <img alt="Python" src="https://img.shields.io/badge/python-%E2%89%A53.12-3776ab" />
   <img alt="License" src="https://img.shields.io/badge/license-BSD--3--Clause-green" />
-  <img alt="Actions" src="https://img.shields.io/badge/actions-26-orange" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-602%20passing-brightgreen" />
+  <img alt="Actions" src="https://img.shields.io/badge/actions-27-orange" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-621%20passing-brightgreen" />
   <img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey" />
 </p>
 
@@ -28,7 +28,7 @@ phase of the work you're in.**
 
 ## What You Get
 
-- **26 actions across the author lifecycle** — frame · gather · plan · draft · strengthen · referee · respond · ship, all behind one interface
+- **27 actions across the author lifecycle** — frame · gather · plan · draft · strengthen · referee · respond · ship, all behind one interface
 - **PDF/arXiv → clean scientific Markdown** with structured memory blocks (sections, figures, equations)
 - **Grounded peer review** — Accept/Reject, per-axis scores, strengths/weaknesses, optional vision on figures
 - **Source-grounded writing** — outline → plan → draft → self-review → LaTeX/PDF, with verified citations
@@ -58,7 +58,7 @@ cd clio-author
 uv sync
 ```
 
-**3. Confirm it works** (lists the 26 things it can do — no model or network needed):
+**3. Confirm it works** (lists the 27 things it can do — no model or network needed):
 
 ```bash
 uv run clio-author capabilities      # what it can do
@@ -108,7 +108,7 @@ at any phase**. Most jobs don't even need `ingest`: only `ask`, `kg`, `experimen
 | **② Gather** | *Pull in what I'll build on* | `ingest`, `gather`, `ask`, `kg`, `cite` |
 | **③ Plan** | *Blueprint the paper + evaluation* | `plan`, `experiment`, `research` |
 | **④ Draft** | *Write & illustrate* | `write`, `compose`, `plot`, `describe_figures`, `figure_refine` |
-| **⑤ Strengthen** | *Make my own paper bulletproof* | `review`, `revise`, `coherence`, `verify_work`, `check_refs`, `cite`, `audit`, `section_review`, `write_review` |
+| **⑤ Strengthen** | *Make my own paper bulletproof* | `review`, `revise`, `coherence`, `verify_work`, `check_refs`, `cite`, `audit`, `ground`, `section_review`, `write_review` |
 | **⑥ Referee** | *Judge others' papers* | `review`, `section_review`, `meta_review` |
 | **⑦ Respond** | *Answer my reviewers* | `rebuttal`, `revise`, `audit` |
 | **⑧ Ship** | *Camera-ready* | `compose`, `export` |
@@ -116,7 +116,7 @@ at any phase**. Most jobs don't even need `ingest`: only `ask`, `kg`, `experimen
 
 The full story, with copy-paste recipes per phase, is in **[`docs/LIFECYCLE.md`](docs/LIFECYCLE.md)**.
 
-### The 26 actions at a glance
+### The 27 actions at a glance
 
 | Action | What it's for |
 |--------|---------------|
@@ -136,6 +136,7 @@ The full story, with copy-paste recipes per phase, is in **[`docs/LIFECYCLE.md`]
 | `coherence` | **Consistency check.** Terminology drift, contradictions, broken flow. |
 | `verify_work` | **Claim audit.** Per-claim made/supported check → VERIFIED/GAPS verdict. |
 | `audit` | **Manuscript checklist.** Sections, word counts, placeholders, coverage; no LLM. |
+| `ground` | **Grounding integrity.** % of citations that resolve + claims supported, end-to-end. |
 | `review` | **Peer review.** Accept/Reject + scores + critique; optional grounding and vision. |
 | `section_review` | **Section review.** L1 refs → L2 coherence → L3 persona; severity summary. |
 | `meta_review` | **Area-chair decision.** Aggregate several reviews; offline arithmetic. |
@@ -188,8 +189,9 @@ without a dedicated subcommand are reached with `clio-author run <action> --json
 - `section-review [--text T | --text-file FILE] [--bibtex-file FILE] [--persona-json JSON]`
 - `verify-work [--text T | --text-file FILE] [--section-plan-json JSON | --section-plan-file FILE] [--claims-json JSON]`
 - `audit [--sections-json JSON | --sections-file FILE] [--markdown-file FILE] [--bibtex-file FILE]`
+- `ground [--markdown-file FILE | --text T] [--bibtex-file FILE | --bibtex T] [--claims-json JSON] [--section-plan-file FILE] [--out-dir DIR]`
 - `rebuttal [--paper T | --paper-file FILE] [--review-json JSON | --review-file FILE]`
-- `run meta_review --json '{"reviews":[ … ]}'`
+- `run meta_review --json '{"reviews":[ … ]}'`  *(reports a `robustness` verdict: solid / borderline / split)*
 - `run write_review --json '{"outline":{…},"section_plan":{…},"blocks":{…},"max_rounds":N}'` — also `source` / `sources`
 
 **Figures**

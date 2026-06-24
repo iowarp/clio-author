@@ -49,3 +49,6 @@ dist/
 /docs/INTEGRATION.md
 /eval/agentic/
 /.claude/
+
+# editor lock files
+.~lock.*#

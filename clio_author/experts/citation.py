@@ -29,9 +29,10 @@ from clio_author.retrieval.scholar import (
     Candidate,
     Reference,
     ScholarClient,
+    grade_summary,
     to_bibtex,
     verified_coverage,
-    verify,
+    verify_and_grade,
 )
 
 CITATION_SYSTEM_PROMPT = (
@@ -118,13 +119,14 @@ class CitationExpert(BaseAgent):
             references = [
                 Reference(query_title=c.title, year_hint=c.year, raw=c.reason) for c in candidates
             ]
-            verified = verify(
+            verified, graded = verify_and_grade(
                 references,
                 self._client,
                 cutoff_date=self.cutoff_date,
                 threshold=self.threshold,
             )
             min_required, ratio, meets = verified_coverage(candidates, verified)
+            grades = grade_summary(graded)
 
             suggested_bibtex = "\n\n".join(to_bibtex(v) for v in verified)
             citation_map = {v.citation_key: v.record.title for v in verified}
@@ -154,14 +156,18 @@ class CitationExpert(BaseAgent):
             content=content,
             structured={
                 "verified": [v.model_dump() for v in verified],
+                "graded": [g.model_dump() for g in graded],
                 "suggested_bibtex": suggested_bibtex,
                 "citation_map": citation_map,
                 "coverage": coverage,
+                "grades": grades,
             },
             metadata={
                 "num_candidates": len(candidates),
                 "num_verified": len(verified),
                 "meets_90pct": meets,
+                "severity_counts": grades["counts"],
+                "citation_integrity": grades["citation_integrity"],
                 "wrote": wrote,
             },
         )

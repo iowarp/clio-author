@@ -23,7 +23,7 @@ deferred to a later milestone.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from statistics import mean
+from statistics import mean, pstdev
 from typing import Any
 
 from clio_author.experts.review_models import MetaReview, PaperReview, PersonaSpec
@@ -53,6 +53,36 @@ _ACCEPT_OVERALL_THRESHOLD = 6
 
 def _clamp(value: int, low: int, high: int) -> int:
     return max(low, min(high, value))
+
+
+def review_robustness(reviews: Sequence[PaperReview]) -> dict[str, Any]:
+    """How trustworthy is the verdict, given how much the reviewers disagree?
+
+    Inspired by AgentReview's finding that a large share of accept/reject
+    decisions is driven by reviewer variance rather than the paper. Deterministic:
+    ``agreement`` is the fraction siding with the majority decision; ``overall_std``
+    is the spread of overall ratings. The ``label`` is **solid** (reviewers agree,
+    tight scores), **split** (they disagree or scores are wide), else **borderline**.
+    """
+    n = len(reviews)
+    if n == 0:
+        return {"agreement": 1.0, "overall_std": 0.0, "label": "solid", "reviewer_count": 0}
+    accept = sum(1 for r in reviews if r.decision == "Accept")
+    agreement = max(accept, n - accept) / n
+    overalls = [r.overall for r in reviews]
+    overall_std = pstdev(overalls) if n > 1 else 0.0
+    if agreement >= 0.8 and overall_std <= 1.0:
+        label = "solid"
+    elif agreement < 0.6 or overall_std > 2.0:
+        label = "split"
+    else:
+        label = "borderline"
+    return {
+        "agreement": round(agreement, 3),
+        "overall_std": round(overall_std, 3),
+        "label": label,
+        "reviewer_count": n,
+    }
 
 
 class MetaReviewerExpert(BaseAgent):
@@ -147,20 +177,25 @@ class MetaReviewerExpert(BaseAgent):
                 return self._error(session, "no reviews to aggregate")
 
             meta = self.aggregate(reviews)
+            robustness = review_robustness(reviews)
         except Exception as exc:  # noqa: BLE001 - never raise; flag error on output
             return self._error(session, str(exc))
 
+        structured = meta.model_dump()
+        structured["robustness"] = robustness
         output = AgentOutput(
             agent=self.name,
             content=(
                 f"Meta-decision: {meta.decision} (overall {meta.overall}/10) "
-                f"from {meta.reviewer_count} reviewer(s)."
+                f"from {meta.reviewer_count} reviewer(s); verdict is {robustness['label']} "
+                f"(agreement {robustness['agreement']}, score spread {robustness['overall_std']})."
             ),
-            structured=meta.model_dump(),
+            structured=structured,
             metadata={
                 "decision": meta.decision,
                 "overall": meta.overall,
                 "reviewer_count": meta.reviewer_count,
+                "robustness": robustness["label"],
             },
         )
         session.add(output)
@@ -203,4 +238,9 @@ def run_panel(
     return outputs
 
 
-__all__ = ["MetaReviewerExpert", "META_REVIEWER_SYSTEM_PROMPT", "run_panel"]
+__all__ = [
+    "MetaReviewerExpert",
+    "META_REVIEWER_SYSTEM_PROMPT",
+    "run_panel",
+    "review_robustness",
+]

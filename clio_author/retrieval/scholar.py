@@ -34,7 +34,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, runtime_checkable
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
@@ -952,6 +952,124 @@ def to_bibtex(citation: VerifiedCitation) -> str:
     return citation.bibtex
 
 
+Severity = Literal["exact", "minor", "major"]
+"""Graded citation-verification label (CiteCheck-style: Exact / Minor / Major)."""
+
+
+class GradedCitation(BaseModel):
+    """A candidate graded by *how well* it matches a real record.
+
+    ``severity`` is **exact** (a real record matches title and, when given, year),
+    **minor** (a real record matches the title but with metadata drift -- e.g. a
+    different year), or **major** (no real record matches above threshold -- the
+    citation is likely fabricated). ``alternatives`` lists titles of other real
+    records the search surfaced, so a weak/fabricated citation can be replaced
+    with an equally-supported one (CiteGuard-style) rather than merely flagged.
+    """
+
+    candidate_title: str
+    candidate_year: int | None = None
+    severity: Severity
+    score: float
+    matched_title: str | None = None
+    matched_year: int | None = None
+    citation_key: str | None = None
+    alternatives: list[str] = Field(default_factory=list)
+
+
+def grade_reference(
+    reference: Reference,
+    records: list[S2Record],
+    *,
+    threshold: int = 70,
+    exact_score: int = 92,
+    max_alternatives: int = 3,
+) -> GradedCitation:
+    """Grade one ``reference`` against retrieved ``records`` (no network here).
+
+    Scores every record by :func:`fuzzy_ratio` on titles, then labels the
+    candidate **exact** (best title score >= ``exact_score`` and the year matches
+    or no year was given), **minor** (best score > ``threshold`` but with title or
+    year drift), or **major** (nothing above ``threshold`` -- likely fabricated).
+    ``alternatives`` are the next-best *real* record titles (above ``threshold``),
+    so a Minor/Major citation can be replaced rather than just flagged.
+    """
+    scored: list[tuple[int, S2Record]] = []
+    for record in records:
+        if not record.title:
+            continue
+        score = fuzzy_ratio(reference.query_title.lower(), record.title.lower())
+        scored.append((score, record))
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+
+    if not scored or scored[0][0] <= threshold:
+        return GradedCitation(
+            candidate_title=reference.query_title,
+            candidate_year=reference.year_hint,
+            severity="major",
+            score=float(scored[0][0]) if scored else 0.0,
+            alternatives=[rec.title for _s, rec in scored[:max_alternatives] if rec.title],
+        )
+
+    best_score, best = scored[0]
+    year_ok = reference.year_hint is None or best.year == reference.year_hint
+    severity: Severity = "exact" if (best_score >= exact_score and year_ok) else "minor"
+    alternatives = [rec.title for _s, rec in scored[1 : 1 + max_alternatives] if rec.title]
+    return GradedCitation(
+        candidate_title=reference.query_title,
+        candidate_year=reference.year_hint,
+        severity=severity,
+        score=float(best_score),
+        matched_title=best.title,
+        matched_year=best.year,
+        citation_key=mint_citation_key(best),
+        alternatives=alternatives,
+    )
+
+
+def verify_and_grade(
+    references: list[Reference],
+    client: ScholarClient,
+    *,
+    cutoff_date: str | None = None,
+    threshold: int = 70,
+) -> tuple[list[VerifiedCitation], list[GradedCitation]]:
+    """Search each reference **once** and return both verified + graded results.
+
+    One ``search_title`` per reference (kind to rate limits): the records feed
+    both :func:`best_match` (the strict, abstract/cutoff-gated path that yields the
+    deduped :class:`VerifiedCitation`s for BibTeX) and :func:`grade_reference` (the
+    Exact/Minor/Major severity + alternatives). Returns ``(verified, graded)``.
+    """
+    matched: list[VerifiedCitation] = []
+    graded: list[GradedCitation] = []
+    for reference in references:
+        records = client.search_title(reference.query_title, reference.year_hint, cutoff_date)
+        match = best_match(reference, records, threshold=threshold, cutoff_date=cutoff_date)
+        if match is not None:
+            matched.append(match)
+        graded.append(grade_reference(reference, records, threshold=threshold))
+    return dedupe(matched), graded
+
+
+def grade_summary(graded: list[GradedCitation]) -> dict[str, Any]:
+    """Roll graded citations into counts + a citation-integrity ratio.
+
+    ``citation_integrity`` is the fraction that are **not** ``major`` (i.e. map to
+    a real record) -- the headline "how much of the bibliography is real" number.
+    """
+    counts = {"exact": 0, "minor": 0, "major": 0}
+    for g in graded:
+        counts[g.severity] += 1
+    total = len(graded)
+    real = counts["exact"] + counts["minor"]
+    return {
+        "counts": counts,
+        "total": total,
+        "citation_integrity": (real / total) if total else 1.0,
+    }
+
+
 def verify(
     references: list[Reference],
     client: ScholarClient,
@@ -1034,6 +1152,11 @@ __all__ = [
     "verified_coverage",
     "to_bibtex",
     "verify",
+    "GradedCitation",
+    "Severity",
+    "grade_reference",
+    "verify_and_grade",
+    "grade_summary",
     "discover_papers",
     "resolve_scholar_client",
 ]

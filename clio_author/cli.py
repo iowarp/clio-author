@@ -276,6 +276,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Plan each section (tasks/claims/sources) before drafting it.",
     )
+    p_compose.add_argument(
+        "--verify",
+        action="store_true",
+        help="After drafting, score grounding integrity (citations resolve + claims supported).",
+    )
     _add_format(p_compose)
     _add_json(p_compose)
 
@@ -495,6 +500,43 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_format(p_audit)
     _add_json(p_audit)
+
+    p_ground = sub.add_parser(
+        "ground",
+        help="Score grounding integrity: how much of a manuscript traces to real sources.",
+    )
+    p_ground.add_argument("--text", default=None, help="The manuscript prose (inline).")
+    p_ground.add_argument(
+        "--markdown-file",
+        dest="markdown_file",
+        default=None,
+        help="Path to the manuscript Markdown.",
+    )
+    p_ground.add_argument(
+        "--bibtex",
+        default=None,
+        help="The BibTeX bibliography (inline; drives citation integrity).",
+    )
+    p_ground.add_argument(
+        "--bibtex-file", dest="bibtex_file", default=None, help="Path to a BibTeX file."
+    )
+    p_ground.add_argument(
+        "--claims-json",
+        dest="claims_json",
+        default=None,
+        help="A JSON list of intended claims (drives claim integrity; needs a real model).",
+    )
+    p_ground.add_argument(
+        "--section-plan-file",
+        dest="section_plan_file",
+        default=None,
+        help="Path to a JSON SectionPlan whose claims to verify.",
+    )
+    p_ground.add_argument(
+        "--out-dir", dest="out_dir", default=None, help="Directory to persist grounding.json/.md."
+    )
+    _add_format(p_ground)
+    _add_json(p_ground)
 
     p_export = sub.add_parser(
         "export", help="Export a composed manuscript to LaTeX (paper.tex + references.bib)."
@@ -1061,6 +1103,8 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         if args.pdf:
             payload["pdf"] = True
         payload["plan"] = args.plan
+        if getattr(args, "verify", False):
+            payload["verify"] = True
         payload["format"] = args.fmt
     elif command == "plan":
         if args.idea_file is not None:
@@ -1162,6 +1206,27 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
             payload["bibtex"] = _read_file(args.bibtex_file, field="--bibtex-file")
         payload["format"] = args.fmt
         return "audit", payload
+    elif command == "ground":
+        if args.markdown_file is not None:
+            payload["markdown"] = _read_file(args.markdown_file, field="--markdown-file")
+        elif args.text is not None:
+            payload["text"] = args.text
+        if args.bibtex_file is not None:
+            payload["bibtex"] = _read_file(args.bibtex_file, field="--bibtex-file")
+        elif args.bibtex is not None:
+            payload["bibtex"] = args.bibtex
+        claims = _json_input(None, args.claims_json, field="claims (--claims-json)")
+        if claims is not None:
+            payload["claims"] = claims
+        section_plan = _json_input(
+            args.section_plan_file, None, field="section_plan (--section-plan-file)"
+        )
+        if section_plan is not None:
+            payload["section_plan"] = section_plan
+        if args.out_dir is not None:
+            payload["out_dir"] = args.out_dir
+        payload["format"] = args.fmt
+        return "ground", payload
     elif command == "export":
         if args.title is not None:
             payload["title"] = args.title
