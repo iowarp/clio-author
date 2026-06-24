@@ -52,3 +52,6 @@ dist/
 
 # editor lock files
 .~lock.*#
+
+# runbook example scratch
+/runbook-out/
