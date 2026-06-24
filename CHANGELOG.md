@@ -7,6 +7,11 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Grounding-integrity benchmark** (`scripts/benchmark_grounding.py` + `eval/grounding/`) — runs
+  the `ground` action over a case set and shows the headline finding: single-slice tools
+  (citation-only, claim-only) are *wrong per paper* about end-to-end grounding (mean-absolute-error +
+  "false-confidence" count) because each is blind to the other half; AUTHOR's unified score is the
+  honest figure none of them can compute. Runs offline on a bundled sample.
 - **Novelty stack — grounding-integrity metric + cross-stage verification** (positions AUTHOR beyond
   the single-slice prior work; each piece maps to a 2024–2026 paper):
   - **`ground` action (27th)** — the flagship *grounding-integrity* number: fraction of in-text
