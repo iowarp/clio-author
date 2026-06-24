@@ -9,7 +9,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-%E2%89%A53.12-3776ab" />
   <img alt="License" src="https://img.shields.io/badge/license-BSD--3--Clause-green" />
   <img alt="Actions" src="https://img.shields.io/badge/actions-27-orange" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-621%20passing-brightgreen" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-635%20passing-brightgreen" />
   <img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey" />
 </p>
 
@@ -53,7 +53,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 **2. Get the code and install the core package:**
 
 ```bash
-git clone <repo-url>          # the clio-author repository
+git clone https://github.com/iowarp/clio-author.git
 cd clio-author
 uv sync
 ```
@@ -156,17 +156,19 @@ payload-key reference for calling AUTHOR as a library is in **[`docs/USAGE.md`](
 
 ## Commands & arguments
 
-Three flags are available on (almost) every command and are omitted below for brevity:
+A few flags are available on (almost) every command and are omitted below for brevity:
 `--format {structured,prose}` (JSON vs. human-readable text), `--json '{...}'` (merge extra payload
-keys), and `--out FILE` (also save the result). `A | B` means "either"; `…` means repeatable. Actions
-without a dedicated subcommand are reached with `clio-author run <action> --json '{...}'`.
+keys), `--out FILE` (also save the result), and `--append` (with `--out`, **append** into a running
+log instead of overwriting — each entry headed by the question + a trace line). `A | B` means
+"either"; `…` means repeatable. Actions without a dedicated subcommand are reached with
+`clio-author run <action> --json '{...}'`.
 
 **Read & gather**
 - `ingest <source>` — `<source>` = arXiv id / URL / local PDF path / paper title
 - `gather [--sources S … | --sources-file FILE] [--out-dir DIR] [--max-files N] [--max-text-chars N]`
 
 **Understand**
-- `ask --question Q [--markdown-file paper.md | --blocks-file FILE | --sources <pdf|arXiv id> | --text T] [--k N] [--all]` — give the paper in any form; a PDF/arXiv via `--sources` is auto-ingested; `--all` uses the whole paper
+- `ask --question Q [--markdown-file paper.md | --blocks-file FILE | --sources <pdf|arXiv id> | --text T] [--k N] [--all]` — give the paper in any form; a PDF/arXiv via `--sources` is auto-ingested; `--all` uses the whole paper. The answer's `metadata.grounded_in` reports the exact sections + lines it used.
 - `kg [--blocks-file FILE | --blocks-json JSON] [--full] [--stages LIST] [--resume DIR] [--out-dir DIR] [--sources …]`
 - `experiment [--sources S … | --blocks-file FILE | --markdown-file FILE | --text T] [--idea I | --idea-file FILE] [--out-dir DIR]`
 
