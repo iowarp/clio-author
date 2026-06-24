@@ -33,23 +33,31 @@ SLIDES: list[dict] = [
     },
     {
         "type": "bullets",
-        "title": "1 . What this is (and the paper)",
+        "title": "1 . The mandate - what we were asked to build",
         "bullets": [
             (
                 0,
-                "AUTHOR: one Python package that turns a paper (arXiv link / PDF / title) into clean Markdown + memory blocks, then runs specialized expert agents to answer, verify, review, plan, write, illustrate, and export - behind one interface a host agent can call.",
+                "Goal: give the host agent (CLIO) two new capabilities, cleanly integrated as something it can load, use, and unload on demand.",
+            ),
+            (
+                1,
+                "Process papers: any arXiv link / PDF -> clean scientific Markdown with vision (figures, tables, equations), stored as structured memory blocks for selective context injection and Q&A.",
+            ),
+            (
+                1,
+                "Review & write papers: decompose the work into expert agents + retrieval + read/write/edit tools, so the host can review and write papers - grounded, not free-form.",
             ),
             (
                 0,
-                "Paper title: AUTHOR - Agentic Understanding for Thesis, Hypothesis, and Objective Research.",
+                "Method we were given: study 5 reference codebases + 2 papers, map their similarities/differences, then design the evolution of all of it into ONE cohesive package - and benchmark it against those baselines.",
             ),
             (
                 0,
-                "Core claim: the contribution is unifying the lifecycle in one grounded, composable package - not any single capability in isolation.",
+                "Form constraint: a standalone, tested Python harness (not an MCP server, not a blueprint), permissively licensed - no AGPL code copied.",
             ),
             (
                 0,
-                "Status: built end-to-end - 26 actions, ~595 hermetic tests, CI green; validated live (Claude / Codex / Ollama / Gemini vision / live citation backends).",
+                "This deck: the mandate -> the gap we found -> what we built -> the sources -> how we compare -> the author's story.",
             ),
         ],
     },
@@ -75,46 +83,13 @@ SLIDES: list[dict] = [
             ),
             (
                 0,
-                "Hosts need an on-demand capability: a larger agent (CLIO) should load paper processing/writing, use it, and drop it - like calling a library, not running a monolith.",
-            ),
-            (
-                0,
-                "One substrate, reused: ingest once -> the same memory blocks feed Q&A, review, planning, and writing - no lossy re-parsing between stages.",
-            ),
-        ],
-    },
-    {
-        "type": "bullets",
-        "title": "2b . The cost today (concretely)",
-        "bullets": [
-            (
-                0,
-                "A typical 'process + review + write related work' task today touches 4-6 disjoint tools:",
-            ),
-            (1, "PDF -> Markdown: Docling / MinerU (no writing, no citation check)"),
-            (1, "Ask questions about it: PaperQA2 / OpenScholar (separate index, separate API)"),
-            (
-                1,
-                "Check the references: a citation auditor (CiteCheck) - yet another tool, another format",
-            ),
-            (
-                1,
-                "Draft text: a survey/writing agent (AutoSurvey / PaperOrchestra) - starts over, re-ingests",
-            ),
-            (1, "Make a figure: PaperBanana; export LaTeX: a sixth step"),
-            (
-                0,
-                "Each boundary loses structure, repeats work, and adds a place for hallucinated or unverifiable output to slip in. Nothing carries the paper's grounded representation across all stages.",
-            ),
-            (
-                0,
-                "AUTHOR replaces that chain with one grounded substrate and one interface - the integration is the point.",
+                "What's needed: an on-demand, grounded capability a host can call like a library, with ONE substrate reused across stages - ingest once, and the same memory blocks feed Q&A, review, planning, and writing.",
             ),
         ],
     },
     {
         "type": "table",
-        "title": "3 . The gap - nobody unifies the lifecycle",
+        "title": "2b . The gap we found - nobody unifies the lifecycle",
         "headers": ["Camp", "Examples", "Does well", "Omits"],
         "rows": [
             [
@@ -136,40 +111,73 @@ SLIDES: list[dict] = [
                 "every other capability",
             ],
         ],
-        "note": "The quadrant {vision ingest + grounded QA + cite-verify + review + write + figures + export} as ONE host-invocable package is held by no one. That is AUTHOR's position.",
+        "note": "The quadrant {vision ingest + grounded QA + cite-verify + review + write + figures + export} as ONE host-invocable package is held by no one. That is AUTHOR's position. (Full survey + a source per claim: docs/MOTIVATION.md)",
         "col0": 52,
         "font": 12,
     },
     {
         "type": "bullets",
-        "title": "3b . Gap - even the closest systems miss most of it",
+        "title": "3 . What we have - 26 actions, one package",
         "bullets": [
             (
                 0,
-                "AI Scientist v2 - generates NEW research end-to-end and reviews its own output, but does not ingest external PDFs, does no grounded Q&A, does not verify citations against scholarly DBs, and is a closed CLI with no host tool-surface.",
+                "Read / understand: ingest (PDF->MD + blocks + figures), gather (many sources -> one context), ask (grounded Q&A), kg (content knowledge graph; --full = 6-stage pipeline)",
             ),
             (
                 0,
-                "PaperOrchestra - strongest writing system (write + figures + export), but: no ingest, only partial QA, only partial citation-verify, no review, no host API.",
+                "Discover / verify sources: discover (find real papers), cite (verify; 4-source cascade), check_refs (BibTeX audit), research (grounded lit brief)",
             ),
             (
                 0,
-                "AutoSurvey / SurveyForge - write cited surveys from a curated abstract DB; cannot ingest arbitrary PDFs with vision, do not verify against external DBs, no review/figures/export.",
+                "Plan / write: plan, write, compose (whole paper), revise (feedback|style), coherence, experiment (recreate an evaluation plan from reference papers)",
             ),
             (
                 0,
-                "PaperQA2 / OpenScholar - excellent grounded literature-QA and host-invocable, but verify their OWN answers against a corpus, not a manuscript's bibliography; no ingest-with-vision, review, writing, figures, or export.",
+                "Review / respond: review (decision + scores + --ground; multimodal), section_review, meta_review, verify_work, audit, rebuttal, write_review (loop)",
             ),
-            (0, "Docling / MinerU - best-in-class ingest, then stop: nothing downstream."),
             (
                 0,
-                "Takeaway: the capabilities exist but are disjoint across systems and don't interoperate - exactly the integration gap AUTHOR closes.",
+                "Illustrate / ship / drive: plot, describe_figures (Gemini vision), figure_refine, export (-> LaTeX + PDF), orchestrate (goal -> plan -> execute)",
+            ),
+            (
+                0,
+                "One adapter (capabilities() + run(action, payload)) + a CLI + an MCP bridge - stateless, JSON in/out, never raises; each action tagged with its lifecycle phase.",
+            ),
+            (
+                0,
+                "Status: built end-to-end - ~605 hermetic tests, CI green; validated live (Claude / Codex / Ollama / LM Studio / OpenRouter / LiteLLM / Gemini vision / real citation backends).",
+            ),
+        ],
+    },
+    {
+        "type": "bullets",
+        "title": "4 . What we built on - papers & artifacts",
+        "bullets": [
+            (0, "Combined per the mandate (adapted with attribution):"),
+            (1, "Processing - paper-to-md (MIT, + phagocyte) and PaperBanana (arXiv 2601.23265)"),
+            (1, "Writing / editing - wtf-p (MIT) and PaperOrchestra (arXiv 2604.05018)"),
+            (0, "Harness references (concepts re-implemented, NOT copied):"),
+            (
+                1,
+                "papervizagent - orchestrator + expert agents + critic loop -> CriticRefine + figure_agent",
+            ),
+            (
+                1,
+                "protoneo/knowledge (AGPL) - BaseAgent / deliberation patterns / 6-stage KG -> harness/ + kg",
+            ),
+            (
+                0,
+                "5 codebases + 2 papers, all cloned in artifact/repos/ + artifact/papers/, with deep-study notes in artifact/notes/.",
+            ),
+            (
+                0,
+                "License-clean: BSD-3-Clause; MIT/Apache adapted with headers; no AGPL code copied (protoneo concepts re-built from scratch).",
             ),
         ],
     },
     {
         "type": "table",
-        "title": "4 . Capability coverage (AUTHOR vs the field)",
+        "title": "5 . Comparison - AUTHOR vs the field",
         "headers": ["System", "In", "QA", "CV", "Rv", "Wr", "Fg", "Ex", "1pkg", "Host"],
         "rows": [
             ["AUTHOR", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y"],
@@ -186,174 +194,92 @@ SLIDES: list[dict] = [
     },
     {
         "type": "bullets",
-        "title": "5 . What we built - the 26 actions",
+        "title": "5b . Comparison - even the closest systems miss most of it",
         "bullets": [
             (
                 0,
-                "Read / understand: ingest (PDF->MD + blocks + figures), ask (grounded Q&A), kg (content knowledge graph)",
+                "AI Scientist v2 - generates NEW research end-to-end and reviews its own output, but does not ingest external PDFs, does no grounded Q&A, does not verify citations against scholarly DBs, and is a closed CLI with no host tool-surface.",
             ),
             (
                 0,
-                "Discover/verify: discover (find real papers via scholarly search), cite (verify; 4-source cascade), check_refs (BibTeX audit)",
+                "PaperOrchestra - strongest writing system (write + figures + export), but: no ingest, only partial QA, only partial citation-verify, no review, no host API.",
             ),
             (
                 0,
-                "Review: review (decision + scores + --ground; multimodal - sees figures via vision), meta_review (panel), rebuttal (point-by-point), write_review (loop)",
+                "AutoSurvey / SurveyForge - write cited surveys from a curated abstract DB; cannot ingest arbitrary PDFs with vision, do not verify against external DBs, no review/figures/export.",
             ),
             (
                 0,
-                "Write: plan, write, edit, polish, coherence, compose (whole paper), export (-> LaTeX + PDF via --pdf)",
+                "PaperQA2 / OpenScholar - excellent grounded literature-QA and host-invocable, but verify their OWN answers against a corpus, not a manuscript's bibliography; no ingest-with-vision, review, writing, figures, export.",
             ),
-            (0, "Illustrate: plot, describe_figures (Gemini vision), figure_refine (loop)"),
+            (0, "Docling / MinerU - best-in-class ingest, then stop: nothing downstream."),
             (
                 0,
-                "Research/verify: research (grounded lit brief), verify_work (claim coverage), check_refs (BibTeX audit), section_review (3-layer), audit (pre-submission)",
-            ),
-            (
-                0,
-                "Knowledge graph: kg (single-shot) and kg --full (6-stage pipeline: ontology->extraction->coref->verification, clean-room protoneo)",
-            ),
-            (0, "Drive: orchestrate (goal -> plan a sequence of the above -> execute)"),
-            (
-                0,
-                "One adapter (capabilities() + run(action, payload)) + a CLI - stateless, JSON in/out, never raises.",
+                "Takeaway: the capabilities exist but are disjoint across systems and don't interoperate - exactly the integration gap AUTHOR closes.",
             ),
         ],
     },
     {
         "type": "bullets",
-        "title": "6 . References & artifacts we built on",
+        "title": "6 . The story - one author, the whole lifecycle",
         "bullets": [
-            (0, "Combined (the mandate):"),
-            (1, "Processing - paper-to-md (+ phagocyte) and PaperBanana (arXiv 2601.23265)"),
-            (1, "Writing / editing - wtf-p and PaperOrchestra (arXiv 2604.05018)"),
-            (0, "Harness references (concepts re-implemented, not copied):"),
             (
-                1,
-                "papervizagent - orchestrator + expert agents + critic loop -> CriticRefine + figure_agent",
+                0,
+                "An author wears two hats - Writer (their own paper) and Referee (others') - and can enter at ANY phase; most jobs don't even start with ingest.",
             ),
             (
                 1,
-                "protoneo/knowledge (AGPL) - BaseAgent / deliberation patterns / KG -> harness/ + kg",
+                "Frame: research + discover + experiment - what's the story, what exists, how did related work evaluate?",
+            ),
+            (
+                1,
+                "Gather: gather/ingest results notes, related PDFs, even a code repo into one grounded context.",
+            ),
+            (
+                1,
+                "Plan: plan per-section blueprints; experiment recreates a grounded evaluation plan for the new method.",
+            ),
+            (
+                1,
+                "Draft: write section by section or compose the whole paper; plot + describe_figures for figures.",
+            ),
+            (
+                1,
+                "Strengthen (before anyone sees it): revise, coherence, verify_work, check_refs, audit - and review your own draft as a hostile referee.",
+            ),
+            (1, "Referee (others' papers): review + section_review, aggregate with meta_review."),
+            (1, "Respond: rebuttal point-by-point, then revise to incorporate it."),
+            (
+                1,
+                "Ship: export -> paper.tex + references.bib (+ PDF). orchestrate drives any multi-step run from one goal.",
             ),
             (
                 0,
-                "All cloned in artifact/repos/; both papers in artifact/papers/; deep-study notes in artifact/notes/.",
-            ),
-            (
-                0,
-                "License-clean (BSD-3-Clause; no AGPL code copied - protoneo concepts re-implemented from scratch).",
-            ),
-        ],
-    },
-    {
-        "type": "diagram",
-        "title": "7 . Design - how it's put together",
-        "diagram": (
-            "host (CLIO)  --->  ClioAuthorSubagent   (capabilities + run; JSON; never-raises)\n"
-            "                        |\n"
-            "                   Main agent (router)  +  orchestrate (goal -> plan -> execute)\n"
-            "                        |\n"
-            "    expert agents:  ingestor . paper_qa . citation . reviewer/meta .\n"
-            "    planner . writer/editor . polish . coherence . figure_agent . kg .\n"
-            "    compose . export\n"
-            "                        |\n"
-            "    backends:  retrieval (RAG + scholarly cascade) . vision (Gemini) .\n"
-            "    SafeFiles (read/write/edit, sandboxed) . LLM (claude/codex/ollama/echo)"
-        ),
-        "note": "Principles: expert agents + retrieval + read/write/edit tools  .  grounded (verify, source-bound)  .  standalone harness, thin host bridge  .  hermetic-first (offline echo model; heavy paths gated).",
-    },
-    {
-        "type": "table",
-        "title": "8 . How we'll prove it - evaluation plan",
-        "headers": ["Track", "Why we need it", "Baselines"],
-        "rows": [
-            [
-                "PDF->MD fidelity",
-                "ingest errors propagate to every action",
-                "paper-to-md, Docling, MinerU",
-            ],
-            [
-                "Figures",
-                "high-bar, easily-judged; backs 'writes a paper'",
-                "PaperBanana, DeTikZify",
-            ],
-            [
-                "Citation verify",
-                "the grounding claim; hallucination is the top failure",
-                "CiteCheck, PaperOrchestra",
-            ],
-            [
-                "Review",
-                "must track ground-truth decisions; does --ground help?",
-                "AgentReview, DeepReview (data: ASAP-Review, PeerRead, ORB, MMReview)",
-            ],
-            [
-                "Writing",
-                "most visible output; parity = credible, not marketing",
-                "PaperOrchestra, AutoSurvey",
-            ],
-            ["Orchestration + cost", "composability is part of the novelty; budgets", "-"],
-        ],
-        "note": "Review datasets secured: PeerRead, ASAP-Review, NLPeer, MOPRD, ORB, MMReview (cross-domain + multimodal).  Phasing: Phase 0 automated metrics (now) -> Phase 1 LLM/VLM-as-Judge -> Phase 2 human win-rates.  Full plan: docs/BENCHMARK-PLAN.md",
-        "col0": 40,
-        "font": 12,
-    },
-    {
-        "type": "bullets",
-        "title": "9 . Justification - why this is worth doing",
-        "bullets": [
-            (
-                0,
-                "A real, unoccupied gap: surveyed 20+ systems; none unify the lifecycle as one grounded, host-invocable package (slides 3-4).",
-            ),
-            (
-                0,
-                "Fixes the trust problem: verification + source-grounded writing vs hallucination-prone generators.",
-            ),
-            (
-                0,
-                "A reusable substrate, not a one-off: a host (CLIO) gains paper read/review/write as composable, on-demand capabilities; experts compose in any order.",
-            ),
-            (
-                0,
-                "Already real: built, tested, demonstrable today; the benchmark plan turns the claim into numbers a reviewer will accept.",
-            ),
-            (
-                0,
-                "External validation: the newest cross-domain + multimodal review benchmark (MMReview) tests exactly our edge - vision-grounded review across 17 domains, which text-only reviewers structurally can't do.",
-            ),
-            (
-                0,
-                "Objection - 'isn't this just tool orchestration?': frameworks (MCP, LangGraph) are domain-agnostic plumbing that ship zero paper-lifecycle capability. AUTHOR is the missing domain package; MCP is just how a host reaches it.",
+                "Same toolkit, grounded throughout - the full walkthrough + copy-paste recipes: docs/LIFECYCLE.md.",
             ),
         ],
     },
     {
         "type": "bullets",
-        "title": "10 . Status & next steps",
+        "title": "7 . Status & next steps",
         "bullets": [
             (
                 0,
-                "Done: 26 actions . ~595 hermetic tests + CI . live-validated (Claude/Codex/Ollama/Gemini, real citation backends) . motivation + benchmark plan . dynamic orchestrate.",
+                "Done: 26 actions . ~605 hermetic tests + CI green . live-validated across providers (Claude/Codex/Ollama/LM Studio/OpenRouter/LiteLLM/Gemini) + real citation backends . author-lifecycle framing . dynamic orchestrate.",
+            ),
+            (
+                0,
+                "Host integration: invocable as a subagent (in-process), a CLI tool, a /author slash command (Claude/Codex), and over an MCP bridge (CLIO's tool gateway).",
             ),
             (0, "Next:"),
             (
                 1,
-                "Demo - prove a host agent (Claude/Codex) invokes AUTHOR as a subagent end-to-end.",
+                "Benchmarks - run Phase 0 automated metrics; scope datasets / judge models / human eval.",
             ),
-            (
-                1,
-                "CLIO integration - thin MCP bridge (CLIO invokes external capability via MCP); file a CLIO feature request for an in-process subagent hook.",
-            ),
-            (1, "Benchmarks - run Phase 0 metrics; scope datasets / judge models / human eval."),
+            (1, "Drive a full end-to-end demo through CLIO over the MCP bridge."),
             (
                 0,
-                "Open decisions: the bar (beat specialists vs parity + unification) . dataset access (PaperBananaBench / PaperWritingBench) . human-eval resourcing.",
-            ),
-            (
-                0,
-                "Docs: README.md  .  docs/LIFECYCLE.md, docs/MOTIVATION.md, docs/RUNBOOK.md",
+                "Docs: README.md  .  docs/LIFECYCLE.md, docs/MOTIVATION.md, docs/RUNBOOK.md, docs/USAGE.md",
             ),
         ],
     },
