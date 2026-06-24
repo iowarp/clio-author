@@ -62,6 +62,7 @@ GEMINI_API_KEY=...
 | Flag | Meaning |
 |---|---|
 | `--out FILE` | also write the result — prose `content` for `.md`/`.txt`, full JSON for `.json` |
+| `--append` | with `--out`, **append** after existing content instead of overwriting — builds a running log: each entry gets a `## <question>` header + a `_trace:` line (action · metadata · timestamp). (`.json` + `--append` → JSON Lines.) |
 | `--json '{...}'` | merge a JSON object into the action payload (available on all subcommands except `capabilities`) |
 | `-h` / `--help` | show that subcommand's exact flags |
 
