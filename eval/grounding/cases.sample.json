@@ -1,0 +1,26 @@
+[
+  {
+    "name": "fabricated_citations",
+    "markdown": "We extend \\cite{real} and also \\cite{ghost1} and \\cite{ghost2}.",
+    "bibtex": "@article{real, title={A Real Paper}, year={2020}}",
+    "claim_integrity": 0.9
+  },
+  {
+    "name": "fabricated_claims",
+    "markdown": "Building on \\cite{real}, we report strong gains.",
+    "bibtex": "@article{real, title={A Real Paper}, year={2020}}",
+    "claim_integrity": 0.4
+  },
+  {
+    "name": "clean",
+    "markdown": "We use \\cite{real}.",
+    "bibtex": "@article{real, title={A Real Paper}, year={2020}}",
+    "claim_integrity": 1.0
+  },
+  {
+    "name": "weak_both",
+    "markdown": "From \\cite{real} and \\cite{ghost} we conclude.",
+    "bibtex": "@article{real, title={A Real Paper}, year={2020}}",
+    "claim_integrity": 0.5
+  }
+]

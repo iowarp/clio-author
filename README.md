@@ -333,6 +333,13 @@ uv run pytest                        # the offline test suite (no network, no mo
 uv run pytest -m live                # real-backend tests (need the extras + network)
 ```
 
+**Grounding benchmark** — the experiment behind the headline claim (how much of a paper traces to a
+real source end-to-end, vs single-slice tools that only see one half):
+
+```bash
+uv run python scripts/benchmark_grounding.py     # see eval/grounding/ for cases + the finding
+```
+
 ---
 
 ## Troubleshooting
