@@ -72,7 +72,7 @@ GEMINI_API_KEY=...
 uv run ruff check clio_author tests        # -> All checks passed!
 uv run mypy clio_author                    # -> Success: no issues found in 75 source files
 uv run pytest -q                           # -> 621 passed, 3 skipped, 12 deselected
-uv run clio-author capabilities            # -> name=clio-author, 28 actions
+uv run clio-author capabilities            # -> name=clio-author, 29 actions
 uv run clio-author lifecycle               # -> the phase -> actions map (see docs/LIFECYCLE.md)
 ```
 
@@ -687,6 +687,29 @@ CLIO_LLM=claude uv run clio-author plan --idea "cooperating agents for the paper
 
 ---
 
+**`plan_check`** — validate the plan **before** you write a word. **No model needed.**
+
+The pre-write twin of `audit`: `audit` checks a finished manuscript, `plan_check` checks the *plan*, so
+problems are caught while they're still cheap. It runs six deterministic checks over `plan.json`: every
+outline section has a plan, every plan has tasks + claims, every claim has a backing source, every
+section has a word budget (and, with `--word-target`, they sum to it within 15%), and every
+research-flagged section names its topics.
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--plan-file` | one file | a `plan.json` (`{outline, plans}`) from `clio-author plan --out-dir` |
+| `--plan-json` | JSON string | the same structure inline |
+| `--word-target` | int | optional total word target the budgets must sum to (±15%) |
+| `--format` | `structured`\|`prose` | `prose` emits the one-line verdict |
+| `--json` | JSON object | merge payload keys |
+
+```bash
+uv run clio-author plan_check --plan-file runbook-out/plan-out/plan.json --word-target 6000 --format prose
+```
+**Expect:** `structured` = `{sections[], missing_plans[], taskless[], claimless[], uncited_claim_sections[], missing_budgets[], unresolved_research[], budget_total, budget_ok}`; `metadata` = `{passed, num_sections, num_problems}`. Fix the plan (re-run `plan`) until it passes, *then* `write`/`compose`.
+
+---
+
 **`experiment`** — read reference papers' design/architecture/experiments and recreate an
 evaluation plan for your new paper. Phase 1 extracts each paper's `PaperDesign` (research questions,
 architecture, datasets, baselines, metrics, ablations, protocol, compute, limitations); phase 2 (when
@@ -1033,6 +1056,9 @@ All other actions have dedicated subcommands — see Appendix A.
 - Print-only otherwise (ask, review, edit, polish, coherence, meta_review) — use `--out` to capture.
 
 ## 5. Tips
+- **What to run next:** after every command, clio-author prints **suggested next steps** to *stderr*
+  (so stdout stays clean JSON), and also exposes them as `metadata.suggested_next`
+  (`[{action, why}]`) for host agents. Suppress with `CLIO_SUGGEST=off`.
 - Pretty-print JSON: `… 2>/dev/null | python3 -m json.tool`.
 - Any action: `clio-author run <action> --json '{...}'` (the universal escape hatch).
 - Big inputs → use the `--*-file` flags (inline JSON can exceed the shell arg limit). Each
@@ -1041,12 +1067,12 @@ All other actions have dedicated subcommands — see Appendix A.
   `ClioAuthorSubagent(llm=…).run("review", {"paper": "..."})`.
 - See a subcommand's exact flags anytime: `clio-author <cmd> --help`.
 
-## Appendix A — all 28 actions at a glance
+## Appendix A — all 29 actions at a glance
 
 Grouped by the Acts above (the order you actually use them in), so this index mirrors the body.
 
 **Kind:** 🔧 **tool** = does one specific job; 🔗 **shortcut** = adds no new ability, just runs several
-tools together for you (the description says which). There are 22 tools and 6 shortcuts.
+tools together for you (the description says which). There are 23 tools and 6 shortcuts.
 
 | Act | Action | Kind | Subcommand |
 |---|---|---|---|
@@ -1067,6 +1093,7 @@ tools together for you (the description says which). There are 22 tools and 6 sh
 | IV · Review & strengthen | `verify_work` | 🔧 | `clio-author verify-work` |
 | IV · Review & strengthen | `audit` | 🔧 | `clio-author audit` |
 | V · Plan & write | `plan` | 🔧 | `clio-author plan` |
+| V · Plan & write | `plan_check` | 🔧 | `clio-author plan_check` |
 | V · Plan & write | `experiment` | 🔧 | `clio-author experiment` |
 | V · Plan & write | `research` | 🔧 | `clio-author research` |
 | V · Plan & write | `write` | 🔧 | `clio-author write` |

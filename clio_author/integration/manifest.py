@@ -211,6 +211,17 @@ ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["sections", "markdown", "outline", "bibtex", "candidates", "verified"],
     },
     {
+        "action": "plan_check",
+        "description": (
+            "Deterministically validate a writing plan BEFORE drafting: every "
+            "outline section has a plan, every plan has tasks + claims, every "
+            "claim has a backing source, every section has a word budget (summing "
+            "to an optional target), and every research-flagged section names its "
+            "topics. No LLM; the pre-write twin of 'audit'."
+        ),
+        "payload_keys": ["plan", "plans", "outline", "word_target"],
+    },
+    {
         "action": "cite_support",
         "description": (
             "Claim-to-source faithfulness: for each in-text 'claim \\cite{key}' pair, "
@@ -335,6 +346,7 @@ _LIFECYCLE: dict[str, tuple[list[str], bool]] = {
     "check_refs": (["strengthen"], False),
     "section_review": (["strengthen", "referee"], False),
     "audit": (["strengthen", "respond"], False),
+    "plan_check": (["plan"], False),
     "cite_support": (["strengthen"], False),
     "ground": (["strengthen"], False),
     "describe_figures": (["draft"], True),
@@ -359,6 +371,123 @@ for _entry in ACTIONS:
     _entry["needs_source"] = _needs_source
 
 
+# --------------------------------------------------------------------------- #
+# "What should I run next?" suggestions
+# --------------------------------------------------------------------------- #
+# For each action, the natural follow-ups in pipeline order: ``action -> [(next
+# action, one-line why)]``. A host (or the CLI) surfaces these after a result so
+# the user/agent knows the next step without memorising the lifecycle. The list
+# is advisory and ordered best-first; an empty list means "end of a branch".
+NEXT_STEPS: dict[str, list[tuple[str, str]]] = {
+    "ingest": [
+        ("ask", "ask questions grounded in the paper you just ingested"),
+        ("kg", "map the paper's claims/methods/results as a graph"),
+        ("gather", "add more sources into one merged context"),
+    ],
+    "gather": [
+        ("plan", "blueprint a paper grounded in the gathered sources"),
+        ("research", "survey the literature for a section"),
+        ("experiment", "recreate an evaluation plan from the sources"),
+    ],
+    "ask": [("kg", "see the whole content graph"), ("research", "go wider on the literature")],
+    "kg": [("ask", "ask targeted questions"), ("research", "survey related work")],
+    "discover": [("cite", "verify the discovered papers into BibTeX")],
+    "cite": [
+        ("cite_support", "check the cited sources actually support your claims"),
+        ("check_refs", "lint the \\cite{} keys against the bibliography"),
+        ("compose", "draft a paper using the verified citations"),
+    ],
+    "check_refs": [("ground", "roll citation + claim + support into one score")],
+    "cite_support": [("ground", "fold this into the overall grounding score")],
+    "ground": [
+        ("revise", "fix the weak spots the score surfaced"),
+        ("audit", "run the completeness checklist before shipping"),
+    ],
+    "research": [
+        ("plan", "turn the brief into section plans"),
+        ("experiment", "design the evaluation"),
+    ],
+    "experiment": [("plan", "blueprint the paper around the evaluation plan")],
+    "plan": [
+        ("plan_check", "validate the plan BEFORE writing (cheap to fix now)"),
+        ("write", "draft a section from the plan"),
+        ("compose", "draft the whole paper from the plan"),
+    ],
+    "plan_check": [
+        ("plan", "regenerate the plan if issues were found"),
+        ("compose", "the plan is clean — draft the paper"),
+        ("write", "the plan is clean — draft a section"),
+    ],
+    "write": [
+        ("write_review", "loop writer ↔ reviewer to tighten the section"),
+        ("verify_work", "confirm the planned claims were made + supported"),
+        ("revise", "polish or address feedback"),
+    ],
+    "write_review": [("coherence", "check it fits the rest of the manuscript")],
+    "compose": [
+        ("coherence", "check cross-section consistency"),
+        ("ground", "score how grounded the manuscript is"),
+        ("audit", "run the completeness checklist"),
+        ("export", "ship to LaTeX / PDF"),
+    ],
+    "revise": [
+        ("coherence", "re-check consistency after editing"),
+        ("review", "re-review the draft"),
+    ],
+    "coherence": [
+        ("verify_work", "confirm claims are still made + supported"),
+        ("audit", "final checklist"),
+    ],
+    "verify_work": [
+        ("ground", "roll claim integrity into one score"),
+        ("revise", "fill the gaps found"),
+    ],
+    "review": [
+        ("revise", "address the reviewer's points"),
+        ("rebuttal", "draft a point-by-point response"),
+        ("meta_review", "aggregate several reviews"),
+    ],
+    "section_review": [("revise", "fix the issues the layered review found")],
+    "meta_review": [("rebuttal", "respond to the aggregated decision")],
+    "rebuttal": [
+        ("revise", "apply the rebuttal to the manuscript"),
+        ("audit", "re-check completeness"),
+    ],
+    "audit": [("export", "ship to LaTeX / PDF once the checklist passes")],
+    "describe_figures": [("plot", "generate any missing figures")],
+    "plot": [
+        ("figure_refine", "iterate the figure with a critic"),
+        ("describe_figures", "caption it"),
+    ],
+    "figure_refine": [("describe_figures", "caption the refined figure")],
+    "export": [],
+    "orchestrate": [],
+}
+
+
+def suggested_next(action: str) -> list[dict[str, str]]:
+    """Return the recommended next actions for ``action`` (best-first).
+
+    Each item is ``{"action": ..., "why": ...}``. Unknown actions return ``[]``.
+    Hosts surface these after a result; the CLI prints them after each command.
+    """
+    return [{"action": a, "why": why} for a, why in NEXT_STEPS.get(action, [])]
+
+
+# Lock-step guard: every action has a suggestion entry, and every suggested next
+# action is itself a real action (a typo here would silently dead-end the UX).
+_ACTION_NAMES = {entry["action"] for entry in ACTIONS}
+for _src, _nexts in NEXT_STEPS.items():
+    if _src not in _ACTION_NAMES:  # pragma: no cover - guards a typo
+        raise ValueError(f"NEXT_STEPS has an unknown source action: {_src!r}")
+    for _nxt, _ in _nexts:
+        if _nxt not in _ACTION_NAMES:  # pragma: no cover - guards a typo
+            raise ValueError(f"NEXT_STEPS[{_src!r}] points at unknown action: {_nxt!r}")
+_missing_next = _ACTION_NAMES - set(NEXT_STEPS)
+if _missing_next:  # pragma: no cover - guards a forgotten entry
+    raise ValueError(f"actions with no NEXT_STEPS entry: {sorted(_missing_next)}")
+
+
 def actions_for_phase(phase: str) -> list[str]:
     """Return the action names that serve ``phase`` (in manifest order)."""
     return [entry["action"] for entry in ACTIONS if phase in entry["phase"]]
@@ -371,4 +500,11 @@ def lifecycle_overview() -> list[dict[str, Any]]:
     ]
 
 
-__all__ = ["ACTIONS", "PHASES", "actions_for_phase", "lifecycle_overview"]
+__all__ = [
+    "ACTIONS",
+    "PHASES",
+    "NEXT_STEPS",
+    "suggested_next",
+    "actions_for_phase",
+    "lifecycle_overview",
+]
