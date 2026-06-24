@@ -118,36 +118,41 @@ The full story, with copy-paste recipes per phase, is in **[`docs/LIFECYCLE.md`]
 
 ### The 28 actions at a glance
 
-| Action | What it's for |
-|--------|---------------|
-| `ingest` | **Read a paper.** arXiv id / URL / PDF / title → Markdown + blocks + figures. |
-| `gather` | **Build context.** Many sources (files/folders/globs/git/PDFs) → one merged `context.json`. |
-| `ask` | **Question answering.** Grounded answer from the paper's memory blocks. |
-| `kg` | **Map content.** Claims/methods/datasets/results graph; `--full` for the 6-stage pipeline. |
-| `discover` | **Find real papers.** Scholarly search (S2/OpenAlex/Crossref/arXiv); no LLM. |
-| `cite` | **Verify citations.** Check candidates against scholarly backends; suggestions only. |
-| `check_refs` | **Lint bibliography.** Malformed/duplicate entries, missing/uncited keys; no LLM. |
-| `research` | **Survey literature.** Foundational/recent/competing sources, gaps, synthesis. |
-| `experiment` | **Recreate evaluation.** Extract reference papers' design/experiments → grounded eval plan. |
-| `plan` | **Section blueprints.** Tasks, claims, sources, word budgets before drafting. |
-| `write` | **Draft a section.** Grounded in supplied source material. |
-| `compose` | **Write a whole paper.** idea → outline → cite → write → assemble; `--latex`/`--pdf`. |
-| `revise` | **Revise prose.** `--mode feedback` (address review) or `style` (polish). Aliases: `edit`, `polish`. |
-| `coherence` | **Consistency check.** Terminology drift, contradictions, broken flow. |
-| `verify_work` | **Claim audit.** Per-claim made/supported check → VERIFIED/GAPS verdict. |
-| `cite_support` | **Citation faithfulness.** Does each cited source actually support the claim? supported/partial/unsupported/contradicted, vs. abstract or (`--deep`) full text. |
-| `audit` | **Manuscript checklist.** Sections, word counts, placeholders, coverage; no LLM. |
-| `ground` | **Grounding integrity.** One score: citations that resolve + claims supported + claims substantiated by their source. |
-| `review` | **Peer review.** Accept/Reject + scores + critique; optional grounding and vision. |
-| `section_review` | **Section review.** L1 refs → L2 coherence → L3 persona; severity summary. |
-| `meta_review` | **Area-chair decision.** Aggregate several reviews; offline arithmetic. |
-| `rebuttal` | **Author rebuttal.** Point-by-point response grounded in the paper. |
-| `write_review` | **Self-improve a draft.** Writer ↔ reviewer critic-refine loop. |
-| `plot` | **Make a plot/diagram.** Matplotlib code (or real PNG with vision). |
-| `describe_figures` | **Caption figures.** Text or Gemini vision descriptions. |
-| `figure_refine` | **Self-improve a figure.** Visualizer ↔ critic refine loop. |
-| `export` | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF. |
-| `orchestrate` | **Goal-driven.** Plan and run a sequence of actions from a natural-language goal. |
+**Two kinds.** Most actions are **tools** 🔧 — each does one specific job nothing else can. Six are
+**shortcuts** 🔗 — they don't add a new ability, they just **run several tools together** so you don't
+have to (the "Kind" column names what each one runs). If the list feels long, read the 🔧 tools first;
+the 🔗 shortcuts are just convenient bundles of them.
+
+| Action | Kind | What it's for |
+|--------|------|---------------|
+| `ingest` | 🔧 tool | **Read a paper.** arXiv id / URL / PDF / title → Markdown + blocks + figures. |
+| `gather` | 🔧 tool | **Build context.** Many sources (files/folders/globs/git/PDFs) → one merged `context.json`. |
+| `ask` | 🔧 tool | **Question answering.** Grounded answer from the paper's memory blocks. |
+| `kg` | 🔧 tool | **Map content.** Claims/methods/datasets/results graph; `--full` for the 6-stage pipeline. |
+| `discover` | 🔧 tool | **Find real papers.** Scholarly search (S2/OpenAlex/Crossref/arXiv); no LLM. |
+| `cite` | 🔧 tool | **Verify citations exist.** Check candidate titles against scholarly backends; suggestions only. |
+| `check_refs` | 🔧 tool | **Lint bibliography.** Malformed/duplicate entries, missing/uncited keys; no LLM. |
+| `cite_support` | 🔧 tool | **Citation faithfulness.** Does each cited source actually support the claim? vs. abstract or (`--deep`) full text. |
+| `verify_work` | 🔧 tool | **Claim check.** Did the prose make + back the claims you planned? VERIFIED/GAPS. |
+| `audit` | 🔧 tool | **Completeness checklist.** Sections, word counts, placeholders, coverage; no LLM. |
+| `research` | 🔧 tool | **Survey literature.** Foundational/recent/competing sources, gaps, synthesis. |
+| `experiment` | 🔧 tool | **Recreate evaluation.** Reference papers' design/experiments → grounded eval plan. |
+| `plan` | 🔧 tool | **Section blueprints.** Tasks, claims, sources, word budgets before drafting. |
+| `write` | 🔧 tool | **Draft a section.** Grounded in supplied source material. |
+| `revise` | 🔧 tool | **Revise prose.** `--mode feedback` (address review) or `style` (polish). Aliases: `edit`, `polish`. |
+| `coherence` | 🔧 tool | **Consistency check.** Terminology drift, contradictions, broken flow. |
+| `review` | 🔧 tool | **Peer review.** Accept/Reject + scores + critique; optional grounding and vision. |
+| `meta_review` | 🔧 tool | **Area-chair decision.** Aggregate several reviews; offline arithmetic. |
+| `rebuttal` | 🔧 tool | **Author rebuttal.** Point-by-point response grounded in the paper. |
+| `plot` | 🔧 tool | **Make a plot/diagram.** Matplotlib code (or real PNG with vision). |
+| `describe_figures` | 🔧 tool | **Caption figures.** Text or Gemini vision descriptions. |
+| `export` | 🔧 tool | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF. |
+| `ground` | 🔗 **shortcut** | **One grounding score.** Runs `check_refs` + `verify_work` + `cite_support` → a single integrity number. |
+| `section_review` | 🔗 **shortcut** | **Review one section in layers.** Runs `check_refs` + `coherence` + `review` on a section. |
+| `compose` | 🔗 **shortcut** | **Write a whole paper.** Runs `plan` + `cite` + `write` per section + a review loop + assemble. |
+| `write_review` | 🔗 **shortcut** | **Self-improve a draft.** Runs `write` ↔ `review` in a loop until it converges. |
+| `figure_refine` | 🔗 **shortcut** | **Self-improve a figure.** Runs `plot` ↔ critic in a loop. |
+| `orchestrate` | 🔗 **shortcut** | **Goal-driven.** Plans and runs a sequence of the tools above from a natural-language goal. |
 
 Every action's **full command, every flag, and a runnable example** is in
 **[`docs/RUNBOOK.md`](docs/RUNBOOK.md)** (copy-paste, grouped by lifecycle phase). The action +
