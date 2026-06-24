@@ -166,23 +166,31 @@ contributions / experiments?" use **`--all`** to inject the whole paper.
 | `--format` | `structured`\|`prose` | default `structured` (JSON); `prose` for human-readable text |
 | `--json` / `--out` | JSON object / file | merge extra payload keys / save result |
 
+`--append` makes repeated questions into a **running Q&A log** (each entry headed by the question +
+a `_trace:` line). **Omit `--append` and `--out` overwrites the file each time.**
+
 ```bash
 # from a paper.md, whole paper (no separate ingest, no blocks.json):
 CLIO_LLM=claude uv run clio-author ask --markdown-file runbook-out/ingest/paper.md \
   --question "What are the contributions and what experiments do they run?" \
-  --all --format prose --out runbook-out/answer.md
+  --all --format prose --out runbook-out/answer.md --append
+
+# ask another question into the SAME file — it's appended, not overwritten:
+CLIO_LLM=claude uv run clio-author ask --markdown-file runbook-out/ingest/paper.md \
+  --question "What datasets and baselines are used?" \
+  --all --format prose --out runbook-out/answer.md --append
 
 # straight from a PDF / arXiv id (auto-ingests, then answers):
 CLIO_LLM=claude uv run --extra pdf clio-author ask --sources 1706.03762 \
-  --question "What datasets and baselines are used?" \
-  --all --format prose --out runbook-out/answer.md
+  --question "What is the main result?" \
+  --all --format prose --out runbook-out/answer.md --append
 
 # from pre-built blocks (top-8 retrieval), with better semantic ranking:
 CLIO_RAG=semantic CLIO_LLM=claude uv run --extra rag clio-author ask \
   --blocks-file runbook-out/ingest/blocks.json --question "What problem does this solve?" \
-  --k 8 --format prose --out runbook-out/answer.md
+  --k 8 --format prose --out runbook-out/answer.md --append
 ```
-**Saves to:** `runbook-out/answer.md` (`--out` writes the prose for `.md`/`.txt`, full JSON for `.json`); the result is also printed to stdout.
+**`runbook-out/answer.md`** becomes a log: each entry is `## <question>` + `_trace: action=ask · … · <timestamp>` + the answer, separated by `---`. (Drop `--append` to overwrite instead; the result is always also printed to stdout.)
 
 **`kg`** — extract a content knowledge graph (claims/methods/datasets/results/metrics/concepts/tasks + relations).
 
