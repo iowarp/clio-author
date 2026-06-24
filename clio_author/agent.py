@@ -83,6 +83,7 @@ class ClioAuthorAgent:
         files: SafeFiles | None = None,
         scholar_client: ScholarClient | None = None,
         vision: VisionClient | None = None,
+        retriever: Any = None,
     ) -> None:
         """Construct the expert set.
 
@@ -103,7 +104,7 @@ class ClioAuthorAgent:
 
         self.echo_expert = EchoExpert(self.llm)
         self.ingestor = IngestorExpert(self.llm, out_dir=files.root if files else None)
-        self.paper_qa = PaperQAExpert(self.llm)
+        self.paper_qa = PaperQAExpert(self.llm, retriever=retriever)
         self.reviewer = ReviewerExpert(self.llm, scholar_client=scholar_client, vision=vision)
         self.meta_reviewer = MetaReviewerExpert(self.llm)
         self.rebuttal = RebuttalExpert(self.llm, files=files)

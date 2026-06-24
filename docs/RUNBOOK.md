@@ -43,6 +43,7 @@ mkdir -p runbook-out
 | `CLIO_LITELLM_URL` | **`http://localhost:4000/v1`** | `CLIO_LLM=litellm` |
 | `LITELLM_API_KEY` / `LMSTUDIO_API_KEY` | optional bearer key | `litellm` / `lmstudio` |
 | `CLIO_SCHOLAR` | **`auto`** (=`cascade`/`all`) · `semantic`(`s2`) · `openalex`(`oa`) · `crossref`(`cr`) · `arxiv` · `off`(`none`/`offline`/`disabled`) | `cite`, `discover`, `review --ground`, `research` |
+| `CLIO_RAG` | **`off`** (`hash`, deterministic default) · `semantic`(`st`) · `lancedb` | `ask` retrieval quality (`semantic`/`lancedb` need `--extra rag`) |
 | `CLIO_VISION` | **`off`** (`none`/`offline`/`disabled`) · `gemini`(`google`) | `describe`, `review` (with figures), `plot kind="diagram"` |
 | `CLIO_VISION_MODEL` | **`gemini-2.5-flash`** | vision describe |
 | `CLIO_IMAGE_MODEL` | **`gemini-2.5-flash-image`** | vision image-gen |
@@ -147,24 +148,35 @@ CLIO_LLM=claude uv run clio-author plan \
 
 ## Act II · Understand it
 
-**`ask`** — answer a question grounded in memory blocks.
+**`ask`** — answer a question grounded in a paper. Give it the paper in **any** form: a `paper.md`
+(`--markdown-file`), pre-built blocks (`--blocks-file`), or a **PDF/arXiv id via `--sources`** (it
+auto-ingests). `ask` injects the top-`k` most relevant blocks (default 5) — for "what are the
+contributions / experiments?" use **`--all`** to inject the whole paper.
 
 | Flag | Takes | Meaning |
 |---|---|---|
 | `--question` | string (required) | the question to answer |
-| `--blocks-json` | JSON string | inline MemoryBlocks dump; prefer `--blocks-file` for real papers |
-| `--blocks-file` | one file | path to a JSON MemoryBlocks file (avoids arg-length limits) |
+| `--markdown-file` | one file | a `paper.md` — split into blocks on the fly (no `blocks.json` needed) |
+| `--text` | string | raw paper text inline |
+| `--blocks-json` / `--blocks-file` | JSON / one file | a MemoryBlocks dump / file (for pre-ingested papers) |
+| `--sources` | one or more | a PDF / arXiv id / folder — **auto-ingested** then answered (needs `--extra pdf`) |
+| `--k` | int | how many blocks to inject (default 5; raise for broad questions) |
+| `--all` | flag | inject the **whole paper** (best for contributions/experiments/summary questions) |
 | `--format` | `structured`\|`prose` | default `structured` (JSON); `prose` for human-readable text |
-| `--json` | JSON object | merge any additional payload key |
-| `--out` | file path | save result |
+| `--json` / `--out` | JSON object / file | merge extra payload keys / save result |
 
 ```bash
-CLIO_LLM=claude uv run clio-author ask \
-  --question "What problem does this paper solve?" \
-  --blocks-file runbook-out/ingest/blocks.json \
-  --format prose \
-  --out runbook-out/answer.md
-# inline blocks instead of a file: --blocks-json '{"sections":[...]}'
+# from a paper.md, whole paper (no separate ingest, no blocks.json):
+CLIO_LLM=claude uv run clio-author ask --markdown-file runbook-out/ingest/paper.md \
+  --question "What are the contributions and what experiments do they run?" --all --format prose
+
+# straight from a PDF / arXiv id (auto-ingests, then answers):
+CLIO_LLM=claude uv run --extra pdf clio-author ask --sources 1706.03762 \
+  --question "What datasets and baselines are used?" --all --format prose
+
+# from pre-built blocks (top-8 retrieval), with better semantic ranking:
+CLIO_RAG=semantic CLIO_LLM=claude uv run --extra rag clio-author ask \
+  --blocks-file runbook-out/ingest/blocks.json --question "What problem does this solve?" --k 8 --format prose
 ```
 
 **`kg`** — extract a content knowledge graph (claims/methods/datasets/results/metrics/concepts/tasks + relations).
