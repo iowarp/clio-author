@@ -64,8 +64,10 @@ def test_paper_qa_happy_path_cites_blocks() -> None:
     # retrieved entries are JSON-safe summaries only.
     retrieved = output.structured["retrieved"]
     assert all(set(r) == {"block_id", "kind", "score"} for r in retrieved)
-    assert output.metadata["k"] == 5
+    # k is the *effective* count (clamped to the 3 available blocks = whole paper).
+    assert output.metadata["k"] == 3
     assert output.metadata["num_blocks"] == 3
+    assert output.metadata["whole_paper"] is True
     assert session.history == [output]
 
 

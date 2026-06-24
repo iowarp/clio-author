@@ -52,6 +52,7 @@ class ClioAuthorSubagent:
         files: SafeFiles | None = None,
         scholar_client: ScholarClient | None = None,
         vision: VisionClient | None = None,
+        retriever: Any = None,
     ) -> None:
         """Build the subagent over a :class:`ClioAuthorAgent`.
 
@@ -65,6 +66,7 @@ class ClioAuthorSubagent:
             files=files,
             scholar_client=scholar_client,
             vision=vision,
+            retriever=retriever,
         )
 
     def capabilities(self) -> dict[str, Any]:

@@ -7,6 +7,13 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`ask` takes a paper in any form + better retrieval.** No more hand-building `blocks.json`: `ask`
+  now accepts a `paper.md` (`--markdown-file`/`--text`, split into blocks on the fly) or a **PDF/arXiv
+  id via `--sources`** (auto-ingested). New `--k` widens the injected context and `--all` injects the
+  **whole paper** (fixes "the blocks don't contain the contributions/experiments" on broad questions —
+  that was top-5 retrieval, working as designed). `CLIO_RAG=semantic` (with `--extra rag`) swaps the
+  default deterministic hashing retriever for sentence-transformer ranking; threaded through the
+  agent/adapter/CLI.
 - **Grounding-integrity benchmark** (`scripts/benchmark_grounding.py` + `eval/grounding/`) — runs
   the `ground` action over a case set and shows the headline finding: single-slice tools
   (citation-only, claim-only) are *wrong per paper* about end-to-end grounding (mean-absolute-error +

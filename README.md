@@ -166,7 +166,7 @@ without a dedicated subcommand are reached with `clio-author run <action> --json
 - `gather [--sources S … | --sources-file FILE] [--out-dir DIR] [--max-files N] [--max-text-chars N]`
 
 **Understand**
-- `ask --question Q [--blocks-file FILE | --blocks-json JSON] [--sources S … | --sources-file FILE]`
+- `ask --question Q [--markdown-file paper.md | --blocks-file FILE | --sources <pdf|arXiv id> | --text T] [--k N] [--all]` — give the paper in any form; a PDF/arXiv via `--sources` is auto-ingested; `--all` uses the whole paper
 - `kg [--blocks-file FILE | --blocks-json JSON] [--full] [--stages LIST] [--resume DIR] [--out-dir DIR] [--sources …]`
 - `experiment [--sources S … | --blocks-file FILE | --markdown-file FILE | --text T] [--idea I | --idea-file FILE] [--out-dir DIR]`
 

@@ -367,6 +367,26 @@ def inject_context(
     return context
 
 
+def resolve_rag_retriever(spec: str | None = None):
+    """Resolve a retriever for `ask` from a spec (e.g. the ``CLIO_RAG`` env var).
+
+    ``None`` / ``off`` / ``hash`` -> ``None`` (the expert's default deterministic
+    :class:`HashingEmbedder`, hermetic, no extra). ``st`` / ``semantic`` /
+    ``rag`` / ``on`` -> a :class:`RagRetriever` backed by
+    :class:`SentenceTransformerEmbedder` (much better ranking; needs the ``rag``
+    extra). ``lancedb`` -> a :class:`LanceDbRetriever`. Construction is lazy and
+    does no heavy import; a missing dependency surfaces only when `ask` indexes.
+    """
+    name = (spec or "").strip().lower()
+    if name in ("", "off", "none", "disabled", "hash", "hashing"):
+        return None
+    if name in ("st", "semantic", "rag", "on", "true", "sentence-transformers", "sbert"):
+        return RagRetriever(embedder=SentenceTransformerEmbedder())
+    if name in ("lancedb", "lance"):
+        return LanceDbRetriever()
+    raise ValueError(f"unknown CLIO_RAG={spec!r} (use one of: off, semantic, lancedb)")
+
+
 __all__ = [
     "RetrievalDependencyError",
     "Embedder",
@@ -377,4 +397,5 @@ __all__ = [
     "LanceDbRetriever",
     "render_scored",
     "inject_context",
+    "resolve_rag_retriever",
 ]

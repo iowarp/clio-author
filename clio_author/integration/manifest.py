@@ -46,8 +46,12 @@ ACTIONS: list[dict[str, Any]] = [
     },
     {
         "action": "ask",
-        "description": "Answer a question grounded only in the provided memory blocks.",
-        "payload_keys": ["question", "blocks", "sources"],
+        "description": (
+            "Answer a question grounded only in a paper — given as blocks, a "
+            "paper.md (markdown/text), or sources (a PDF/arXiv id is auto-ingested). "
+            "k controls how many blocks are injected; all=True uses the whole paper."
+        ),
+        "payload_keys": ["question", "blocks", "markdown", "text", "sources", "k", "all"],
     },
     {
         "action": "review",

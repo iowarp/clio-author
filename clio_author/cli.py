@@ -122,6 +122,27 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to a JSON MemoryBlocks file (use this for real papers, e.g. "
         "clio-out/<id>/blocks.json — avoids command-line length limits).",
     )
+    p_ask.add_argument(
+        "--markdown-file",
+        dest="markdown_file",
+        default=None,
+        help="Path to a paper Markdown (e.g. clio-out/<id>/paper.md) — split into blocks on the fly.",
+    )
+    p_ask.add_argument(
+        "--text", default=None, help="Raw paper text (inline) to ground the answer in."
+    )
+    p_ask.add_argument(
+        "--k",
+        type=int,
+        default=None,
+        help="How many blocks to inject as context (default 5; higher = more of the paper).",
+    )
+    p_ask.add_argument(
+        "--all",
+        dest="all_blocks",
+        action="store_true",
+        help="Inject the WHOLE paper (every block) — best for 'contributions/experiments' questions.",
+    )
     _add_format(p_ask)
     _add_json(p_ask)
 
@@ -1034,6 +1055,14 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         )
         if blocks is not None:
             payload["blocks"] = blocks
+        elif args.markdown_file is not None:
+            payload["markdown"] = _read_file(args.markdown_file, field="--markdown-file")
+        elif args.text is not None:
+            payload["text"] = args.text
+        if args.k is not None:
+            payload["k"] = args.k
+        if getattr(args, "all_blocks", False):
+            payload["all"] = True
         payload["format"] = args.fmt
     elif command == "review":
         if args.paper_file is not None:
@@ -1386,6 +1415,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     from clio_author.integration.clio_adapter import ClioAuthorSubagent
     from clio_author.llm.providers import resolve_llm
     from clio_author.llm.vision import resolve_vision_client
+    from clio_author.retrieval.rag import resolve_rag_retriever
     from clio_author.retrieval.scholar import resolve_scholar_client
 
     try:
@@ -1398,6 +1428,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             llm=resolve_llm(os.environ.get("CLIO_LLM")),
             scholar_client=resolve_scholar_client(os.environ.get("CLIO_SCHOLAR")),
             vision=resolve_vision_client(os.environ.get("CLIO_VISION")),
+            retriever=resolve_rag_retriever(os.environ.get("CLIO_RAG")),
         )
         if args.command == "capabilities":
             result: dict[str, Any] = subagent.capabilities()

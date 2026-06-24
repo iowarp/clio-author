@@ -85,23 +85,26 @@ class PaperQAExpert(BaseAgent):
         ``metadata={"k", "num_blocks"}``. Never raises: missing inputs or any
         failure produce an error-flagged output (appended once).
         """
-        question = task.payload.get("question") or task.description
+        payload = task.payload
+        question = payload.get("question") or task.description
         if not question:
             return self._error(session, "no 'question' provided in task.payload/description")
 
-        if "blocks" not in task.payload:
-            return self._error(session, "no 'blocks' provided in task.payload")
-
         try:
-            blocks = self._coerce_blocks(task.payload["blocks"])
+            blocks = self._resolve_blocks(payload)
+            if blocks is None:
+                return self._error(
+                    session, "no 'blocks'/'markdown'/'text' provided in task.payload"
+                )
             num_blocks = len(blocks.all_blocks())
+            k = self._resolve_k(payload, num_blocks)
 
             retriever = self._retriever or RagRetriever()
             # An injected shared retriever is re-indexed on every run and so is
             # not safe across *concurrent* runs (fine for the single-threaded
             # Sequential/Engine path; relevant under a Parallel pattern).
             retriever.index(blocks)
-            scored = retriever.search(question, k=self.k)
+            scored = retriever.search(question, k=k)
             context, cited_block_ids = render_scored(scored)
 
             messages = [
@@ -122,10 +125,46 @@ class PaperQAExpert(BaseAgent):
                 "cited_block_ids": cited_block_ids,
                 "retrieved": [item.to_dict() for item in scored],
             },
-            metadata={"k": self.k, "num_blocks": num_blocks},
+            metadata={"k": k, "num_blocks": num_blocks, "whole_paper": k >= num_blocks},
         )
         session.add(output)
         return output
+
+    @staticmethod
+    def _resolve_blocks(payload: dict[str, Any]) -> MemoryBlocks | None:
+        """Resolve memory blocks from ``blocks``, or build them from markdown/text.
+
+        Accepts a :class:`MemoryBlocks` / its dump under ``blocks`` (preferred), or
+        a raw ``markdown`` / ``text`` string (e.g. a ``paper.md``) which is split
+        into section blocks on the fly -- so ``ask`` works straight from a paper
+        file without a separate ``blocks.json``.
+        """
+        raw = payload.get("blocks")
+        if raw is not None:
+            return PaperQAExpert._coerce_blocks(raw)
+        text = payload.get("markdown") or payload.get("text")
+        if isinstance(text, str) and text.strip():
+            from clio_author.ingest.blocks import build_section_blocks
+
+            return MemoryBlocks(sections=build_section_blocks(text))
+        return None
+
+    def _resolve_k(self, payload: dict[str, Any], num_blocks: int) -> int:
+        """How many blocks to inject: payload ``k`` (or ``all``) falls back to ``self.k``.
+
+        ``all`` truthy or ``k <= 0`` means "the whole paper" (inject every block);
+        otherwise the value is clamped to the number of available blocks.
+        """
+        k = self.k
+        raw_k = payload.get("k")
+        if raw_k is not None:
+            try:
+                k = int(raw_k)
+            except (TypeError, ValueError):
+                pass
+        if payload.get("all") or k <= 0:
+            return max(num_blocks, 1)
+        return min(k, num_blocks) if num_blocks else k
 
 
 __all__ = ["PaperQAExpert", "PAPER_QA_SYSTEM_PROMPT", "PAPER_QA_USER_TEMPLATE"]
