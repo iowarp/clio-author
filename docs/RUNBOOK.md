@@ -205,7 +205,7 @@ is a compact string (e.g. `Methods:L42; Results:L88`) that also appears in the `
 | `--full` | flag | run the 6-stage pipeline (metadata→ontology→extraction→coref→verify→summary) with per-stage checkpoints |
 | `--stages` | comma-separated list | restrict the pipeline to specific stage names (implies pipeline path; e.g. `metadata,ontology`) |
 | `--resume` | directory | path to a prior run's `kg_pipeline/*.json` checkpoints to resume from |
-| `--out-dir` | directory | persist `kg.json`/`kg.mmd` and (with `--full`) per-stage pipeline checkpoints under `kg_pipeline/` |
+| `--out-dir` | directory | persist `kg.json`/`kg.mmd`/`kg.html` and (with `--full`) per-stage pipeline checkpoints under `kg_pipeline/` |
 | `--format` | `structured`\|`prose` | `prose` emits a Mermaid `graph TD` rendering |
 | `--max-edges` | int | cap edges in the `.mmd` view (default **500** — the Mermaid live-editor limit; `0` = no cap, smaller = a more readable overview). `kg.json` always holds the full graph. |
 | `--json` | JSON object | merge payload keys |
@@ -213,7 +213,17 @@ is a compact string (e.g. `Methods:L42; Results:L88`) that also appears in the `
 
 Plain `kg` (single-shot LLM extraction) is the default. `--full` activates the multi-stage pipeline; `--stages` lets you run a subset; `--resume DIR` feeds prior checkpoints so interrupted runs continue where they left off.
 
-The Mermaid `.mmd` view **color-codes nodes by type** (method · concept · dataset · metric · claim · result · task) and **caps edges at `--max-edges`** so large graphs render in the live editor instead of erroring "Maximum number of edges exceeded". A big paper can exceed 500 edges; drop the cap (e.g. `--max-edges 120`) for a legible overview, and read `kg.json` for the complete graph.
+**Three views are written when `--out-dir` is set:**
+- **`kg.html`** — a **self-contained interactive viewer** (the recommended one). Open it in a browser:
+  the *whole* graph with a force-directed layout you can zoom/pan/drag, a **node search box**,
+  **per-type show/hide** legend chips, and **click-a-node to highlight its neighbors**. No edge cap —
+  it handles a 500+-edge paper that Mermaid can't. (Loads the `vis-network` library from a CDN, so the
+  first open needs internet; the graph data itself is embedded, so the file is portable.)
+- **`kg.mmd`** — a static Mermaid `graph TD`. **Color-codes nodes by type** (method · concept · dataset ·
+  metric · claim · result · task) and **caps edges at `--max-edges`** so it renders in the Mermaid live
+  editor instead of erroring "Maximum number of edges exceeded". A big paper can exceed 500 edges; drop
+  the cap (e.g. `--max-edges 120`) for a legible overview.
+- **`kg.json`** — the complete machine-readable graph (never capped).
 
 ```bash
 # Single-shot extraction (default):
@@ -237,7 +247,7 @@ CLIO_LLM=claude uv run clio-author kg \
   --blocks-file runbook-out/ingest/blocks.json \
   --stages metadata,ontology --out-dir runbook-out/kg-pipeline
 ```
-**Artifacts:** `runbook-out/kg-out/{kg.json, kg.mmd}`; pipeline: `runbook-out/kg-pipeline/kg_pipeline/{stage}.json`.
+**Artifacts:** `runbook-out/kg-out/{kg.json, kg.mmd, kg.html}` (open `kg.html` in a browser for the interactive view); pipeline: `runbook-out/kg-pipeline/kg_pipeline/{stage}.json`.
 
 ---
 
@@ -287,20 +297,40 @@ CLIO_SCHOLAR=arxiv uv run clio-author discover \
 
 **`cite`** — verify citation candidates; emits **suggestions only**, never overwrites.
 
+**Why it exists.** LLM-written papers hallucinate citations — real-sounding titles that don't exist.
+You hand `cite` a list of paper **titles** you intend to cite; it looks each up against real
+scholarly databases (Semantic Scholar → OpenAlex → Crossref → arXiv), **fuzzy-matches** your title
+to the real record, **grades** the match (Exact / Minor / Major), and writes a clean **`suggested.bib`**
+of the *verified, real* entries plus a coverage score (targets ≥90% verified). It physically refuses
+to touch your `references.bib`, so it can never corrupt your real bibliography — you review and copy
+what you want. In short: titles in → verified, ready-to-paste BibTeX out, with fakes flagged.
+
 | Flag | Takes | Meaning |
 |---|---|---|
-| `--candidates-json` | JSON string | inline list of `{title, year?, reason?}` |
+| `--candidates-json` | JSON string | inline list of `{title, year?, reason?}` — only `title` is required |
 | `--candidates-file` | one file | same format, as a JSON file |
 | `--format` | `structured`\|`prose` | default `structured` |
 | `--json` | JSON object | merge payload keys, e.g. `{"out_dir":"..."}` to persist `suggested.bib` |
 | `--out` | file path | save result |
 
+**`year` is optional.** You supply the title; `cite` discovers the correct year, venue and authors
+from the database. Year is used only as a small tie-breaker bonus when titles are similar — so if you
+**don't know the year, leave it out**. A *wrong* guessed year can hide the right paper (the OpenAlex
+backend treats year as a hard filter); a *missing* year only forgoes the tie-breaker. When unsure, omit it.
+
 Backend via `CLIO_SCHOLAR` (see §1). Needs `--extra scholar` only for the Semantic-Scholar path
 (arxiv/openalex/crossref are stdlib).
 ```bash
+# With a year hint (tie-breaker only):
 CLIO_SCHOLAR=auto uv run --extra scholar clio-author cite \
   --candidates-json '[{"title":"Attention Is All You Need","year":2017}]' \
   --json '{"out_dir":"runbook-out/cite-out"}'
+
+# Don't know the year? Just omit it — title alone is enough:
+CLIO_SCHOLAR=auto uv run --extra scholar clio-author cite \
+  --candidates-json '[{"title":"Attention Is All You Need"}]' \
+  --json '{"out_dir":"runbook-out/cite-out"}'
+
 # force one backend (no key/extra needed for these):
 CLIO_SCHOLAR=arxiv  uv run clio-author cite --candidates-json '[{"title":"Attention Is All You Need"}]'
 CLIO_SCHOLAR=openalex uv run clio-author cite --candidates-json '[{"title":"Attention Is All You Need"}]'
@@ -866,7 +896,7 @@ All other actions have dedicated subcommands — see Appendix A.
 - **stdout** always (the JSON result); **`--out FILE`** to also save it.
 - **`out_dir` / `out_path`** (payload keys / `--out-dir`) persist structured artifacts:
   ingest → `paper.md`+`blocks.json`+`img/`; cite → `suggested.bib`; discover → `discovered.json`+`discovered.bib`;
-  kg → `kg.json`+`kg.mmd`; compose → `paper.md`+`sections/`(+`paper.tex` with `--latex`; +`paper.pdf` with `--pdf`);
+  kg → `kg.json`+`kg.mmd`+`kg.html`; compose → `paper.md`+`sections/`(+`paper.tex` with `--latex`; +`paper.pdf` with `--pdf`);
   export → `paper.tex`+`references.bib`(+`paper.pdf` with `--pdf`);
   orchestrate → `orchestrate.json`; write/plot/figure_refine → `out_path`.
 - Print-only otherwise (ask, review, edit, polish, coherence, meta_review) — use `--out` to capture.

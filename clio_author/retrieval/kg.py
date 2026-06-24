@@ -16,6 +16,7 @@ extractor and never raising.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -52,6 +53,18 @@ _TYPE_STYLE: dict[str, str] = {
     "claim": "fill:#f8d7da,stroke:#842029,color:#000",
     "result": "fill:#e2d9f3,stroke:#59359a,color:#000",
     "task": "fill:#cff4fc,stroke:#055160,color:#000",
+}
+
+# Per-type (background, border) colors for the interactive HTML view. Kept in
+# sync with ``_TYPE_STYLE`` so the Mermaid and HTML renderings color-match.
+_HTML_COLORS: dict[str, tuple[str, str]] = {
+    "method": ("#cfe2ff", "#1f3a5f"),
+    "concept": ("#e9ecef", "#495057"),
+    "dataset": ("#d1e7dd", "#0f5132"),
+    "metric": ("#fff3cd", "#997404"),
+    "claim": ("#f8d7da", "#842029"),
+    "result": ("#e2d9f3", "#59359a"),
+    "task": ("#cff4fc", "#055160"),
 }
 
 BASE_EDGE_RELATIONS: tuple[str, ...] = (
@@ -271,6 +284,54 @@ class KnowledgeGraph(BaseModel):
             lines.append(f"    {_mermaid_id(edge.source)} -->|{rel}| {_mermaid_id(edge.target)}")
         return "\n".join(lines)
 
+    def to_html(self, *, title: str = "Knowledge graph") -> str:
+        """Render the graph as a **self-contained interactive HTML** page.
+
+        Unlike :meth:`to_mermaid` (which caps edges to stay within the Mermaid
+        renderer's limit), this draws the *whole* graph with a force-directed
+        layout you can zoom, pan and drag, plus a node search box, per-type
+        show/hide filters, and click-to-highlight-neighbors. Nodes are
+        color-coded by type to match the Mermaid view.
+
+        The page is a single HTML string with one external dependency: the
+        ``vis-network`` library loaded from a CDN (so a browser needs network
+        access the first time, but no build step or local install is required).
+        The node/edge data is embedded inline, so the file is fully portable.
+        """
+        nodes = [
+            {
+                "id": node.id,
+                "label": node.label,
+                "group": node.type if node.type in _HTML_COLORS else "concept",
+                "title": _html_tooltip(node),
+            }
+            for node in self.nodes
+        ]
+        edges = [
+            {"from": edge.source, "to": edge.target, "label": edge.relation}
+            for edge in self.edges
+            if edge.source != edge.target
+        ]
+        groups = {
+            t: {"color": {"background": bg, "border": br}} for t, (bg, br) in _HTML_COLORS.items()
+        }
+        legend = "".join(
+            f'<span class="chip" data-type="{t}">'
+            f'<span class="dot" style="background:{bg};border-color:{br}"></span>{t}</span>'
+            for t, (bg, br) in _HTML_COLORS.items()
+        )
+        data = {
+            "nodes": nodes,
+            "edges": edges,
+            "groups": groups,
+            "counts": {"nodes": len(nodes), "edges": len(edges)},
+        }
+        return (
+            _HTML_TEMPLATE.replace("__TITLE__", _html_escape(title))
+            .replace("__LEGEND__", legend)
+            .replace("__DATA__", json.dumps(data))
+        )
+
 
 def _extract_one(
     context: str,
@@ -476,6 +537,130 @@ def _mermaid_id(node_id: str) -> str:
 def _mermaid_label(text: str) -> str:
     """Escape characters that would break a Mermaid quoted label."""
     return text.replace('"', "'").replace("[", "(").replace("]", ")").replace("\n", " ").strip()
+
+
+def _html_escape(text: str) -> str:
+    """Minimal HTML-escape for text interpolated into the page chrome."""
+    return (
+        text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+    )
+
+
+def _html_tooltip(node: KGNode) -> str:
+    """Build a plain-text hover tooltip for a node (type, section, description)."""
+    parts = [f"{node.label}  ·  {node.type}"]
+    if node.section_path:
+        parts.append(f"section: {node.section_path}")
+    if node.description:
+        desc = node.description.strip()
+        parts.append(desc if len(desc) <= 240 else desc[:237] + "...")
+    return "\n".join(parts)
+
+
+# Self-contained interactive viewer. ``vis-network`` is loaded from a CDN; node
+# and edge data are embedded inline at ``__DATA__``. Placeholders (``__TITLE__``,
+# ``__LEGEND__``, ``__DATA__``) are filled by ``KnowledgeGraph.to_html`` with
+# str.replace so the CSS/JS braces need no escaping.
+_HTML_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>__TITLE__</title>
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 system-ui, sans-serif; color: #1b1b1b; }
+  header { padding: 10px 14px; border-bottom: 1px solid #ddd; background: #fafafa;
+           display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  .meta { color: #666; font-size: 12px; }
+  .controls { display: flex; gap: 8px; align-items: center; margin-left: auto; flex-wrap: wrap; }
+  input[type=search] { padding: 5px 9px; border: 1px solid #bbb; border-radius: 6px; min-width: 200px; }
+  button { padding: 5px 10px; border: 1px solid #bbb; border-radius: 6px; background: #fff; cursor: pointer; }
+  button:hover { background: #f0f0f0; }
+  .legend { display: flex; gap: 6px 10px; flex-wrap: wrap; padding: 8px 14px; border-bottom: 1px solid #eee; }
+  .chip { cursor: pointer; user-select: none; display: inline-flex; align-items: center; gap: 5px;
+          padding: 2px 8px; border: 1px solid #ddd; border-radius: 12px; font-size: 12px; }
+  .chip.off { opacity: 0.35; text-decoration: line-through; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; border: 1px solid #000; display: inline-block; }
+  #net { width: 100vw; height: calc(100vh - 96px); }
+</style>
+</head>
+<body>
+<header>
+  <h1>__TITLE__</h1>
+  <span class="meta" id="meta"></span>
+  <div class="controls">
+    <input id="search" type="search" placeholder="Search nodes..." />
+    <button id="fit">Fit</button>
+    <button id="freeze">Freeze layout</button>
+    <button id="reset">Reset view</button>
+  </div>
+</header>
+<div class="legend" id="legend">__LEGEND__</div>
+<div id="net"></div>
+<script>
+  const DATA = __DATA__;
+  document.getElementById("meta").textContent =
+    DATA.counts.nodes + " nodes · " + DATA.counts.edges + " relations";
+
+  const nodes = new vis.DataSet(DATA.nodes);
+  const edges = new vis.DataSet(DATA.edges);
+  const container = document.getElementById("net");
+  const options = {
+    groups: DATA.groups,
+    nodes: { shape: "dot", size: 12, font: { size: 13, face: "system-ui" },
+             borderWidth: 1.5 },
+    edges: { arrows: { to: { enabled: true, scaleFactor: 0.5 } }, color: { color: "#bbb", highlight: "#444" },
+             font: { size: 10, color: "#777", strokeWidth: 3, strokeColor: "#fff" }, smooth: false },
+    physics: { stabilization: { iterations: 200 },
+               barnesHut: { gravitationalConstant: -8000, springLength: 110, springConstant: 0.03 } },
+    interaction: { hover: true, tooltipDelay: 120, navigationButtons: false, keyboard: false },
+  };
+  const network = new vis.Network(container, { nodes, edges }, options);
+
+  // Click a node -> highlight it + neighbors, dim the rest.
+  const adj = {};
+  DATA.edges.forEach(e => { (adj[e.from] = adj[e.from] || new Set()).add(e.to);
+                            (adj[e.to] = adj[e.to] || new Set()).add(e.from); });
+  function highlight(id) {
+    const keep = new Set([id, ...(adj[id] || [])]);
+    nodes.update(DATA.nodes.map(n => ({ id: n.id, opacity: keep.has(n.id) ? 1 : 0.15 })));
+  }
+  function clearHighlight() { nodes.update(DATA.nodes.map(n => ({ id: n.id, opacity: 1 }))); }
+  network.on("click", p => { if (p.nodes.length) highlight(p.nodes[0]); else clearHighlight(); });
+
+  // Search: focus + select the first label match.
+  document.getElementById("search").addEventListener("input", ev => {
+    const q = ev.target.value.trim().toLowerCase();
+    if (!q) { clearHighlight(); network.unselectAll(); return; }
+    const hit = DATA.nodes.find(n => (n.label || "").toLowerCase().includes(q));
+    if (hit) { network.selectNodes([hit.id]); network.focus(hit.id, { scale: 1.1, animation: true }); highlight(hit.id); }
+  });
+
+  // Type filter chips: toggle visibility per node type.
+  const hidden = new Set();
+  document.querySelectorAll(".chip").forEach(chip => chip.addEventListener("click", () => {
+    const t = chip.dataset.type;
+    if (hidden.has(t)) { hidden.delete(t); chip.classList.remove("off"); }
+    else { hidden.add(t); chip.classList.add("off"); }
+    nodes.update(DATA.nodes.map(n => ({ id: n.id, hidden: hidden.has(n.group) })));
+  }));
+
+  document.getElementById("fit").onclick = () => network.fit({ animation: true });
+  document.getElementById("reset").onclick = () => { clearHighlight(); network.unselectAll();
+    document.getElementById("search").value = ""; network.fit({ animation: true }); };
+  let frozen = false;
+  document.getElementById("freeze").onclick = ev => { frozen = !frozen;
+    network.setOptions({ physics: { enabled: !frozen } });
+    ev.target.textContent = frozen ? "Unfreeze layout" : "Freeze layout"; };
+  network.once("stabilizationIterationsDone", () => network.fit());
+</script>
+</body>
+</html>
+"""
 
 
 __all__ = [
