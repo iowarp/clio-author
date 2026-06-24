@@ -124,7 +124,15 @@ ACTIONS: list[dict[str, Any]] = [
             "(metadata -> ontology -> extraction -> coref -> verification -> summary) "
             "with checkpoint/resume."
         ),
-        "payload_keys": ["blocks", "sources", "out_dir", "full", "stages", "checkpoints"],
+        "payload_keys": [
+            "blocks",
+            "sources",
+            "out_dir",
+            "full",
+            "stages",
+            "checkpoints",
+            "max_edges",
+        ],
     },
     {
         "action": "plan",

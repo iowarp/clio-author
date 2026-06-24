@@ -43,6 +43,17 @@ BASE_NODE_TYPES: tuple[str, ...] = (
 )
 """The base kinds of content entity a :class:`KGNode` may represent."""
 
+# Color-by-type styling for the Mermaid view (one classDef per node type).
+_TYPE_STYLE: dict[str, str] = {
+    "method": "fill:#cfe2ff,stroke:#1f3a5f,color:#000",
+    "concept": "fill:#e9ecef,stroke:#495057,color:#000",
+    "dataset": "fill:#d1e7dd,stroke:#0f5132,color:#000",
+    "metric": "fill:#fff3cd,stroke:#997404,color:#000",
+    "claim": "fill:#f8d7da,stroke:#842029,color:#000",
+    "result": "fill:#e2d9f3,stroke:#59359a,color:#000",
+    "task": "fill:#cff4fc,stroke:#055160,color:#000",
+}
+
 BASE_EDGE_RELATIONS: tuple[str, ...] = (
     "uses",
     "evaluates_on",
@@ -216,18 +227,46 @@ class KnowledgeGraph(BaseModel):
         """Return a JSON-serializable ``{nodes, edges}`` dict."""
         return self.model_dump()
 
-    def to_mermaid(self) -> str:
+    def to_mermaid(self, *, max_edges: int | None = 500, styled: bool = True) -> str:
         """Render the graph as a Mermaid ``graph TD`` block for a human view.
 
-        Each node renders as ``id["<label> (<type>)"]``; each edge renders as
-        ``source -->|relation| target``. Labels are sanitized so quotes/brackets
-        do not break Mermaid parsing.
+        Each node renders as ``id["<label> (<type>)"]:::<type>`` and each edge as
+        ``source -->|relation| target``; labels are sanitized so quotes/brackets
+        do not break parsing.
+
+        ``styled`` adds a ``classDef`` per node type so nodes are **color-coded**
+        (method/concept/dataset/metric/claim/result/task) -- the single biggest
+        readability win. ``max_edges`` caps the rendered edges (default 500, the
+        Mermaid live-editor limit): when the graph is larger only the first
+        ``max_edges`` edges and the nodes they touch are drawn, with a note;
+        ``max_edges=None`` (or ``0``) renders everything (may exceed renderer
+        limits). The full graph is always available in the JSON dump.
         """
+        all_edges = self.edges
+        cap = max_edges if (max_edges is not None and max_edges > 0) else None
+        truncated = cap is not None and len(all_edges) > cap
+        edges = all_edges[:cap] if truncated else all_edges
+
+        if truncated:
+            kept = {e.source for e in edges} | {e.target for e in edges}
+            nodes = [n for n in self.nodes if n.id in kept]
+        else:
+            nodes = self.nodes
+
         lines = ["graph TD"]
-        for node in self.nodes:
+        if truncated:
+            lines.append(
+                f"    %% showing {len(edges)} of {len(all_edges)} edges + their nodes "
+                f"(set max_edges=0 / CLI --max-edges 0 for the full graph; full data is in kg.json)"
+            )
+        if styled:
+            for node_type, style in _TYPE_STYLE.items():
+                lines.append(f"    classDef {node_type} {style};")
+        for node in nodes:
             label = _mermaid_label(f"{node.label} ({node.type})")
-            lines.append(f'    {_mermaid_id(node.id)}["{label}"]')
-        for edge in self.edges:
+            suffix = f":::{node.type}" if styled and node.type in _TYPE_STYLE else ""
+            lines.append(f'    {_mermaid_id(node.id)}["{label}"]{suffix}')
+        for edge in edges:
             rel = _mermaid_label(edge.relation)
             lines.append(f"    {_mermaid_id(edge.source)} -->|{rel}| {_mermaid_id(edge.target)}")
         return "\n".join(lines)
