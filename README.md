@@ -28,7 +28,7 @@ phase of the work you're in.**
 
 ## What You Get
 
-- **27 actions across the author lifecycle** — frame · gather · plan · draft · strengthen · referee · respond · ship, all behind one interface
+- **28 actions across the author lifecycle** — frame · gather · plan · draft · strengthen · referee · respond · ship, all behind one interface
 - **PDF/arXiv → clean scientific Markdown** with structured memory blocks (sections, figures, equations)
 - **Grounded peer review** — Accept/Reject, per-axis scores, strengths/weaknesses, optional vision on figures
 - **Source-grounded writing** — outline → plan → draft → self-review → LaTeX/PDF, with verified citations
@@ -108,7 +108,7 @@ at any phase**. Most jobs don't even need `ingest`: only `ask`, `kg`, `experimen
 | **② Gather** | *Pull in what I'll build on* | `ingest`, `gather`, `ask`, `kg`, `cite` |
 | **③ Plan** | *Blueprint the paper + evaluation* | `plan`, `experiment`, `research` |
 | **④ Draft** | *Write & illustrate* | `write`, `compose`, `plot`, `describe_figures`, `figure_refine` |
-| **⑤ Strengthen** | *Make my own paper bulletproof* | `review`, `revise`, `coherence`, `verify_work`, `check_refs`, `cite`, `audit`, `ground`, `section_review`, `write_review` |
+| **⑤ Strengthen** | *Make my own paper bulletproof* | `review`, `revise`, `coherence`, `verify_work`, `check_refs`, `cite`, `cite_support`, `audit`, `ground`, `section_review`, `write_review` |
 | **⑥ Referee** | *Judge others' papers* | `review`, `section_review`, `meta_review` |
 | **⑦ Respond** | *Answer my reviewers* | `rebuttal`, `revise`, `audit` |
 | **⑧ Ship** | *Camera-ready* | `compose`, `export` |
@@ -116,7 +116,7 @@ at any phase**. Most jobs don't even need `ingest`: only `ask`, `kg`, `experimen
 
 The full story, with copy-paste recipes per phase, is in **[`docs/LIFECYCLE.md`](docs/LIFECYCLE.md)**.
 
-### The 27 actions at a glance
+### The 28 actions at a glance
 
 | Action | What it's for |
 |--------|---------------|
@@ -135,8 +135,9 @@ The full story, with copy-paste recipes per phase, is in **[`docs/LIFECYCLE.md`]
 | `revise` | **Revise prose.** `--mode feedback` (address review) or `style` (polish). Aliases: `edit`, `polish`. |
 | `coherence` | **Consistency check.** Terminology drift, contradictions, broken flow. |
 | `verify_work` | **Claim audit.** Per-claim made/supported check → VERIFIED/GAPS verdict. |
+| `cite_support` | **Citation faithfulness.** Does each cited source actually support the claim? supported/partial/unsupported/contradicted, vs. abstract or (`--deep`) full text. |
 | `audit` | **Manuscript checklist.** Sections, word counts, placeholders, coverage; no LLM. |
-| `ground` | **Grounding integrity.** % of citations that resolve + claims supported, end-to-end. |
+| `ground` | **Grounding integrity.** One score: citations that resolve + claims supported + claims substantiated by their source. |
 | `review` | **Peer review.** Accept/Reject + scores + critique; optional grounding and vision. |
 | `section_review` | **Section review.** L1 refs → L2 coherence → L3 persona; severity summary. |
 | `meta_review` | **Area-chair decision.** Aggregate several reviews; offline arithmetic. |
@@ -191,7 +192,8 @@ log instead of overwriting — each entry headed by the question + a trace line)
 - `section-review [--text T | --text-file FILE] [--bibtex-file FILE] [--persona-json JSON]`
 - `verify-work [--text T | --text-file FILE] [--section-plan-json JSON | --section-plan-file FILE] [--claims-json JSON]`
 - `audit [--sections-json JSON | --sections-file FILE] [--markdown-file FILE] [--bibtex-file FILE]`
-- `ground [--markdown-file FILE | --text T] [--bibtex-file FILE | --bibtex T] [--claims-json JSON] [--section-plan-file FILE] [--out-dir DIR]`
+- `cite_support [--markdown-file FILE | --text T] [--citations-file FILE | --citations-json JSON] [--deep] [--out-dir DIR]` — does each cited source actually support the claim? Feed it `cite`'s saved output; `--deep` checks full text.
+- `ground [--markdown-file FILE | --text T] [--bibtex-file FILE | --bibtex T] [--claims-json JSON] [--section-plan-file FILE] [--citations-file FILE | --citations-json JSON] [--deep] [--out-dir DIR]`
 - `rebuttal [--paper T | --paper-file FILE] [--review-json JSON | --review-file FILE]`
 - `run meta_review --json '{"reviews":[ … ]}'`  *(reports a `robustness` verdict: solid / borderline / split)*
 - `run write_review --json '{"outline":{…},"section_plan":{…},"blocks":{…},"max_rounds":N}'` — also `source` / `sources`

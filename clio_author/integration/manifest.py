@@ -211,11 +211,23 @@ ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["sections", "markdown", "outline", "bibtex", "candidates", "verified"],
     },
     {
+        "action": "cite_support",
+        "description": (
+            "Claim-to-source faithfulness: for each in-text 'claim \\cite{key}' pair, "
+            "decide whether the cited source actually supports the claim "
+            "(supported/partial/unsupported/contradicted). mode='abstract' (default) "
+            "judges against the cited abstract; mode='deep' fetches the cited full text. "
+            "Catches real citations attached to sentences they do not support."
+        ),
+        "payload_keys": ["markdown", "text", "sections", "citations", "mode", "out_dir"],
+    },
+    {
         "action": "ground",
         "description": (
             "Score a manuscript's grounding integrity: fraction of in-text "
-            "citations that resolve to a real bibliography entry, and (with "
-            "intended claims) fraction of claims actually made + supported."
+            "citations that resolve to a real bibliography entry, (with intended "
+            "claims) fraction of claims actually made + supported, and (with "
+            "verified citations) fraction of cited claims substantiated by their source."
         ),
         "payload_keys": [
             "markdown",
@@ -224,6 +236,8 @@ ACTIONS: list[dict[str, Any]] = [
             "bibtex",
             "claims",
             "section_plan",
+            "citations",
+            "mode",
             "out_dir",
         ],
     },
@@ -321,6 +335,7 @@ _LIFECYCLE: dict[str, tuple[list[str], bool]] = {
     "check_refs": (["strengthen"], False),
     "section_review": (["strengthen", "referee"], False),
     "audit": (["strengthen", "respond"], False),
+    "cite_support": (["strengthen"], False),
     "ground": (["strengthen"], False),
     "describe_figures": (["draft"], True),
     "plot": (["draft"], False),

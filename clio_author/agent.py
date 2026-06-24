@@ -27,6 +27,7 @@ from uuid import uuid4
 from clio_author.experts.audit import AuditExpert
 from clio_author.experts.check_refs import CheckRefsExpert
 from clio_author.experts.citation import CitationExpert
+from clio_author.experts.cite_support import CiteSupportExpert
 from clio_author.experts.coherence import CoherenceExpert
 from clio_author.experts.compose import run_compose
 from clio_author.experts.context import ContextExpert
@@ -66,6 +67,30 @@ from clio_author.tools.files import SafeFiles
 _GROUNDING_ACTIONS: frozenset[str] = frozenset(
     {"ask", "plan", "write", "compose", "write_review", "research", "kg", "review", "experiment"}
 )
+
+
+def _arxiv_source_for(entry: dict[str, Any]) -> str | None:
+    """Derive an ingestable arXiv id / source from a normalized citation entry.
+
+    Prefers an explicit ``source``; otherwise reads the cited record's
+    ``external_ids['ArXiv']`` or an ``arxiv:<id>`` ``paper_id``. Returns ``None``
+    when no arXiv source is available (so deep mode falls back to the abstract).
+    """
+    source = entry.get("source")
+    if isinstance(source, str) and source.strip():
+        return source.strip()
+    rec = entry.get("record")
+    record: dict[str, Any] = rec if isinstance(rec, dict) else {}
+    ext_raw = record.get("external_ids")
+    ext: dict[str, Any] = ext_raw if isinstance(ext_raw, dict) else {}
+    for field in ("ArXiv", "arxiv", "ARXIV"):
+        value = ext.get(field)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    paper_id = str(record.get("paper_id") or "")
+    if paper_id.lower().startswith("arxiv:"):
+        return paper_id.split(":", 1)[1].strip() or None
+    return None
 
 
 class ClioAuthorAgent:
@@ -122,6 +147,7 @@ class ClioAuthorAgent:
         self.experiment_expert = ExperimentExpert(self.llm, files=files)
         self.verify_work = VerifyWorkExpert(self.llm)
         self.check_refs = CheckRefsExpert(self.llm)
+        self.cite_support = CiteSupportExpert(self.llm, full_text_resolver=self._cited_full_text)
         self.audit = AuditExpert(self.llm)
 
         # M0 echo wiring is preserved for the unknown/None-action fallthrough.
@@ -215,11 +241,14 @@ class ClioAuthorAgent:
             return self.check_refs.run(task, session)
         if action == "audit":
             return self.audit.run(task, session)
+        if action == "cite_support":
+            return self.cite_support.run(task, session)
         if action == "ground":
             return run_grounding(
                 task,
                 check_refs=self.check_refs,
                 verify_work=self.verify_work,
+                cite_support=self.cite_support,
                 session=session,
             )
         if action == "section_review":
@@ -325,6 +354,29 @@ class ClioAuthorAgent:
                 }
             }
         )
+
+    def _cited_full_text(self, key: str, entry: dict[str, Any]) -> str | None:
+        """Resolve a cited paper's full text for ``cite_support`` deep mode.
+
+        The network seam injected into :class:`CiteSupportExpert`: derives an
+        arXiv id (or an explicit ``source``) from the citation record, ingests it
+        into Markdown via :class:`IngestorExpert`, and returns that text. Returns
+        ``None`` on any failure so deep mode falls back to the abstract; never
+        raises.
+        """
+        source = _arxiv_source_for(entry)
+        if not source:
+            return None
+        try:
+            out = self.ingestor.run(
+                Task(id=uuid4().hex, description="ingest", payload={"source": source}),
+                SessionContext(id=uuid4().hex),
+            )
+        except Exception:  # noqa: BLE001 - best-effort; fall back to abstract
+            return None
+        if out.metadata.get("error"):
+            return None
+        return out.content or None
 
     def _revise(self, task: Task, session: SessionContext) -> AgentOutput:
         """Unified prose revision: route by ``mode`` to the editor or polish expert.

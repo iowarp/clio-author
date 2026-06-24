@@ -7,6 +7,18 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`cite_support` — claim-to-source faithfulness (new action, 28 total).** `cite` proves a citation
+  *exists* and `check_refs` proves the `\cite{key}` *resolves*, but neither checks that the cited paper
+  actually *says* what the sentence claims. `cite_support` closes that gap: for each `claim … \cite{key}`
+  pair it classifies the link as **supported / partial / unsupported / contradicted**. Two tiers via
+  `--deep`: **abstract** (default — judges against the cited abstract `cite` already fetched) and **deep**
+  (ingests the cited paper's full text by arXiv id and judges against that). Feed it `cite`'s saved output
+  directly (it carries titles + abstracts + ids). Hermetic: the echo client returns `unknown`, never a
+  fabricated `supported`.
+- **`ground` gains a third component: support integrity.** When verified `citations` (with abstracts) are
+  supplied, `ground` now folds `cite_support` into the headline `grounding_integrity` alongside citation
+  integrity and claim integrity — the number no single-slice tool can produce. Both `ground` and
+  `cite_support` are now documented in the RUNBOOK (the `ground` action previously had no runbook entry).
 - **Interactive `kg.html` viewer.** `kg --out-dir` now also writes a **self-contained interactive
   graph** (`KnowledgeGraph.to_html`): the whole graph with a force-directed layout you can zoom/pan/drag,
   a node search box, per-type show/hide legend chips, and click-to-highlight-neighbors. No edge cap — it

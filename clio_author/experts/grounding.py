@@ -7,12 +7,19 @@ report** for a finished (or in-progress) manuscript:
   ``\\cite{...}`` keys, what fraction resolve to a real bibliography entry?
 * **claim integrity** (LLM, via ``verify_work``): of the claims the work was
   supposed to make, what fraction are actually *made and supported* by the prose?
+* **support integrity** (LLM, via ``cite_support``, optional): of the in-text
+  ``claim \\cite{key}`` pairs, what fraction are actually substantiated *by the
+  cited source* (its abstract, or full text in deep mode)? This closes the gap
+  the other two leave open — a real citation, correctly keyed, attached to a
+  sentence it does not support passes citation+claim integrity but fails here.
 
 The headline ``grounding_integrity`` is the mean of whichever components are
 available, so it works deterministically/offline from just a bibliography + prose
 (citation half) and gets richer when intended ``claims`` + a real model are
-supplied (claim half). This is the number no single-slice tool can produce,
-because none of them owns both the citations and the claims of the same paper.
+supplied (claim half) and when verified ``citations`` (with abstracts) are
+supplied (support third). This is the number no single-slice tool can produce,
+because none of them owns the citations, the claims, and the cited sources of the
+same paper.
 
 Like :func:`~clio_author.experts.section_review.run_section_review` this is a
 plain composing helper (not a :class:`BaseAgent`); each sub-expert already
@@ -28,6 +35,7 @@ from typing import Any
 from uuid import uuid4
 
 from clio_author.experts.check_refs import CheckRefsExpert
+from clio_author.experts.cite_support import CiteSupportExpert
 from clio_author.experts.verify_work import VerifyWorkExpert
 from clio_author.harness.session import SessionContext
 from clio_author.harness.types import AgentOutput, Task
@@ -39,20 +47,29 @@ def run_grounding(
     *,
     check_refs: CheckRefsExpert,
     verify_work: VerifyWorkExpert,
+    cite_support: CiteSupportExpert | None = None,
     session: SessionContext | None = None,
 ) -> AgentOutput:
     """Score how much of a manuscript is grounded in real sources. Never raises.
 
     Reads the prose from ``payload["markdown"]`` / ``["text"]`` / ``["sections"]``,
-    an optional ``bibtex`` (drives citation integrity), and optional intended
-    ``claims`` / ``section_plan`` (drive claim integrity). Returns an
-    :class:`AgentOutput` whose ``structured`` is
-    ``{grounding_integrity, citation_integrity, claim_integrity, citations, claims}``
-    and whose ``metadata`` carries the headline numbers + ``wrote``. Persists
-    ``grounding.json`` / ``grounding.md`` under ``out_dir`` when given.
+    an optional ``bibtex`` (drives citation integrity), optional intended
+    ``claims`` / ``section_plan`` (drive claim integrity), and optional verified
+    ``citations`` (drive support integrity, when a ``cite_support`` expert is
+    given; ``mode="deep"`` uses full text). Returns an :class:`AgentOutput` whose
+    ``structured`` is ``{grounding_integrity, citation_integrity, claim_integrity,
+    support_integrity, citations, claims, support}`` and whose ``metadata`` carries
+    the headline numbers + ``wrote``. Persists ``grounding.json`` / ``grounding.md``
+    under ``out_dir`` when given.
     """
     try:
-        return _run_grounding(task, check_refs=check_refs, verify_work=verify_work, session=session)
+        return _run_grounding(
+            task,
+            check_refs=check_refs,
+            verify_work=verify_work,
+            cite_support=cite_support,
+            session=session,
+        )
     except Exception as exc:  # noqa: BLE001 - never raise; flag error on the output
         out = AgentOutput(agent="grounding", content="", metadata={"error": str(exc)})
         if session is not None:
@@ -89,19 +106,24 @@ def _run_grounding(
     *,
     check_refs: CheckRefsExpert,
     verify_work: VerifyWorkExpert,
+    cite_support: CiteSupportExpert | None,
     session: SessionContext | None,
 ) -> AgentOutput:
     payload = task.payload
     prose = _prose(payload)
     bibtex = str(payload.get("bibtex") or "")
     has_claims = bool(payload.get("claims") or payload.get("section_plan"))
+    has_support = bool(cite_support is not None and payload.get("citations"))
 
-    if not bibtex.strip() and not has_claims:
+    if not bibtex.strip() and not has_claims and not has_support:
         out = AgentOutput(
             agent="grounding",
             content="",
             metadata={
-                "error": "provide 'bibtex' (citation integrity) and/or 'claims' (claim integrity)"
+                "error": (
+                    "provide 'bibtex' (citation integrity), 'claims' (claim integrity), "
+                    "and/or 'citations' (support integrity)"
+                )
             },
         )
         if session is not None:
@@ -111,8 +133,10 @@ def _run_grounding(
     components: list[float] = []
     citation_integrity: float | None = None
     claim_integrity: float | None = None
+    support_integrity: float | None = None
     citations: dict[str, Any] = {}
     claims: list[dict[str, Any]] = []
+    support: dict[str, Any] = {}
 
     # --- citation integrity (deterministic) --------------------------------- #
     if bibtex.strip() or prose.strip():
@@ -154,15 +178,42 @@ def _run_grounding(
             claim_integrity = supported / len(claims)
             components.append(claim_integrity)
 
+    # --- support integrity (LLM, optional: claim vs cited source) ----------- #
+    if has_support and cite_support is not None:
+        cs = cite_support.run(
+            Task(
+                id=uuid4().hex,
+                description="cite_support",
+                payload={
+                    "text": prose,
+                    "citations": payload.get("citations"),
+                    "mode": payload.get("mode"),
+                },
+            ),
+            SessionContext(id=uuid4().hex),
+        )
+        cs_struct = cs.structured or {}
+        support = {
+            "support_integrity": cs_struct.get("support_integrity"),
+            "counts": cs_struct.get("counts", {}),
+            "mode": cs_struct.get("mode", "abstract"),
+        }
+        value = cs_struct.get("support_integrity")
+        if isinstance(value, (int, float)):
+            support_integrity = float(value)
+            components.append(support_integrity)
+
     grounding_integrity = _mean(components)
 
-    summary = _summary(grounding_integrity, citation_integrity, claim_integrity)
+    summary = _summary(grounding_integrity, citation_integrity, claim_integrity, support_integrity)
     structured = {
         "grounding_integrity": grounding_integrity,
         "citation_integrity": citation_integrity,
         "claim_integrity": claim_integrity,
+        "support_integrity": support_integrity,
         "citations": citations,
         "claims": claims,
+        "support": support,
     }
     wrote = _maybe_write(payload, structured, summary)
     out = AgentOutput(
@@ -173,6 +224,7 @@ def _run_grounding(
             "grounding_integrity": grounding_integrity,
             "citation_integrity": citation_integrity,
             "claim_integrity": claim_integrity,
+            "support_integrity": support_integrity,
             "wrote": wrote,
         },
     )
@@ -185,11 +237,16 @@ def _pct(x: float | None) -> str:
     return "n/a" if x is None else f"{round(x * 100)}%"
 
 
-def _summary(overall: float | None, cite: float | None, claim: float | None) -> str:
+def _summary(
+    overall: float | None,
+    cite: float | None,
+    claim: float | None,
+    support: float | None = None,
+) -> str:
     return (
         f"Grounding integrity: {_pct(overall)} "
-        f"(citations {_pct(cite)}, claims {_pct(claim)}). "
-        "Fraction of the manuscript traceable to a real source."
+        f"(citations {_pct(cite)}, claims {_pct(claim)}, support {_pct(support)}). "
+        "Fraction of the manuscript traceable to — and substantiated by — a real source."
     )
 
 
@@ -209,6 +266,15 @@ def render_grounding_markdown(structured: dict[str, Any], summary: str) -> str:
         made = sum(1 for c in claims if isinstance(c, dict) and c.get("made"))
         sup = sum(1 for c in claims if isinstance(c, dict) and c.get("supported"))
         lines.append(f"- **Claims:** {len(claims)} intended, {made} made, {sup} supported.")
+    support = structured.get("support") or {}
+    if support and support.get("counts"):
+        c = support["counts"]
+        lines.append(
+            f"- **Source support ({support.get('mode', 'abstract')}):** "
+            f"{c.get('supported', 0)} supported, {c.get('partial', 0)} partial, "
+            f"{c.get('unsupported', 0)} unsupported, {c.get('contradicted', 0)} contradicted, "
+            f"{c.get('no_source', 0)} no-source."
+        )
     return "\n".join(lines) + "\n"
 
 
