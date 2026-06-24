@@ -7,6 +7,11 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Interactive `kg.html` viewer.** `kg --out-dir` now also writes a **self-contained interactive
+  graph** (`KnowledgeGraph.to_html`): the whole graph with a force-directed layout you can zoom/pan/drag,
+  a node search box, per-type show/hide legend chips, and click-to-highlight-neighbors. No edge cap — it
+  handles 500+-edge papers that Mermaid can't. Node/edge data is embedded inline; the `vis-network`
+  renderer loads from a CDN.
 - **Readable `kg` Mermaid graphs.** `to_mermaid` now **color-codes nodes by type** (method / concept /
   dataset / metric / claim / result / task via `classDef`) and **caps edges** (default 500, the
   Mermaid live-editor limit) so a large `kg.mmd` renders instead of erroring "Maximum number of edges

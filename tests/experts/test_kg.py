@@ -119,9 +119,10 @@ def test_kg_writes_artifacts_when_files_and_out_dir(tmp_path) -> None:
     expert = KGExpert(CannedLLMClient(_KG_JSON), files=files)
     out = expert.run(_task(blocks=_blocks(), out_dir="kg-out"), SessionContext(id="s"))
 
-    assert len(out.metadata["wrote"]) == 2
+    assert len(out.metadata["wrote"]) == 3
     assert (tmp_path / "kg-out" / "kg.json").exists()
     assert (tmp_path / "kg-out" / "kg.mmd").exists()
+    assert (tmp_path / "kg-out" / "kg.html").exists()
 
 
 def test_kg_adapter_run_is_json_serializable_and_listed() -> None:
@@ -262,6 +263,7 @@ def test_kg_writes_to_out_dir_without_constructor_files(tmp_path) -> None:
     )
     assert (out / "kg.json").exists(), "kg.json was not written from payload out_dir"
     assert (out / "kg.mmd").exists(), "kg.mmd was not written from payload out_dir"
+    assert (out / "kg.html").exists(), "kg.html was not written from payload out_dir"
     assert any(str(out) in p for p in result.metadata["wrote"])
 
 
@@ -279,3 +281,26 @@ def test_to_mermaid_styles_and_caps() -> None:
     capped = g.to_mermaid(max_edges=2)
     assert sum("-->" in ln for ln in capped.splitlines()) == 2  # edges capped
     assert "showing 2 of 5 edges" in capped  # truncation noted
+
+
+def test_to_html_is_self_contained_and_complete() -> None:
+    import json as _json
+
+    from clio_author.retrieval.kg import KGEdge, KGNode, KnowledgeGraph
+
+    nodes = [
+        KGNode(id="m1", label="Transformer", type="method", description="attention"),
+        KGNode(id="d1", label="GLUE", type="dataset"),
+    ]
+    edges = [KGEdge(source="m1", target="d1", relation="evaluates_on")]
+    g = KnowledgeGraph(nodes=nodes, edges=edges)
+
+    html = g.to_html(title="My KG")
+    # No unfilled placeholders, real renderer, embedded data, title escaped in.
+    for placeholder in ("__DATA__", "__LEGEND__", "__TITLE__"):
+        assert placeholder not in html
+    assert "vis-network" in html and "My KG" in html
+    # The whole graph is embedded (no edge cap, unlike Mermaid).
+    data = _json.loads(html.split("const DATA = ", 1)[1].split(";\n", 1)[0])
+    assert data["counts"] == {"nodes": 2, "edges": 1}
+    assert {n["group"] for n in data["nodes"]} == {"method", "dataset"}

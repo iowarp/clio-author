@@ -88,8 +88,9 @@ class KGExpert(BaseAgent):
         Mermaid rendering; otherwise it is a one-line human summary. On a parse
         failure ``metadata["parse_error"]`` is set and ``structured`` is an empty
         graph. When ``files`` and ``payload["out_dir"]`` are both present, writes
-        ``<out_dir>/kg.json`` + ``<out_dir>/kg.mmd`` (recorded in
-        ``metadata["wrote"]``). Never raises: missing inputs or any failure
+        ``<out_dir>/kg.json`` + ``<out_dir>/kg.mmd`` + ``<out_dir>/kg.html`` (an
+        interactive viewer; recorded in ``metadata["wrote"]``). Never raises:
+        missing inputs or any failure
         produce an error-flagged output (appended once).
         """
         if "blocks" not in task.payload:
@@ -117,7 +118,8 @@ class KGExpert(BaseAgent):
             except (TypeError, ValueError):
                 max_edges = 500
             mermaid = graph.to_mermaid(max_edges=max_edges)
-            wrote = self._maybe_write(task, graph, mermaid)
+            html = graph.to_html()
+            wrote = self._maybe_write(task, graph, mermaid, html)
         except Exception as exc:  # noqa: BLE001 - experts never raise
             return self._error(session, str(exc))
 
@@ -196,9 +198,12 @@ class KGExpert(BaseAgent):
         )
         return graph, report, checkpoints
 
-    def _maybe_write(self, task: Task, graph: KnowledgeGraph, mermaid: str) -> list[str]:
-        """Persist ``kg.json`` + ``kg.mmd`` under ``out_dir`` when given.
+    def _maybe_write(self, task: Task, graph: KnowledgeGraph, mermaid: str, html: str) -> list[str]:
+        """Persist ``kg.json`` + ``kg.mmd`` + ``kg.html`` under ``out_dir`` when given.
 
+        ``kg.html`` is the self-contained interactive viewer (the whole graph,
+        zoom/pan/search/filter); ``kg.mmd`` is the static color-coded Mermaid
+        view; ``kg.json`` is the full machine-readable graph.
         When the expert was constructed with a :class:`SafeFiles`, ``out_dir`` is
         a subdirectory under that sandbox root; otherwise ``out_dir`` is taken as
         the output root directly (the common CLI case — mirrors how
@@ -228,6 +233,7 @@ class KGExpert(BaseAgent):
         for name, text in (
             (f"{prefix}kg.json", json.dumps(graph.to_dict(), indent=2)),
             (f"{prefix}kg.mmd", mermaid),
+            (f"{prefix}kg.html", html),
         ):
             try:
                 path = files.write_new(name, text)
