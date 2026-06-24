@@ -596,10 +596,64 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to a JSON SectionPlan whose claims to verify.",
     )
     p_ground.add_argument(
+        "--citations-json",
+        dest="citations_json",
+        default=None,
+        help="JSON verified citations (cite's output, with abstracts; drives support integrity).",
+    )
+    p_ground.add_argument(
+        "--citations-file",
+        dest="citations_file",
+        default=None,
+        help="Path to a JSON file of verified citations (e.g. cite's structured 'verified').",
+    )
+    p_ground.add_argument(
+        "--deep",
+        action="store_true",
+        help="Support integrity: judge claims against cited FULL TEXT (ingests sources), not abstracts.",
+    )
+    p_ground.add_argument(
         "--out-dir", dest="out_dir", default=None, help="Directory to persist grounding.json/.md."
     )
     _add_format(p_ground)
     _add_json(p_ground)
+
+    p_cite_support = sub.add_parser(
+        "cite_support",
+        help="Check whether each cited source actually supports the claim it is attached to.",
+    )
+    p_cite_support.add_argument("--text", default=None, help="The manuscript prose (inline).")
+    p_cite_support.add_argument(
+        "--markdown-file",
+        dest="markdown_file",
+        default=None,
+        help="Path to the manuscript Markdown.",
+    )
+    p_cite_support.add_argument(
+        "--citations-json",
+        dest="citations_json",
+        default=None,
+        help="JSON verified citations (cite's output, with abstracts), inline.",
+    )
+    p_cite_support.add_argument(
+        "--citations-file",
+        dest="citations_file",
+        default=None,
+        help="Path to a JSON file of verified citations (e.g. cite's structured 'verified').",
+    )
+    p_cite_support.add_argument(
+        "--deep",
+        action="store_true",
+        help="Judge claims against cited FULL TEXT (ingests each cited arXiv source), not abstracts.",
+    )
+    p_cite_support.add_argument(
+        "--out-dir",
+        dest="out_dir",
+        default=None,
+        help="Directory to persist cite_support.json/.md.",
+    )
+    _add_format(p_cite_support)
+    _add_json(p_cite_support)
 
     p_export = sub.add_parser(
         "export", help="Export a composed manuscript to LaTeX (paper.tex + references.bib)."
@@ -1309,10 +1363,33 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         )
         if section_plan is not None:
             payload["section_plan"] = section_plan
+        citations = _json_input(
+            args.citations_file, args.citations_json, field="citations (--citations-json/-file)"
+        )
+        if citations is not None:
+            payload["citations"] = citations
+        if args.deep:
+            payload["mode"] = "deep"
         if args.out_dir is not None:
             payload["out_dir"] = args.out_dir
         payload["format"] = args.fmt
         return "ground", payload
+    elif command == "cite_support":
+        if args.markdown_file is not None:
+            payload["markdown"] = _read_file(args.markdown_file, field="--markdown-file")
+        elif args.text is not None:
+            payload["text"] = args.text
+        citations = _json_input(
+            args.citations_file, args.citations_json, field="citations (--citations-json/-file)"
+        )
+        if citations is not None:
+            payload["citations"] = citations
+        if args.deep:
+            payload["mode"] = "deep"
+        if args.out_dir is not None:
+            payload["out_dir"] = args.out_dir
+        payload["format"] = args.fmt
+        return "cite_support", payload
     elif command == "export":
         if args.title is not None:
             payload["title"] = args.title

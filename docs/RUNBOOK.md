@@ -513,6 +513,92 @@ uv run clio-author audit \
 
 ---
 
+**`cite_support`** — does the cited source **actually support** the claim it's attached to?
+
+**Why it exists.** `cite` proves a citation *exists* and `check_refs` proves the `\cite{key}` *resolves*
+to a bib entry — but **neither checks that the cited paper actually says what your sentence claims**.
+A real paper, correctly keyed, attached to a sentence it doesn't support, passes everything else. This
+is the check that closes that hole: *claim-to-source faithfulness*. For each `claim … \cite{key}` pair it
+reads the cited work and classifies the link as **supported / partial / unsupported / contradicted**.
+
+Two evidence tiers via `--deep`:
+- **abstract** (default, cheap) — judges the claim against the cited paper's **abstract** (which `cite`
+  already fetched, so no extra downloads). An `unsupported` here means *not found in the abstract* — a
+  weak signal, since most claims are backed by a paper's body, not its abstract.
+- **deep** (`--deep`, strong) — **ingests the cited paper's full text** (by its arXiv id) and judges the
+  claim against that. Falls back to the abstract when a source can't be fetched.
+
+The `citations` input is exactly **`cite`'s verified output** (it carries titles + abstracts + ids), or any
+list of `{citation_key, abstract, source?}`. Needs a real model (`CLIO_LLM`); the offline echo client
+returns `unknown` per pair (it never fabricates a `supported`).
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--markdown-file` / `--text` | file / string | the manuscript prose to scan for `\cite{}` claims |
+| `--citations-json` / `--citations-file` | JSON / file | verified citations (`cite`'s `verified`, with abstracts) |
+| `--deep` | flag | judge against cited **full text** (ingests each cited arXiv source) instead of abstracts |
+| `--out-dir` | directory | persist `cite_support.json` / `cite_support.md` |
+| `--format` | `structured`\|`prose` | `prose` emits the human summary |
+
+```bash
+# 1) verify candidates -> suggested.bib AND the structured 'verified' (with abstracts):
+CLIO_SCHOLAR=auto uv run --extra scholar clio-author cite \
+  --candidates-json '[{"title":"Attention Is All You Need"}]' \
+  --out runbook-out/cite-out/cite.json
+
+# 2) check each cited claim against its source abstract (cheap):
+CLIO_LLM=claude uv run clio-author cite_support \
+  --markdown-file runbook-out/compose-out/paper.md \
+  --citations-file runbook-out/cite-out/cite.json \
+  --out-dir runbook-out/support-out --format prose
+
+# 3) the rigorous pass — judge against the cited papers' FULL TEXT:
+CLIO_LLM=claude uv run clio-author cite_support \
+  --markdown-file runbook-out/compose-out/paper.md \
+  --citations-file runbook-out/cite-out/cite.json \
+  --deep --out-dir runbook-out/support-out
+```
+> Step 2 reads `cite`'s structured output. If you saved `cite` with `--out cite.json`, pass the file as-is
+> — `cite_support` reads the `verified` list (or `structured.verified`) and pulls each abstract from it.
+
+**Expect:** `metadata` = `{support_integrity, counts:{supported,partial,unsupported,contradicted,no_source,unknown}, num_pairs, mode}`. **Artifacts:** `runbook-out/support-out/{cite_support.json, cite_support.md}`.
+
+---
+
+**`ground`** — one **grounding-integrity** score for a whole manuscript (composes three checks).
+
+This is the headline "how much of this paper is real?" number — the mean of whichever of these are available:
+- **citation integrity** (deterministic) — fraction of `\cite{}` keys that resolve to a real bib entry (via `check_refs`).
+- **claim integrity** (LLM) — fraction of your *intended* claims actually made + supported by the prose (via `verify_work`).
+- **support integrity** (LLM) — fraction of cited claims actually substantiated *by their source* (via `cite_support`; add `--deep` for full text).
+
+| Flag | Takes | Meaning |
+|---|---|---|
+| `--markdown-file` / `--text` | file / string | the manuscript prose |
+| `--bibtex-file` / `--bibtex` | file / string | bibliography → drives **citation** integrity |
+| `--claims-json` / `--section-plan-file` | JSON / file | intended claims → drives **claim** integrity |
+| `--citations-json` / `--citations-file` | JSON / file | verified citations (with abstracts) → drives **support** integrity |
+| `--deep` | flag | support integrity judges against cited **full text** |
+| `--out-dir` | directory | persist `grounding.json` / `grounding.md` |
+
+```bash
+# Deterministic half (offline): just citation integrity from the bib + prose.
+uv run clio-author ground \
+  --markdown-file runbook-out/compose-out/paper.md \
+  --bibtex-file runbook-out/cite-out/suggested.bib --format prose
+
+# Full grounding integrity: citations + claims + source-support in one number.
+CLIO_LLM=claude uv run clio-author ground \
+  --markdown-file runbook-out/compose-out/paper.md \
+  --bibtex-file runbook-out/cite-out/suggested.bib \
+  --claims-json '["Transformers outperform RNNs on long sequences."]' \
+  --citations-file runbook-out/cite-out/cite.json \
+  --out-dir runbook-out/ground-out
+```
+**Expect:** `metadata` = `{grounding_integrity, citation_integrity, claim_integrity, support_integrity}`. **Artifacts:** `runbook-out/ground-out/{grounding.json, grounding.md}`.
+
+---
+
 ## Act V · Plan, then write a new paper
 
 **`plan`** — turn an idea or outline into per-section writing plans (tasks, claims, sources, word budgets).
