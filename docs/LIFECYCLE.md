@@ -46,8 +46,10 @@ Two things shape the whole design:
 >
 > **⑤ Strengthen it — before anyone sees it.** `revise` for clarity, `coherence`
 > for cross-section consistency, `verify_work` to confirm every planned claim is
-> made and supported, `check_refs` + `cite` for the bibliography, an `audit` for
-> completeness — and `review` the draft as a hostile referee (or loop it with
+> made and supported, `check_refs` + `cite` for the bibliography, `cite_support`
+> to confirm each cited source actually backs the sentence it's attached to, and
+> `ground` for one grounding-integrity score over the whole manuscript; an `audit`
+> for completeness — and `review` the draft as a hostile referee (or loop it with
 > `write_review` / `section_review`).
 >
 > **⑥ Separately, referee.** A venue asks you to review submissions. Paste each
@@ -72,7 +74,7 @@ Two things shape the whole design:
 | **② Gather** | *Pull in what I'll build on* | `ingest`, `gather`, `ask`, `kg`, `cite` |
 | **③ Plan** | *Blueprint the paper + evaluation* | `plan`, `experiment`, `research` |
 | **④ Draft** | *Write & illustrate* | `write`, `compose`, `plot`, `describe_figures`, `figure_refine` |
-| **⑤ Strengthen** | *Make my own paper bulletproof* | `review`, `revise`, `coherence`, `verify_work`, `check_refs`, `cite`, `audit`, `section_review`, `write_review`, `figure_refine` |
+| **⑤ Strengthen** | *Make my own paper bulletproof* | `review`, `revise`, `coherence`, `verify_work`, `check_refs`, `cite`, `cite_support`, `ground`, `audit`, `section_review`, `write_review`, `figure_refine` |
 | **⑥ Referee** | *Judge others' papers* | `review`, `section_review`, `meta_review` |
 | **⑦ Respond** | *Answer my reviewers* | `rebuttal`, `revise`, `audit` |
 | **⑧ Ship** | *Camera-ready* | `compose`, `export` |
@@ -134,6 +136,9 @@ clio-author coherence --markdown-file clio-out/paper/paper.md
 clio-author verify-work --text-file clio-out/paper/sections/03-method.md \
   --section-plan-file clio-out/plan/plan.json
 clio-author check-refs --bibtex-file clio-out/paper/references.bib --markdown-file clio-out/paper/paper.md
+clio-author cite_support --markdown-file clio-out/paper/paper.md --citations-file clio-out/cite.json  # do the sources back the claims?
+clio-author ground --markdown-file clio-out/paper/paper.md --bibtex-file clio-out/paper/references.bib \
+  --citations-file clio-out/cite.json --out-dir clio-out/paper/ground          # one grounding-integrity score
 clio-author audit --markdown-file clio-out/paper/paper.md --bibtex-file clio-out/paper/references.bib
 clio-author review --paper-file clio-out/paper/paper.md --format prose   # self peer-review
 ```
