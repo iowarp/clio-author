@@ -37,8 +37,9 @@ Two things shape the whole design:
 > with `ingest`.
 >
 > **③ Plan.** `plan` turns the idea into per-section blueprints (claims, evidence,
-> word budgets); `experiment` recreates a grounded **evaluation plan** (datasets /
-> baselines / metrics / ablations) for the new method.
+> word budgets); `plan_check` validates that blueprint *before* you write a word
+> (every claim has a source, budgets add up); `experiment` recreates a grounded
+> **evaluation plan** (datasets / baselines / metrics / ablations) for the new method.
 >
 > **④ Draft.** `write` section by section, or `compose` the whole paper at once —
 > grounded in the context from ②. Figures via `plot`, captions via
@@ -72,7 +73,7 @@ Two things shape the whole design:
 |---|---|---|
 | **① Frame** | *What's my story; what exists?* | `research`, `discover`, `ask`, `kg`, `experiment` |
 | **② Gather** | *Pull in what I'll build on* | `ingest`, `gather`, `ask`, `kg`, `cite` |
-| **③ Plan** | *Blueprint the paper + evaluation* | `plan`, `experiment`, `research` |
+| **③ Plan** | *Blueprint the paper + evaluation* | `plan`, `plan_check`, `experiment`, `research` |
 | **④ Draft** | *Write & illustrate* | `write`, `compose`, `plot`, `describe_figures`, `figure_refine` |
 | **⑤ Strengthen** | *Make my own paper bulletproof* | `review`, `revise`, `coherence`, `verify_work`, `check_refs`, `cite`, `cite_support`, `ground`, `audit`, `section_review`, `write_review`, `figure_refine` |
 | **⑥ Referee** | *Judge others' papers* | `review`, `section_review`, `meta_review` |

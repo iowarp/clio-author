@@ -394,6 +394,32 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_plan)
     _add_json(p_plan)
 
+    p_plan_check = sub.add_parser(
+        "plan_check",
+        help="Validate a writing plan BEFORE drafting (deterministic; the pre-write twin of audit).",
+    )
+    p_plan_check.add_argument(
+        "--plan-file",
+        dest="plan_file",
+        default=None,
+        help="Path to a plan.json ({outline, plans}) from `clio-author plan --out-dir`.",
+    )
+    p_plan_check.add_argument(
+        "--plan-json",
+        dest="plan_json",
+        default=None,
+        help="Inline plan JSON ({outline, plans}).",
+    )
+    p_plan_check.add_argument(
+        "--word-target",
+        dest="word_target",
+        type=int,
+        default=None,
+        help="Optional total word target; budgets must sum to it within 15%%.",
+    )
+    _add_format(p_plan_check)
+    _add_json(p_plan_check)
+
     p_research = sub.add_parser(
         "research",
         help="Propose + ground a literature brief for a topic or section.",
@@ -1269,6 +1295,13 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         if args.out_dir is not None:
             payload["out_dir"] = args.out_dir
         payload["format"] = args.fmt
+    elif command == "plan_check":
+        plan = _json_input(args.plan_file, args.plan_json, field="plan (--plan-json/--plan-file)")
+        if plan is not None:
+            payload["plan"] = plan
+        if args.word_target is not None:
+            payload["word_target"] = args.word_target
+        payload["format"] = args.fmt
     elif command == "research":
         if args.topic_file is not None:
             payload["topic"] = _read_file(args.topic_file, field="--topic-file")
@@ -1586,7 +1619,47 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"[warning: could not write {out_file}: {exc}]", file=sys.stderr)
 
     print(json.dumps(result, indent=2))
+    _print_suggestions(result)
     return 1 if _has_error(result) else 0
+
+
+# Actions reached via `run <action>` (no dedicated subcommand) / renamed subcommands,
+# so the "Next steps" hints show the exact command to type.
+_RUN_ONLY = {"meta_review", "plot", "write_review", "figure_refine", "edit"}
+_SUBCOMMAND_OVERRIDE = {
+    "verify_work": "verify-work",
+    "check_refs": "check-refs",
+    "section_review": "section-review",
+    "describe_figures": "describe",
+}
+
+
+def _subcommand_for(action: str) -> str:
+    """Map an action name to the CLI invocation a user would type."""
+    if action in _RUN_ONLY:
+        return f"run {action}"
+    return _SUBCOMMAND_OVERRIDE.get(action, action)
+
+
+def _print_suggestions(result: dict[str, Any]) -> None:
+    """Print "what to run next" hints to stderr (keeps stdout clean JSON).
+
+    Reads ``metadata.suggested_next`` attached by the agent. Suppressed when
+    ``CLIO_SUGGEST`` is ``off`` / ``0`` / ``false`` / ``no``.
+    """
+    if os.environ.get("CLIO_SUGGEST", "").strip().lower() in {"off", "0", "false", "no"}:
+        return
+    meta = result.get("metadata")
+    nxt = meta.get("suggested_next") if isinstance(meta, dict) else None
+    if not isinstance(nxt, list) or not nxt:
+        return
+    lines = ["", "Next steps (suggested):"]
+    for item in nxt:
+        if not isinstance(item, dict):
+            continue
+        cmd = _subcommand_for(str(item.get("action", "")))
+        lines.append(f"  clio-author {cmd:<16} — {item.get('why', '')}")
+    print("\n".join(lines), file=sys.stderr)
 
 
 def _has_error(result: dict[str, Any]) -> bool:

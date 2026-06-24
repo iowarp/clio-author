@@ -42,6 +42,7 @@ from clio_author.experts.kg import KGExpert
 from clio_author.experts.meta_reviewer import MetaReviewerExpert
 from clio_author.experts.orchestrate import run_orchestrate
 from clio_author.experts.paper_qa import PaperQAExpert
+from clio_author.experts.plan_check import PlanCheckExpert
 from clio_author.experts.planner import PlannerExpert
 from clio_author.experts.polish import PolishExpert
 from clio_author.experts.rebuttal import RebuttalExpert
@@ -149,6 +150,7 @@ class ClioAuthorAgent:
         self.check_refs = CheckRefsExpert(self.llm)
         self.cite_support = CiteSupportExpert(self.llm, full_text_resolver=self._cited_full_text)
         self.audit = AuditExpert(self.llm)
+        self.plan_check = PlanCheckExpert(self.llm)
 
         # M0 echo wiring is preserved for the unknown/None-action fallthrough.
         self.engine = Engine()
@@ -168,6 +170,14 @@ class ClioAuthorAgent:
         action = task_obj.payload.get("action")
         try:
             out = self._route(action, task_obj)
+            # Attach "what to run next" hints (advisory; skipped on errors) so a
+            # host or the CLI can guide the user through the pipeline.
+            if not out.metadata.get("error") and isinstance(action, str):
+                from clio_author.integration.manifest import suggested_next
+
+                nxt = suggested_next(action)
+                if nxt:
+                    out.metadata.setdefault("suggested_next", nxt)
             # format="prose": return a human-readable text answer (drop the JSON).
             # Experts that write prose themselves (e.g. review) already set
             # structured=None, so this only re-renders the data-shaped actions.
@@ -241,6 +251,8 @@ class ClioAuthorAgent:
             return self.check_refs.run(task, session)
         if action == "audit":
             return self.audit.run(task, session)
+        if action == "plan_check":
+            return self.plan_check.run(task, session)
         if action == "cite_support":
             return self.cite_support.run(task, session)
         if action == "ground":

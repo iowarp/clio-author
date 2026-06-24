@@ -71,7 +71,7 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 
 ---
 
-## Action catalog (28 actions)
+## Action catalog (29 actions)
 
 Payload keys below are exactly the keys each expert reads. Keys marked *(optional)* have a fallback.
 
@@ -363,7 +363,30 @@ sub.run("write", {"section_plan": plans[0], "source": "..."})
 
 ---
 
-### 9. `experiment`
+### 9. `plan_check`
+
+Deterministically validate a writing plan **before** drafting — the pre-write twin of `audit`. Catches
+plan problems (a section with no claims, a claim with no source, missing word budgets, an outline
+section with no plan) while they are still cheap to fix. No LLM call, so it runs identically offline.
+
+- **Reads:** `plan` *(required)* — the planner's `{outline, plans}` structure (or `plans` + `outline`
+  separately); `word_target` *(optional int)* — budgets must sum to it within 15%.
+- **Returns:** `content` = a one-line verdict; `structured` = `{sections[], missing_plans[], taskless[],
+  claimless[], uncited_claim_sections[], missing_budgets[], unresolved_research[], budget_total,
+  budget_ok}`; `metadata` = `{passed, num_sections, num_problems}`.
+- **Extra:** none; pure Python (no model, no network).
+- **File inputs:** `--plan-file plan.json` (pass `plan`'s saved output as-is).
+
+```bash
+clio-author plan_check --plan-file clio-out/plan/plan.json --word-target 6000 --format prose
+```
+```python
+sub.run("plan_check", {"plan": plan_result["structured"], "word_target": 6000})
+```
+
+---
+
+### 10. `experiment`
 
 Read the design / architecture / experiments of one or more reference papers and recreate a grounded
 evaluation plan for a new paper.
@@ -396,7 +419,7 @@ agent.experiment(blocks=context_blocks, idea="my new method")
 
 ---
 
-### 10. `research`
+### 11. `research`
 
 Produce a grounded literature brief for a topic or section: foundational works, recent work,
 competing/alternative approaches, open gaps, a synthesis, and confidence. When a scholar client is
@@ -453,7 +476,7 @@ sub.run("research", {"topic": "transformer self-attention", "discover": True})
 
 ---
 
-### 11. `discover`
+### 12. `discover`
 
 Find real candidate papers for a topic via scholarly search (Semantic Scholar / OpenAlex / Crossref /
 arXiv). Deterministic — no LLM call. Returns only records the search actually returns; never
@@ -497,7 +520,7 @@ sub.run("discover", {"topic": "transformer self-attention", "limit": 10})
 
 ---
 
-### 12. `verify_work`
+### 13. `verify_work`
 
 Goal-backward check of written prose against the claims it was supposed to make. For each intended
 claim, determines whether the prose actually states it (`made`) and whether it is supported with
@@ -541,7 +564,7 @@ sub.run("verify_work", {
 
 ---
 
-### 13. `write`
+### 14. `write`
 
 Draft a single paper section grounded in scoped source material.
 
@@ -566,7 +589,7 @@ agent.write(outline={"title": "Methods"}, source="...")
 
 ---
 
-### 14. `revise`
+### 15. `revise`
 
 Revise existing prose. **`mode='feedback'`** (default) addresses reviewer feedback/critique and may
 change content; **`mode='style'`** polishes clarity, flow, and academic voice *without changing
@@ -600,7 +623,7 @@ agent.revise("...", mode="style", voice="concise")
 
 ---
 
-### 15. `coherence`
+### 16. `coherence`
 
 Check **cross-section consistency** of a manuscript — terminology drift, contradictions, undefined
 terms, duplication, and broken narrative flow.
@@ -627,7 +650,7 @@ sub.run("coherence", {"sections": [{"title": "Introduction", "draft": "..."}, ..
 
 ---
 
-### 16. `check_refs`
+### 17. `check_refs`
 
 Deterministically lint a BibTeX bibliography and cross-check it against the `\cite{}` keys used in
 the manuscript prose. Flags malformed entries, duplicate entries, cited-but-missing keys, and
@@ -660,7 +683,7 @@ sub.run("check_refs", {"bibtex": bibtex_string, "markdown": manuscript_text})
 
 ---
 
-### 17. `cite_support`
+### 18. `cite_support`
 
 Claim-to-source faithfulness: for each `claim … \cite{key}` pair in the prose, decide whether the
 **cited source actually supports the claim** (`supported` / `partial` / `unsupported` /
@@ -693,7 +716,7 @@ sub.run("cite_support", {"markdown": manuscript_text, "citations": cite_result["
 
 ---
 
-### 18. `ground`
+### 19. `ground`
 
 One **grounding-integrity** score for a whole manuscript — the mean of whichever of three checks are
 available, composed from `check_refs`, `verify_work`, and `cite_support`. The number no single-slice
@@ -725,7 +748,7 @@ sub.run("ground", {"markdown": manuscript_text, "bibtex": bibtex_string, "citati
 
 ---
 
-### 19. `section_review`
+### 20. `section_review`
 
 Three-layer review of a **single section**: L1 deterministic reference/citation checking
 (`check_refs`) → L2 single-section coherence (`coherence`) → L3 persona-conditioned peer review
@@ -766,7 +789,7 @@ sub.run("section_review", {
 
 ---
 
-### 20. `audit`
+### 21. `audit`
 
 Deterministic manuscript completeness audit: required sections present, per-section word-count vs
 budget, unresolved `[TODO]`/`[CITE:]`/empty `\cite{}` placeholders, and citation coverage. **No
@@ -809,7 +832,7 @@ sub.run("audit", {
 
 ---
 
-### 21. `kg`
+### 22. `kg`
 
 Extract a content knowledge graph of a paper -- its claims, methods, datasets, results, metrics,
 concepts, and tasks plus the relations between them -- from the paper's memory blocks. This is the
@@ -869,7 +892,7 @@ sub.run("kg", {
 
 ---
 
-### 22. `describe_figures`
+### 23. `describe_figures`
 
 Fill in descriptions/captions for figures in memory blocks.
 
@@ -895,7 +918,7 @@ agent.describe_figures(blocks_dump)
 
 ---
 
-### 23. `plot`
+### 24. `plot`
 
 Generate matplotlib plot **code** (text only; never executed on this path).
 
@@ -921,7 +944,7 @@ agent.plot({"kind": "plot", "intent": "bar chart of accuracy by model"})
 
 ---
 
-### 24. `compose`
+### 25. `compose`
 
 **Whole-paper orchestration.** Drafts a full multi-section manuscript from an idea and optional
 experimental log, chaining the existing experts in sequence.
@@ -998,7 +1021,7 @@ print("section errors:", result["metadata"]["section_errors"])
 
 ---
 
-### 25. `export`
+### 26. `export`
 
 Export a composed Markdown manuscript to a standalone LaTeX document (`paper.tex` + optional
 `references.bib`).
@@ -1063,7 +1086,7 @@ print(result["metadata"]["wrote"])
 
 ---
 
-### 26. `write_review`
+### 27. `write_review`
 
 Run a writer ↔ reviewer **critic-refine** loop and return the final output.
 
@@ -1085,7 +1108,7 @@ sub.run("write_review", {"outline": {"title": "Methods"}, "source": "...", "max_
 
 ---
 
-### 27. `figure_refine`
+### 28. `figure_refine`
 
 Run a figure visualizer ↔ critic **critic-refine** loop and return the final output.
 
@@ -1105,7 +1128,7 @@ sub.run("figure_refine", {"spec": {"kind": "plot", "intent": "line chart of loss
 
 ---
 
-### 28. `orchestrate`
+### 29. `orchestrate`
 
 Plan and run a sequence of the other actions to achieve a natural-language **goal** (dynamic
 multi-step). An LLM proposes a minimal ordered plan of action calls, which are executed through the

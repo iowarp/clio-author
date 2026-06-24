@@ -28,7 +28,8 @@ phase of the work you're in.**
 
 ## What You Get
 
-- **28 actions across the author lifecycle** — frame · gather · plan · draft · strengthen · referee · respond · ship, all behind one interface
+- **29 actions across the author lifecycle** — frame · gather · plan · draft · strengthen · referee · respond · ship, all behind one interface
+- **Guided pipeline** — every command suggests what to run next (on stderr + as `metadata.suggested_next` for host agents)
 - **PDF/arXiv → clean scientific Markdown** with structured memory blocks (sections, figures, equations)
 - **Grounded peer review** — Accept/Reject, per-axis scores, strengths/weaknesses, optional vision on figures
 - **Source-grounded writing** — outline → plan → draft → self-review → LaTeX/PDF, with verified citations
@@ -116,7 +117,7 @@ at any phase**. Most jobs don't even need `ingest`: only `ask`, `kg`, `experimen
 
 The full story, with copy-paste recipes per phase, is in **[`docs/LIFECYCLE.md`](docs/LIFECYCLE.md)**.
 
-### The 28 actions at a glance
+### The 29 actions at a glance
 
 **Two kinds.** Most actions are **tools** 🔧 — each does one specific job nothing else can. Six are
 **shortcuts** 🔗 — they don't add a new ability, they just **run several tools together** so you don't
@@ -138,6 +139,7 @@ the 🔗 shortcuts are just convenient bundles of them.
 | `research` | 🔧 tool | **Survey literature.** Foundational/recent/competing sources, gaps, synthesis. |
 | `experiment` | 🔧 tool | **Recreate evaluation.** Reference papers' design/experiments → grounded eval plan. |
 | `plan` | 🔧 tool | **Section blueprints.** Tasks, claims, sources, word budgets before drafting. |
+| `plan_check` | 🔧 tool | **Validate the plan before writing.** Deterministic: claim/citation coverage, word budgets, outline match; no LLM. |
 | `write` | 🔧 tool | **Draft a section.** Grounded in supplied source material. |
 | `revise` | 🔧 tool | **Revise prose.** `--mode feedback` (address review) or `style` (polish). Aliases: `edit`, `polish`. |
 | `coherence` | 🔧 tool | **Consistency check.** Terminology drift, contradictions, broken flow. |
