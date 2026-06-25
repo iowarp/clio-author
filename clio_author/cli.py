@@ -272,80 +272,6 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_write)
     _add_json(p_write)
 
-    p_compose = sub.add_parser(
-        "compose", help="Draft a whole multi-section manuscript from an idea + log."
-    )
-    p_compose.add_argument("--idea", default=None, help="The research idea / thesis (inline).")
-    p_compose.add_argument(
-        "--idea-file", dest="idea_file", default=None, help="Path to a file holding the idea text."
-    )
-    p_compose.add_argument(
-        "--log", default=None, help="The experimental log / results notes (inline)."
-    )
-    p_compose.add_argument(
-        "--log-file",
-        dest="log_file",
-        default=None,
-        help="Path to a file holding the experimental log.",
-    )
-    p_compose.add_argument(
-        "--outline-json",
-        dest="outline_json",
-        default=None,
-        help="A JSON PaperOutline (inline) to use instead of generating one.",
-    )
-    p_compose.add_argument(
-        "--outline-file",
-        dest="outline_file",
-        default=None,
-        help="Path to a JSON PaperOutline file.",
-    )
-    p_compose.add_argument(
-        "--candidates-file",
-        dest="candidates_file",
-        default=None,
-        help="Path to a JSON file of citation candidates to verify and cite.",
-    )
-    p_compose.add_argument(
-        "--review",
-        action="store_true",
-        help="Run a per-section writer/reviewer refine loop.",
-    )
-    p_compose.add_argument(
-        "--max-rounds",
-        dest="max_rounds",
-        type=int,
-        default=3,
-        help="Max writer/reviewer rounds per section when --review is set.",
-    )
-    p_compose.add_argument(
-        "--out-dir",
-        dest="out_dir",
-        default=None,
-        help="Directory to persist paper.md + per-section files (optional).",
-    )
-    p_compose.add_argument(
-        "--latex",
-        action="store_true",
-        help="Also export paper.tex (+ references.bib) when --out-dir is reachable.",
-    )
-    p_compose.add_argument(
-        "--pdf",
-        action="store_true",
-        help="Also compile paper.pdf from the LaTeX (implies --latex; needs a LaTeX engine).",
-    )
-    p_compose.add_argument(
-        "--plan",
-        action="store_true",
-        help="Plan each section (tasks/claims/sources) before drafting it.",
-    )
-    p_compose.add_argument(
-        "--verify",
-        action="store_true",
-        help="After drafting, score grounding integrity (citations resolve + claims supported).",
-    )
-    _add_format(p_compose)
-    _add_json(p_compose)
 
     p_plan = sub.add_parser("plan", help="Turn an idea or outline into per-section writing plans.")
     p_plan.add_argument("--idea", default=None, help="The research idea / thesis (inline).")
@@ -533,31 +459,6 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_check_refs)
     _add_json(p_check_refs)
 
-    p_section_review = sub.add_parser(
-        "section-review",
-        help="Layered (refs -> coherence -> review) check of one section.",
-    )
-    p_section_review.add_argument("--text", default=None, help="The section text (inline).")
-    p_section_review.add_argument(
-        "--text-file",
-        dest="text_file",
-        default=None,
-        help="Path to a file holding the section text.",
-    )
-    p_section_review.add_argument(
-        "--bibtex-file",
-        dest="bibtex_file",
-        default=None,
-        help="Path to a BibTeX file for the L1 reference check.",
-    )
-    p_section_review.add_argument(
-        "--persona-json",
-        dest="persona_json",
-        default=None,
-        help="A JSON PersonaSpec (inline) for the L3 reviewer.",
-    )
-    _add_format(p_section_review)
-    _add_json(p_section_review)
 
     p_audit = sub.add_parser(
         "audit",
@@ -590,59 +491,6 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_audit)
     _add_json(p_audit)
 
-    p_ground = sub.add_parser(
-        "ground",
-        help="Score grounding integrity: how much of a manuscript traces to real sources.",
-    )
-    p_ground.add_argument("--text", default=None, help="The manuscript prose (inline).")
-    p_ground.add_argument(
-        "--markdown-file",
-        dest="markdown_file",
-        default=None,
-        help="Path to the manuscript Markdown.",
-    )
-    p_ground.add_argument(
-        "--bibtex",
-        default=None,
-        help="The BibTeX bibliography (inline; drives citation integrity).",
-    )
-    p_ground.add_argument(
-        "--bibtex-file", dest="bibtex_file", default=None, help="Path to a BibTeX file."
-    )
-    p_ground.add_argument(
-        "--claims-json",
-        dest="claims_json",
-        default=None,
-        help="A JSON list of intended claims (drives claim integrity; needs a real model).",
-    )
-    p_ground.add_argument(
-        "--section-plan-file",
-        dest="section_plan_file",
-        default=None,
-        help="Path to a JSON SectionPlan whose claims to verify.",
-    )
-    p_ground.add_argument(
-        "--citations-json",
-        dest="citations_json",
-        default=None,
-        help="JSON verified citations (cite's output, with abstracts; drives support integrity).",
-    )
-    p_ground.add_argument(
-        "--citations-file",
-        dest="citations_file",
-        default=None,
-        help="Path to a JSON file of verified citations (e.g. cite's structured 'verified').",
-    )
-    p_ground.add_argument(
-        "--deep",
-        action="store_true",
-        help="Support integrity: judge claims against cited FULL TEXT (ingests sources), not abstracts.",
-    )
-    p_ground.add_argument(
-        "--out-dir", dest="out_dir", default=None, help="Directory to persist grounding.json/.md."
-    )
-    _add_format(p_ground)
-    _add_json(p_ground)
 
     p_cite_support = sub.add_parser(
         "cite_support",
@@ -722,24 +570,6 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_json(p_export)
 
-    p_polish = sub.add_parser("polish", help="Polish prose for clarity, flow, and academic voice.")
-    p_polish.add_argument("--text", default=None, help="The prose to polish (inline).")
-    p_polish.add_argument(
-        "--text-file",
-        dest="text_file",
-        default=None,
-        help="Path to a text file holding the prose to polish.",
-    )
-    p_polish.add_argument(
-        "--voice", default=None, help="Optional target voice (e.g. concise, formal)."
-    )
-    p_polish.add_argument(
-        "--target",
-        default=None,
-        help="Optional file (under the harness root) to apply the polished text to.",
-    )
-    _add_format(p_polish)
-    _add_json(p_polish)
 
     p_revise = sub.add_parser(
         "revise",
@@ -1043,7 +873,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # `--sources` on the grounding subcommands: auto-gather files/folders/globs/
     # git repos/PDFs into `blocks` before the action runs (no pre-ingest needed).
-    for _name in ("ask", "review", "write", "compose", "plan", "research", "kg", "experiment"):
+    for _name in ("ask", "review", "write", "plan", "research", "kg", "experiment"):
         _gp = sub.choices[_name]
         _gp.add_argument(
             "--sources",
