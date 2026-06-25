@@ -13,6 +13,7 @@ dependencies = ["pydantic>=2"]
 [project.scripts]
 clio-author = "clio_author.cli:main"
 clio-author-a2a = "clio_author.integration.a2a_server:main"
+clio-author-mcp = "clio_author.integration.mcp_bridge:main"
 
 [project.optional-dependencies]
 # Heavy PDF-extraction stack. Kept OUT of core deps: Docling pulls ~500MB of

@@ -1,13 +1,17 @@
 # Integrating AUTHOR into a host
 
-AUTHOR is designed to be **driven by a host agent**. There are four ways to wire it in; pick by host.
+AUTHOR is designed to be **driven by a host agent**. Pick the wiring by host.
 
 | Mode | Best for | Entry point |
 |---|---|---|
-| **Subagent** (in-process Python) | CLIO, any Python host | `clio_author.integration.clio_adapter.ClioAuthorSubagent` |
-| **Tool** (CLI / subprocess) | any language, any host | the `clio-author` console script (JSON on stdout) |
-| **Slash command** | Codex, Claude Code | `integration/codex/author.md`, `integration/claude/author.md` |
-| **MCP** | MCP-only hosts | `clio_author.integration.mcp_bridge` (`uv sync --extra mcp`) |
+| **Subagent** (in-process Python) | **CLIO**, any Python host | `clio_author.integration.clio_adapter.ClioAuthorSubagent` |
+| **MCP** | **CLIO**, any MCP host | `clio-author-mcp` (`uv sync --extra mcp`) |
+| **A2A** | any agent-to-agent host | `clio-author-a2a` (Agent Card + `message/send`) |
+| **Claude Code plugin** | **Claude Code** | `integration/claude-plugin/` (bundles the MCP server + `author` subagent) |
+| **Codex (MCP)** | **Codex CLI** | `integration/codex/config.toml` (`codex mcp add clio_author -- clio-author-mcp`) |
+| **Tool** (CLI / subprocess) | any language | the `clio-author` console script (JSON on stdout) |
+
+**Host map:** CLIO → subagent (or MCP / A2A); Claude Code → the plugin; Codex → the MCP config.
 
 Discovery is uniform across modes: `capabilities()` / `clio-author capabilities` lists every action
 with its lifecycle `phase` + `needs_source` metadata, and `clio-author lifecycle` prints the
@@ -34,23 +38,44 @@ Any language can shell out and read JSON from stdout (exit `0` = ok, `1` = error
 uv run clio-author run review --json '{"paper":"# My paper\n..."}'
 ```
 
-## Slash command (Codex / Claude Code)
-
-Both files are ready-to-use command prompts that drive the CLI and report the JSON result.
-
-- **Codex** — install `integration/codex/author.md` as a Codex prompt/command, then `/author <task>`.
-- **Claude Code** — copy `integration/claude/author.md` to `.claude/commands/author.md` (project) or
-  `~/.claude/commands/author.md` (user), then `/author <task>`.
-
-## MCP (MCP-only hosts)
+## MCP (CLIO, Codex, any MCP host)
 
 ```bash
 uv sync --extra mcp
-uv run python -m clio_author.integration.mcp_bridge            # stdio (default)
-CLIO_MCP_TRANSPORT=http CLIO_MCP_PORT=8765 uv run python -m clio_author.integration.mcp_bridge   # HTTP
+clio-author-mcp                                  # stdio (default)
+CLIO_MCP_TRANSPORT=http CLIO_MCP_PORT=8765 clio-author-mcp   # HTTP
 ```
 
-The bridge exposes the same actions as MCP tools; the harness itself stays non-MCP.
+The bridge exposes `capabilities` + `run(action, payload)` as MCP tools; the harness itself stays
+non-MCP.
+
+## Claude Code plugin
+
+A real plugin (not a slash command) that bundles the MCP server + an `author` subagent. See
+[`claude-plugin/README.md`](claude-plugin/README.md). Quick version:
+
+```bash
+uv tool install 'clio-author[mcp]'                                  # puts clio-author-mcp on PATH
+claude --plugin-dir integration/claude-plugin                       # local dev
+# …or: /plugin marketplace add iowarp/clio-author  then  /plugin install clio-author@clio-author
+```
+
+## Codex
+
+Codex has no tool-server plugin API — MCP is the path. Register clio-author with one line (or paste
+[`codex/config.toml`](codex/config.toml) into `~/.codex/config.toml`), and drop
+[`codex/AGENTS.md`](codex/AGENTS.md) into your project so Codex knows when to call it:
+
+```bash
+uv tool install 'clio-author[mcp]'
+codex mcp add clio_author -- clio-author-mcp
+```
+
+## A2A (agent-to-agent hosts)
+
+```bash
+clio-author-a2a            # serves the Agent Card + JSON-RPC message/send (one skill per tool + role)
+```
 
 ## Host-specific rule — avoid nesting deadlock
 

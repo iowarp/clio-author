@@ -1,0 +1,11 @@
+{
+  "name": "clio-author",
+  "version": "0.1.0",
+  "description": "Process, review, and write scientific papers with the clio-author harness (24 tools + 7 roles), exposed to Claude Code as MCP tools plus an `author` subagent.",
+  "author": { "name": "iowarp" },
+  "homepage": "https://github.com/iowarp/clio-author",
+  "repository": "https://github.com/iowarp/clio-author",
+  "license": "BSD-3-Clause",
+  "keywords": ["academic", "papers", "scientific-writing", "citations", "grounding"],
+  "mcpServers": "./.mcp.json"
+}

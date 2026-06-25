@@ -1,0 +1,20 @@
+# clio-author as an MCP server for Codex CLI.
+# Codex has no tool-server "plugin" API — MCP is the integration path.
+# Paste this block into ~/.codex/config.toml (or a project-scoped .codex/config.toml),
+# or register it in one line:
+#
+#   codex mcp add clio_author -- clio-author-mcp
+#
+# Prerequisite: clio-author installed with the MCP extra so `clio-author-mcp` is on PATH:
+#   uv tool install 'clio-author[mcp]'      # or pipx install 'clio-author[mcp]'
+
+[mcp_servers.clio_author]
+command = "clio-author-mcp"
+# Ingestion / model startup can exceed the 10s default; long RAG/processing calls need headroom.
+startup_timeout_sec = 30
+tool_timeout_sec = 300
+
+[mcp_servers.clio_author.env]
+# Optional: point clio-author at your key file (it never takes keys on the command line).
+# CLIO_ENV_FILE = "/abs/path/to/clio-author/.env.local"
+PYTHONUNBUFFERED = "1"
