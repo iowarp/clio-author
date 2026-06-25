@@ -21,6 +21,7 @@ returns the echo output.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -45,7 +46,7 @@ from clio_author.experts.orchestrate import run_orchestrate
 from clio_author.experts.paper_qa import PaperQAExpert
 from clio_author.experts.plan_check import PlanCheckExpert
 from clio_author.experts.planner import PlannerExpert
-from clio_author.memory import ProjectMemory
+from clio_author.memory import ProjectMemory, ResultCache
 from clio_author.roles import build_roles
 from clio_author.experts.polish import PolishExpert
 from clio_author.experts.rebuttal import RebuttalExpert
@@ -380,6 +381,46 @@ class ClioAuthorAgent:
         sub = Task(id=uuid4().hex, description=action, payload={**payload, "action": action})
         return self._route(action, sub)
 
+    def _model_id(self) -> str:
+        """A stable id for the active model, used in the result-cache key."""
+        return getattr(self.llm, "model", "") or type(self.llm).__name__
+
+    def _cached_dispatch(self, cache: ResultCache, model: str) -> Callable[..., AgentOutput]:
+        """Wrap :meth:`_dispatch_tool` with a result cache (token economy).
+
+        A repeated ``(action, payload, model)`` returns the stored result instead
+        of re-running the tool — so a step shared across roles (or re-run in a
+        refine loop) costs no tokens. Only non-error results are cached.
+        """
+
+        def dispatch(action: str, payload: dict[str, Any]) -> AgentOutput:
+            hit = cache.get(action, payload, model)
+            if hit is not None:
+                meta = dict(hit.get("metadata") or {})
+                meta["cached"] = True
+                return AgentOutput(
+                    agent=str(hit.get("agent") or action),
+                    content=str(hit.get("content") or ""),
+                    structured=hit.get("structured"),
+                    metadata=meta,
+                )
+            out = self._dispatch_tool(action, payload)
+            if not out.metadata.get("error"):
+                cache.put(
+                    action,
+                    payload,
+                    {
+                        "agent": out.agent,
+                        "content": out.content,
+                        "structured": out.structured,
+                        "metadata": out.metadata,
+                    },
+                    model,
+                )
+            return out
+
+        return dispatch
+
     @staticmethod
     def _project_memory(payload: dict[str, Any]) -> ProjectMemory | None:
         """Build a :class:`ProjectMemory` under ``out_dir``/``project`` when given."""
@@ -392,7 +433,12 @@ class ClioAuthorAgent:
             return None
 
     def _run_role(self, task: Task) -> AgentOutput:
-        """Dispatch ``task.payload['role']`` to the named role-agent. Never raises."""
+        """Dispatch ``task.payload['role']`` to the named role-agent. Never raises.
+
+        When the call has a project dir (``out_dir``/``project``), tool dispatch is
+        wrapped with a project-scoped :class:`ResultCache` so repeated steps are
+        free; otherwise dispatch is uncached.
+        """
         name = str(task.payload.get("role") or "").strip()
         role = self.roles.get(name)
         if role is None:
@@ -402,7 +448,16 @@ class ClioAuthorAgent:
                 content="",
                 metadata={"error": f"unknown role {name!r}; known roles: {known}"},
             )
-        return role.run(task.payload, self._project_memory(task.payload))
+        memory = self._project_memory(task.payload)
+        root = task.payload.get("out_dir") or task.payload.get("project")
+        if root:
+            cache = ResultCache(Path(str(root)) / "cache")
+            role._dispatch = self._cached_dispatch(cache, self._model_id())
+            try:
+                return role.run(task.payload, memory)
+            finally:
+                role._dispatch = self._dispatch_tool
+        return role.run(task.payload, memory)
 
     def _cited_full_text(self, key: str, entry: dict[str, Any]) -> str | None:
         """Resolve a cited paper's full text for ``cite_support`` deep mode.
