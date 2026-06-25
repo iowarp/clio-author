@@ -13,7 +13,7 @@ one at a time and inspect each result. Arranged as a paper's life — **read →
 
 > **Single-file rule (and the multi-source exception).** Every `--*-file` flag reads exactly **one**
 > file (internally `_read_file` in `cli.py`; no `append` or glob). The exception is `--sources`,
-> which takes **many** sources at once: the grounding actions (`ask`, `plan`, `write`, `compose`,
+> which takes **many** sources at once: the grounding actions (`ask`, `plan`, `write`,
 > `research`, `kg`, `review`) and the standalone `gather` action accept `--sources S [S ...]` (a mix
 > of files, folders, globs, git repo URLs, PDFs/arXiv ids) or `--sources-file FILE` (one per line, or
 > a JSON array). They are auto-ingested and merged into the grounding `blocks` for you — so you no
@@ -72,7 +72,7 @@ GEMINI_API_KEY=...
 uv run ruff check clio_author tests        # -> All checks passed!
 uv run mypy clio_author                    # -> Success: no issues found in 75 source files
 uv run pytest -q                           # -> 621 passed, 3 skipped, 12 deselected
-uv run clio-author capabilities            # -> name=clio-author, 29 actions
+uv run clio-author capabilities            # -> name=clio-author, 24 actions + 7 roles
 uv run clio-author lifecycle               # -> the phase -> actions map (see docs/LIFECYCLE.md)
 ```
 
@@ -81,14 +81,16 @@ uv run clio-author lifecycle               # -> the phase -> actions map (see do
 > need `ingest` first. `clio-author lifecycle` prints which actions serve each phase;
 > [`docs/LIFECYCLE.md`](LIFECYCLE.md) tells the full story with copy-paste recipes.
 
-> **Dedicated subcommands** with their own flags: `capabilities, ingest, gather, ask, experiment,
-> review, cite, cite_support, ground, discover, plan, write, compose, revise, export, polish,
-> coherence, kg, describe, orchestrate, rebuttal, research, verify-work, check-refs, section-review,
-> audit, run`. The other
-> actions (`edit`, `meta_review`, `plot`, `write_review`, `figure_refine`) have **no dedicated
-> subcommand** — reach them with `clio-author run <action> --json '{...}'`. `edit` and `polish` are
-> **aliases** of the unified `revise` action (`edit` ≡ `revise --mode feedback`, `polish` ≡
-> `revise --mode style`); both still work and `polish` keeps its own subcommand.
+> **Two layers.** **Tools** (24) each do one job; **roles** (7) run several tools for you via
+> `clio-author role <name>` (reader · scholar · writer · verifier · reviewer · refiner · viz).
+>
+> **Dedicated tool subcommands:** `capabilities, ingest, gather, ask, experiment, review, cite,
+> cite_support, discover, plan, plan_check, write, revise, export, coherence, kg, describe,
+> orchestrate, rebuttal, research, verify-work, check-refs, audit, role, run`. A couple of actions
+> have **no dedicated subcommand** — reach them with `clio-author run <action> --json '{...}'`
+> (`meta_review`, `plot`). The composer logic behind the roles (`compose`, `ground`, `section_review`,
+> `write_review`, `figure_refine`, and the `edit`/`polish` aliases of `revise`) is internal plumbing —
+> not a user-facing command — but still reachable via `run <action>` if you need it directly.
 
 ---
 
@@ -417,41 +419,6 @@ CLIO_LLM=claude uv run clio-author cite_support \
 
 ---
 
-**`ground`** — one **grounding-integrity** score for a whole manuscript (composes three checks).
-
-> 🔗 **Shortcut** — runs `check_refs` + `verify_work` + `cite_support` and rolls them into one score. It adds no new check; use the three tools directly if you want them separately.
-
-This is the headline "how much of this paper is real?" number — the mean of whichever of these are available:
-- **citation integrity** (deterministic) — fraction of `\cite{}` keys that resolve to a real bib entry (via `check_refs`).
-- **claim integrity** (LLM) — fraction of your *intended* claims actually made + supported by the prose (via `verify_work`).
-- **support integrity** (LLM) — fraction of cited claims actually substantiated *by their source* (via `cite_support`; add `--deep` for full text).
-
-| Flag | Takes | Meaning |
-|---|---|---|
-| `--markdown-file` / `--text` | file / string | the manuscript prose |
-| `--bibtex-file` / `--bibtex` | file / string | bibliography → drives **citation** integrity |
-| `--claims-json` / `--section-plan-file` | JSON / file | intended claims → drives **claim** integrity |
-| `--citations-json` / `--citations-file` | JSON / file | verified citations (with abstracts) → drives **support** integrity |
-| `--deep` | flag | support integrity judges against cited **full text** |
-| `--out-dir` | directory | persist `grounding.json` / `grounding.md` |
-
-```bash
-# Deterministic half (offline): just citation integrity from the bib + prose.
-uv run clio-author ground \
-  --markdown-file runbook-out/compose-out/paper.md \
-  --bibtex-file runbook-out/cite-out/suggested.bib --format prose
-
-# Full grounding integrity: citations + claims + source-support in one number.
-CLIO_LLM=claude uv run clio-author ground \
-  --markdown-file runbook-out/compose-out/paper.md \
-  --bibtex-file runbook-out/cite-out/suggested.bib \
-  --claims-json '["Transformers outperform RNNs on long sequences."]' \
-  --citations-file runbook-out/cite-out/cite.json \
-  --out-dir runbook-out/ground-out
-```
-**Expect:** `metadata` = `{grounding_integrity, citation_integrity, claim_integrity, support_integrity}`. **Artifacts:** `runbook-out/ground-out/{grounding.json, grounding.md}`.
-
----
 
 ## Act IV · Review & strengthen — referee a paper, then harden your own
 
@@ -564,34 +531,6 @@ CLIO_LLM=claude uv run clio-author coherence \
 
 ---
 
-**`section_review`** — three-layer review of a single section: L1 reference check → L2 coherence → L3 persona peer review.
-
-> 🔗 **Shortcut** — runs `check_refs` + `coherence` + `review` on one section. It adds no new check; it bundles those three for a single section.
-
-| Flag | Takes | Meaning |
-|---|---|---|
-| `--text` | string | the section text (inline) |
-| `--text-file` | one file | file holding the section text |
-| `--bibtex-file` | one file | BibTeX file for the L1 reference check |
-| `--persona-json` | JSON string | a `PersonaSpec` for the L3 reviewer (inline), e.g. `{"label":"harsh reviewer"}` |
-| `--format` | `structured`\|`prose` | default `structured` |
-| `--json` | JSON object | merge payload keys; also reads `section`, `markdown`, `out_dir` |
-| `--out` | file path | save result |
-
-```bash
-CLIO_LLM=claude uv run clio-author section-review \
-  --text-file runbook-out/compose-out/sections/01-introduction.md \
-  --bibtex-file runbook-out/cite-out/suggested.bib \
-  --format prose
-
-# With a custom reviewer persona:
-CLIO_LLM=claude uv run clio-author section-review \
-  --text-file runbook-out/compose-out/sections/01-introduction.md \
-  --persona-json '{"label":"harsh ML reviewer"}' --format prose
-```
-**Expect:** `structured` = `{layer1, layer2, layer3, severity_summary: [{layer, severity, detail}]}`; `metadata` = `{num_findings, max_severity}` where severity ∈ {critical, major, minor}.
-
----
 
 **`verify_work`** — goal-backward check of written prose against the claims it was supposed to make.
 
@@ -800,67 +739,7 @@ CLIO_LLM=claude uv run clio-author write \
 
 ---
 
-**`write_review`** *(run-only)* — writer ↔ reviewer critic-refine loop.
 
-> 🔗 **Shortcut** — loops `write` ↔ `review` until the section converges. Same as drafting then reviewing by hand, repeated for you.
-
-Payload keys: `outline`, `section_plan`, `blocks`, `source`, `max_rounds`.
-```bash
-CLIO_LLM=claude uv run clio-author run write_review \
-  --json '{"outline":{"title":"Introduction","goal":"introduce AUTHOR"},"source":"AUTHOR reads, reviews, and writes papers.","max_rounds":1}'
-```
-
----
-
-**`compose`** — draft a whole multi-section manuscript (outline → cite → write per section → assemble).
-
-> 🔗 **Shortcut** — runs `plan` + `cite` + `write` for each section + a review loop, then assembles the paper. It is the "write the whole thing" button built from those tools.
-
-| Flag | Takes | Meaning |
-|---|---|---|
-| `--idea` | string | research idea / thesis (inline) |
-| `--idea-file` | one file | file holding the idea text |
-| `--log` | string | experimental log / results notes (inline) |
-| `--log-file` | one file | file holding the experimental log |
-| `--outline-json` | JSON string | a `PaperOutline` to use instead of generating one |
-| `--outline-file` | one file | same format, as a JSON file |
-| `--candidates-file` | one file | JSON citation candidates to verify and cite |
-| `--review` | flag | run a per-section writer/reviewer refine loop |
-| `--max-rounds` | int (default 3) | max writer/reviewer rounds per section when `--review` is set |
-| `--out-dir` | directory | persist `paper.md` + per-section files |
-| `--latex` | flag | also export `paper.tex` (+`references.bib`) when `--out-dir` is set |
-| `--pdf` | flag | compile `paper.pdf` from the LaTeX (implies `--latex`; needs a LaTeX engine on PATH) |
-| `--plan` | flag | plan each section (tasks/claims/sources) before drafting |
-| `--format` | `structured`\|`prose` | default `structured` |
-| `--json` | JSON object | merge payload keys; use for `blocks` and other advanced keys |
-| `--out` | file path | save result |
-
-PDF compilation is best-effort: `tectonic`, `latexmk`, and `pdflatex` are tried in that order.
-On success `metadata["pdf"]` holds the path; on failure `metadata["pdf_error"]` holds the reason
-and compose still succeeds with the Markdown + LaTeX output intact.
-
-```bash
-# provided outline, no review:
-CLIO_LLM=claude uv run clio-author compose \
-  --idea "AUTHOR: a multi-agent system that reads, reviews, and writes scientific papers." \
-  --outline-json '{"title":"AUTHOR","sections":[{"title":"Introduction","goal":"motivate"},{"title":"Method","goal":"the pipeline"}]}' \
-  --out-dir runbook-out/compose-out
-
-# generate the outline from just the idea, add a per-section refine pass and a log:
-CLIO_LLM=claude uv run clio-author compose \
-  --idea "AUTHOR: cooperating agents for the paper lifecycle." \
-  --log "On PaperBananaBench, AUTHOR verified 1/1 citations and drafted 2 sections." \
-  --review --max-rounds 1 --out-dir runbook-out/compose-gen
-
-# write + export LaTeX + compile PDF in one call:
-CLIO_LLM=claude uv run clio-author compose \
-  --idea "AUTHOR: cooperating agents for the paper lifecycle." \
-  --review --out-dir runbook-out/compose-pdf --pdf
-```
-**Artifacts:** `runbook-out/compose-out/{paper.md, sections/01-*.md, 02-*.md}`;
-with `--pdf`: also `paper.tex`, `references.bib`, `paper.pdf` (if a LaTeX engine is found).
-
----
 
 ## Act VI · Refine the prose
 
@@ -931,23 +810,6 @@ CLIO_VISION=gemini uv run clio-author describe \
 
 ---
 
-**`figure_refine`** *(run-only)* — figure visualizer ↔ critic refine loop.
-
-> 🔗 **Shortcut** — loops `plot` ↔ a critic to improve a figure. Same as `plot` then critique, repeated for you.
-
-Payload keys: `spec`, `out_path`, `max_rounds`.
-```bash
-CLIO_LLM=claude uv run clio-author run figure_refine \
-  --json '{"spec":{"kind":"plot","intent":"line chart of loss vs epochs; save to figure.png"},"max_rounds":1}' \
-  > runbook-out/figure_refine.json 2>/dev/null
-uv run --extra viz python -c "
-from pathlib import Path; import json
-from clio_author.experts.figure_agent import render_plot_code
-code = json.load(open('runbook-out/figure_refine.json'))['content']
-print('rendered:', render_plot_code(code, Path('runbook-out/figure.png'), timeout=40))"
-```
-
----
 
 ## Act VIII · Ship it — LaTeX + PDF
 
@@ -981,18 +843,14 @@ uv run clio-author export --title "AUTHOR" --markdown-file runbook-out/compose-o
 ```
 **Artifacts:** `paper.tex` (+ `references.bib` when bib is given); with `--pdf` also `paper.pdf` if a LaTeX engine is available.
 
-…or one shot — **`compose --latex`** / **`compose --pdf`** writes Markdown *and* LaTeX *and* optionally PDF:
+…or write the whole paper first with the **writer role**, then export it:
 ```bash
-CLIO_LLM=claude uv run clio-author compose \
-  --idea "AUTHOR: cooperating agents for the paper lifecycle." \
-  --latex --out-dir runbook-out/paper
-# with PDF:
-CLIO_LLM=claude uv run clio-author compose \
-  --idea "AUTHOR: cooperating agents for the paper lifecycle." \
-  --pdf --out-dir runbook-out/paper-pdf
+CLIO_LLM=claude uv run clio-author role writer \
+  --json '{"idea":"AUTHOR: cooperating agents for the paper lifecycle."}' \
+  --out-dir runbook-out/paper
+uv run clio-author export --markdown-file runbook-out/paper/paper.md --out-dir runbook-out/paper --pdf
 ```
-**Artifacts (--latex):** `runbook-out/paper/{paper.md, sections/, paper.tex, references.bib}`.
-**Artifacts (--pdf):** same, plus `paper.pdf` when a LaTeX engine is on PATH.
+**Artifacts:** `runbook-out/paper/{paper.md, sections/, paper.tex, references.bib}` (+ `paper.pdf` with a LaTeX engine).
 
 ---
 
@@ -1000,7 +858,8 @@ CLIO_LLM=claude uv run clio-author compose \
 
 **`orchestrate`** — plan and run a sequence of actions to achieve a natural-language goal.
 
-> 🔗 **Shortcut** — plans and runs a sequence of the other actions toward your goal. The most general shortcut: it picks and chains the tools for you.
+> **The conductor** — `orchestrate` is the one planner: it *decides* a sequence of tools/roles and runs
+> them toward your goal. A role is a fixed policy; `orchestrate` is the dynamic, model-planned driver.
 
 | Flag | Takes | Meaning |
 |---|---|---|
@@ -1067,44 +926,50 @@ All other actions have dedicated subcommands — see Appendix A.
   `ClioAuthorSubagent(llm=…).run("review", {"paper": "..."})`.
 - See a subcommand's exact flags anytime: `clio-author <cmd> --help`.
 
-## Appendix A — all 29 actions at a glance
+## Appendix A — the 24 tools + 7 roles at a glance
 
 Grouped by the Acts above (the order you actually use them in), so this index mirrors the body.
 
-**Kind:** 🔧 **tool** = does one specific job; 🔗 **shortcut** = adds no new ability, just runs several
-tools together for you (the description says which). There are 23 tools and 6 shortcuts.
+**The 24 tools** (each does one job):
 
-| Act | Action | Kind | Subcommand |
-|---|---|---|---|
-| I · Read | `ingest` | 🔧 | `clio-author ingest <source>` |
-| I · Read | `gather` | 🔧 | `clio-author gather` |
-| II · Understand | `ask` | 🔧 | `clio-author ask` |
-| II · Understand | `kg` | 🔧 | `clio-author kg` |
-| III · Scholarship & grounding | `discover` | 🔧 | `clio-author discover` |
-| III · Scholarship & grounding | `cite` | 🔧 | `clio-author cite` |
-| III · Scholarship & grounding | `check_refs` | 🔧 | `clio-author check-refs` |
-| III · Scholarship & grounding | `cite_support` | 🔧 | `clio-author cite_support` |
-| III · Scholarship & grounding | `ground` | 🔗 runs check_refs + verify_work + cite_support | `clio-author ground` |
-| IV · Review & strengthen | `review` | 🔧 | `clio-author review` |
-| IV · Review & strengthen | `meta_review` | 🔧 | `clio-author run meta_review` |
-| IV · Review & strengthen | `rebuttal` | 🔧 | `clio-author rebuttal` |
-| IV · Review & strengthen | `coherence` | 🔧 | `clio-author coherence` |
-| IV · Review & strengthen | `section_review` | 🔗 runs check_refs + coherence + review | `clio-author section-review` |
-| IV · Review & strengthen | `verify_work` | 🔧 | `clio-author verify-work` |
-| IV · Review & strengthen | `audit` | 🔧 | `clio-author audit` |
-| V · Plan & write | `plan` | 🔧 | `clio-author plan` |
-| V · Plan & write | `plan_check` | 🔧 | `clio-author plan_check` |
-| V · Plan & write | `experiment` | 🔧 | `clio-author experiment` |
-| V · Plan & write | `research` | 🔧 | `clio-author research` |
-| V · Plan & write | `write` | 🔧 | `clio-author write` |
-| V · Plan & write | `write_review` | 🔗 runs write ↔ review loop | `clio-author run write_review` |
-| V · Plan & write | `compose` | 🔗 runs plan + cite + write×N + review | `clio-author compose` |
-| VI · Refine | `revise` | 🔧 | `clio-author revise` *(aliases: `run edit`, `polish`)* |
-| VII · Illustrate | `plot` | 🔧 | `clio-author run plot` |
-| VII · Illustrate | `describe_figures` | 🔧 | `clio-author describe` |
-| VII · Illustrate | `figure_refine` | 🔗 runs plot ↔ critic loop | `clio-author run figure_refine` |
-| VIII · Ship | `export` | 🔧 | `clio-author export` |
-| IX · Drive | `orchestrate` | 🔗 runs any sequence of tools | `clio-author orchestrate` |
+| Act | Tool | Subcommand |
+|---|---|---|
+| I · Read | `ingest` | `clio-author ingest <source>` |
+| I · Read | `gather` | `clio-author gather` |
+| II · Understand | `ask` | `clio-author ask` |
+| II · Understand | `kg` | `clio-author kg` |
+| III · Scholarship & grounding | `discover` | `clio-author discover` |
+| III · Scholarship & grounding | `cite` | `clio-author cite` |
+| III · Scholarship & grounding | `check_refs` | `clio-author check-refs` |
+| III · Scholarship & grounding | `cite_support` | `clio-author cite_support` |
+| IV · Review & strengthen | `review` | `clio-author review` |
+| IV · Review & strengthen | `meta_review` | `clio-author run meta_review` |
+| IV · Review & strengthen | `rebuttal` | `clio-author rebuttal` |
+| IV · Review & strengthen | `coherence` | `clio-author coherence` |
+| IV · Review & strengthen | `verify_work` | `clio-author verify-work` |
+| IV · Review & strengthen | `audit` | `clio-author audit` |
+| V · Plan & write | `plan` | `clio-author plan` |
+| V · Plan & write | `plan_check` | `clio-author plan_check` |
+| V · Plan & write | `experiment` | `clio-author experiment` |
+| V · Plan & write | `research` | `clio-author research` |
+| V · Plan & write | `write` | `clio-author write` |
+| VI · Refine | `revise` | `clio-author revise` *(replaces `edit`/`polish`)* |
+| VII · Illustrate | `plot` | `clio-author run plot` |
+| VII · Illustrate | `describe_figures` | `clio-author describe` |
+| VIII · Ship | `export` | `clio-author export` |
+| IX · Drive | `orchestrate` | `clio-author orchestrate` |
+
+**The 7 roles** (each runs several tools for you — `clio-author role <name>`):
+
+| Role | Runs |
+|---|---|
+| `reader` | ingest/gather → kg (or ask) |
+| `scholar` | discover · research · cite · experiment |
+| `writer` | plan → plan_check → draft the whole paper |
+| `verifier` | check_refs · cite_support · verify_work · audit · coherence → one grounding report |
+| `reviewer` | review (or per-section) · meta_review |
+| `refiner` | revise → coherence |
+| `viz` | plot (with critic refinement) · describe_figures |
 
 ## Appendix B — each action's LLM prompt source (to read/tune)
 | Action | Prompt constant | File |

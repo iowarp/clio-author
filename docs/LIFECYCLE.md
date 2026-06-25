@@ -41,27 +41,26 @@ Two things shape the whole design:
 > (every claim has a source, budgets add up); `experiment` recreates a grounded
 > **evaluation plan** (datasets / baselines / metrics / ablations) for the new method.
 >
-> **④ Draft.** `write` section by section, or `compose` the whole paper at once —
-> grounded in the context from ②. Figures via `plot`, captions via
-> `describe_figures`, a key diagram tightened with `figure_refine`.
+> **④ Draft.** `write` section by section, or the **`writer` role** drafts the whole
+> paper at once (plan → plan_check → draft) — grounded in the context from ②. Figures
+> via `plot`, captions via `describe_figures`; the **`viz` role** tightens a diagram with a critic.
 >
 > **⑤ Strengthen it — before anyone sees it.** `revise` for clarity, `coherence`
 > for cross-section consistency, `verify_work` to confirm every planned claim is
 > made and supported, `check_refs` + `cite` for the bibliography, `cite_support`
-> to confirm each cited source actually backs the sentence it's attached to, and
-> `ground` for one grounding-integrity score over the whole manuscript; an `audit`
-> for completeness — and `review` the draft as a hostile referee (or loop it with
-> `write_review` / `section_review`).
+> to confirm each cited source actually backs the sentence it's attached to, and an
+> `audit` for completeness — or run all of that in one shot with the **`verifier`
+> role** (which also rolls up one grounding-integrity score). `review` the draft as a
+> hostile referee, then apply fixes with the **`refiner` role**.
 >
 > **⑥ Separately, referee.** A venue asks you to review submissions. Paste each
-> into `review` (optionally vision-grounded on its figures), do a focused
-> `section_review`, and as an area chair aggregate with `meta_review`.
+> into `review` (optionally vision-grounded on its figures), or use the **`reviewer`
+> role** for a per-section pass, and as an area chair aggregate with `meta_review`.
 >
 > **⑦ Reviews come back.** Draft a point-by-point `rebuttal`, then `revise` the
 > manuscript to incorporate it and re-run `audit`.
 >
-> **⑧ Ship.** `export` → `paper.tex` + `references.bib`; `--pdf` for the
-> camera-ready (or `compose --pdf` end to end).
+> **⑧ Ship.** `export` → `paper.tex` + `references.bib`; `--pdf` for the camera-ready.
 >
 > Whenever a job spans phases, `orchestrate` drives the sequence from one line.
 
@@ -74,11 +73,11 @@ Two things shape the whole design:
 | **① Frame** | *What's my story; what exists?* | `research`, `discover`, `ask`, `kg`, `experiment` |
 | **② Gather** | *Pull in what I'll build on* | `ingest`, `gather`, `ask`, `kg`, `cite` |
 | **③ Plan** | *Blueprint the paper + evaluation* | `plan`, `plan_check`, `experiment`, `research` |
-| **④ Draft** | *Write & illustrate* | `write`, `compose`, `plot`, `describe_figures`, `figure_refine` |
-| **⑤ Strengthen** | *Make my own paper bulletproof* | `review`, `revise`, `coherence`, `verify_work`, `check_refs`, `cite`, `cite_support`, `ground`, `audit`, `section_review`, `write_review`, `figure_refine` |
-| **⑥ Referee** | *Judge others' papers* | `review`, `section_review`, `meta_review` |
+| **④ Draft** | *Write & illustrate* | `write`, `plot`, `describe_figures` · roles `writer`, `viz` |
+| **⑤ Strengthen** | *Make my own paper bulletproof* | `review`, `revise`, `coherence`, `verify_work`, `check_refs`, `cite`, `cite_support`, `audit` · roles `verifier`, `refiner` |
+| **⑥ Referee** | *Judge others' papers* | `review`, `meta_review` · role `reviewer` |
 | **⑦ Respond** | *Answer my reviewers* | `rebuttal`, `revise`, `audit` |
-| **⑧ Ship** | *Camera-ready* | `compose`, `export` |
+| **⑧ Ship** | *Camera-ready* | `export` · role `writer` |
 | **⟳ Drive** | *Run a multi-step job for me* | `orchestrate` |
 
 A few actions deliberately serve more than one phase — that is the toolkit's
@@ -89,7 +88,7 @@ strength, not a flaw:
 - `experiment` — study others' evaluations (**①**) *and* plan your own (**③**).
 - `ask` / `kg` — interrogate the field (**①**) *and* your gathered material (**②**).
 - `cite` — build the bibliography (**②**) *and* verify it later (**⑤**).
-- `compose` — draft the whole paper (**④**) *and*, with `--pdf`, ship it (**⑧**).
+- role `writer` — draft the whole paper (**④**); then `export` ships it (**⑧**).
 
 ---
 
@@ -125,8 +124,8 @@ clio-author experiment --sources ./related/*.pdf \
 
 **④ Draft**
 ```bash
-clio-author compose --idea "An RL cache-eviction policy ..." \
-  --blocks-file clio-out/context/context.json --plan --out-dir clio-out/paper
+clio-author role writer --json '{"idea":"An RL cache-eviction policy ..."}' \
+  --out-dir clio-out/paper          # plan → plan_check → draft the whole paper
 clio-author plot --json '{"spec":{"kind":"line","title":"Hit-rate vs cache size"}}'
 ```
 
@@ -138,9 +137,9 @@ clio-author verify-work --text-file clio-out/paper/sections/03-method.md \
   --section-plan-file clio-out/plan/plan.json
 clio-author check-refs --bibtex-file clio-out/paper/references.bib --markdown-file clio-out/paper/paper.md
 clio-author cite_support --markdown-file clio-out/paper/paper.md --citations-file clio-out/cite.json  # do the sources back the claims?
-clio-author ground --markdown-file clio-out/paper/paper.md --bibtex-file clio-out/paper/references.bib \
-  --citations-file clio-out/cite.json --out-dir clio-out/paper/ground          # one grounding-integrity score
-clio-author audit --markdown-file clio-out/paper/paper.md --bibtex-file clio-out/paper/references.bib
+# …or run the whole verification pass in one shot with the verifier role:
+clio-author role verifier --markdown-file clio-out/paper/paper.md \
+  --bibtex-file clio-out/paper/references.bib --citations-file clio-out/cite.json --out-dir clio-out/paper
 clio-author review --paper-file clio-out/paper/paper.md --format prose   # self peer-review
 ```
 
