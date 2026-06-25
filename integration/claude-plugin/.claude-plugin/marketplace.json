@@ -1,0 +1,11 @@
+{
+  "name": "clio-author",
+  "owner": { "name": "iowarp" },
+  "plugins": [
+    {
+      "name": "clio-author",
+      "source": "./",
+      "description": "clio-author: scientific paper processing, review, and writing as MCP tools + an `author` subagent."
+    }
+  ]
+}

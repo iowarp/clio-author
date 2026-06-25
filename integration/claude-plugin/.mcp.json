@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "clio-author": {
+      "command": "clio-author-mcp",
+      "args": [],
+      "env": { "PYTHONUNBUFFERED": "1" }
+    }
+  }
+}

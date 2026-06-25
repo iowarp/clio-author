@@ -36,7 +36,7 @@ phase of the work you're in.**
 - **Citations that are real** — a 4-backend scholarly cascade (Semantic Scholar / OpenAlex / Crossref / arXiv); never fabricated
 - **A content knowledge graph** of a paper's claims/methods/datasets/results (6-stage pipeline)
 - **Runs offline out of the box** (built-in echo model); add Claude / Codex / Ollama for real output
-- **Callable as a subagent** in-process, over the CLI, or via an MCP bridge — imports nothing from the host
+- **Callable from any host** — in-process subagent, CLI, MCP, A2A, or a Claude Code plugin; imports nothing from the host
 
 > Requires **Python ≥ 3.12** · BSD-3-Clause. Why one package instead of a dozen tools? →
 > [`docs/MOTIVATION.md`](docs/MOTIVATION.md).
@@ -172,59 +172,18 @@ payload-key reference for calling AUTHOR as a library is in **[`docs/USAGE.md`](
 
 ## Commands & arguments
 
-A few flags are available on (almost) every command and are omitted below for brevity:
-`--format {structured,prose}` (JSON vs. human-readable text), `--json '{...}'` (merge extra payload
-keys), `--out FILE` (also save the result), and `--append` (with `--out`, **append** into a running
-log instead of overwriting — each entry headed by the question + a trace line). `A | B` means
-"either"; `…` means repeatable. Actions without a dedicated subcommand are reached with
-`clio-author run <action> --json '{...}'`.
+Every tool is `clio-author <name> …`; every role is `clio-author role <name> …`; anything else is
+`clio-author run <action> --json '{...}'`. Discover the surface at runtime, and see the full
+flag-by-flag reference in the RUNBOOK:
 
-**Read & gather**
-- `ingest <source>` — `<source>` = arXiv id / URL / local PDF path / paper title
-- `gather [--sources S … | --sources-file FILE] [--out-dir DIR] [--max-files N] [--max-text-chars N]`
+```bash
+clio-author capabilities          # every tool + role, with lifecycle metadata
+clio-author lifecycle             # the phase → actions map
+clio-author <command> --help      # exact flags for any command
+```
 
-**Understand**
-- `ask --question Q [--markdown-file paper.md | --blocks-file FILE | --sources <pdf|arXiv id> | --text T] [--k N] [--all]` — give the paper in any form; a PDF/arXiv via `--sources` is auto-ingested; `--all` uses the whole paper. The answer's `metadata.grounded_in` reports the exact sections + lines it used.
-- `kg [--blocks-file FILE | --blocks-json JSON] [--full] [--stages LIST] [--resume DIR] [--out-dir DIR] [--sources …]`
-- `experiment [--sources S … | --blocks-file FILE | --markdown-file FILE | --text T] [--idea I | --idea-file FILE] [--out-dir DIR]`
-
-**Sources & citations**
-- `discover [--query Q | --query-file FILE] [--limit N] [--cutoff-date YYYY-MM] [--out-dir DIR]`
-- `cite [--candidates-json JSON | --candidates-file FILE]`
-- `check-refs [--bibtex TEXT | --bibtex-file FILE] [--markdown-file FILE | --text T]`
-- `research [--topic T | --topic-file FILE] [--blocks-file FILE] [--depth {standard,deep}] [--sources …]`
-
-**Plan & write**
-- `plan [--idea I | --idea-file FILE] [--log L | --log-file FILE] [--outline-json JSON | --outline-file FILE] [--blocks-file FILE] [--candidates-file FILE] [--out-dir DIR] [--sources …]`
-- `plan_check [--plan-file FILE | --plan-json JSON] [--word-target N]`
-- `write [--source T | --source-file FILE] [--outline TITLE] [--sources …]`
-- `revise [--mode {feedback,style}] [--text T | --text-file FILE] [--review-json JSON | --review-file FILE] [--critic-notes TEXT] [--voice V] [--target FILE]`
-- `coherence [--sections-json JSON | --sections-file FILE] [--markdown-file FILE | --text T]`
-- `role writer [--idea I] [--sources …] [--out-dir DIR]` — plan → plan_check → draft the whole paper
-
-**Review & verify**
-- `review [--paper T | --paper-file FILE] [--ground] [--figures-json JSON | --figures-file FILE] [--sources …]`
-- `verify-work [--text T | --text-file FILE] [--section-plan-json JSON | --section-plan-file FILE] [--claims-json JSON]`
-- `audit [--sections-json JSON | --sections-file FILE] [--markdown-file FILE] [--bibtex-file FILE]`
-- `cite_support [--markdown-file FILE | --text T] [--citations-file FILE | --citations-json JSON] [--deep] [--out-dir DIR]` — does each cited source actually support the claim? Feed it `cite`'s saved output; `--deep` checks full text.
-- `rebuttal [--paper T | --paper-file FILE] [--review-json JSON | --review-file FILE]`
-- `run meta_review --json '{"reviews":[ … ]}'`  *(reports a `robustness` verdict: solid / borderline / split)*
-- `role verifier [--markdown-file FILE | --text T] [--bibtex-file FILE] [--citations-file FILE] [--out-dir DIR]` — one grounding report (check_refs + cite_support + verify_work + audit + coherence)
-- `role reviewer …` · `role refiner …` — referee, then apply feedback
-
-**Figures**
-- `describe [--blocks-file FILE | --blocks-json JSON]` — fills figure descriptions (`describe_figures`)
-- `run plot --json '{"spec":{…},"out_path":"…"}'`
-- `role viz [--json '{"spec":{…}}']` — plot, refine with a critic, and caption
-
-**Ship & drive**
-- `export [--title T] [--markdown-file FILE | --sections-json JSON | --sections-file FILE] [--bibtex-file FILE] [--out-dir DIR] [--pdf]`
-- `orchestrate [--goal G | --goal-file FILE] [--inputs-json JSON | --inputs-file FILE] [--max-steps N] [--out-dir DIR]`
-
-**Discovery**
-- `capabilities` — list every action (with lifecycle `phase` + `needs_source` metadata)
-- `lifecycle` — print the phase → actions map
-- `run <action> [--json '{...}']` — dispatch any action by name (the generic escape hatch)
+→ **[`docs/RUNBOOK.md`](docs/RUNBOOK.md)** — every command, flag, and a runnable example.
+→ **[`docs/USAGE.md`](docs/USAGE.md)** — the payload-key reference for calling it as a library.
 
 ---
 
@@ -265,20 +224,20 @@ automatically. Never paste keys into commands, issues, or commits. See
 
 ---
 
-## Invoke it from a host — Codex · Claude · CLIO
+## Invoke it from a host — CLIO · Claude Code · Codex
 
-AUTHOR is meant to be **driven by a host agent**, four ways. Full setup for each is in
+AUTHOR is meant to be **driven by a host agent**. Pick by host; full setup for each is in
 **[`integration/README.md`](integration/README.md)**.
 
-| Mode | Best for | Entry point |
+| Host | Wire it in with | Entry point |
 |---|---|---|
-| **Subagent** (in-process Python) | CLIO, any Python host | `ClioAuthorSubagent` |
-| **Tool** (CLI / subprocess) | any language, any host | the `clio-author` console script |
-| **Slash command** | Codex, Claude Code | `integration/codex/author.md`, `integration/claude/author.md` |
-| **MCP** | MCP-only hosts | `clio_author.integration.mcp_bridge` (`uv sync --extra mcp`) |
-| **A2A** | any agent-to-agent host | `clio-author-a2a` server — Agent Card + `message/send`; one skill per tool + role (stdlib, no extra) |
+| **CLIO** (Python) | **subagent** (recommended), or MCP / A2A | `ClioAuthorSubagent` · `clio-author-mcp` · `clio-author-a2a` |
+| **Claude Code** | a **plugin** (bundles the MCP server + an `author` subagent) | `integration/claude-plugin/` |
+| **Codex** | an **MCP server** in `~/.codex/config.toml` | `codex mcp add clio_author -- clio-author-mcp` |
+| any agent | **A2A** (Agent Card + `message/send`; one skill per tool + role) | `clio-author-a2a` |
+| any language | **CLI / subprocess** (JSON on stdout) | the `clio-author` console script |
 
-### As a subagent (in-process Python) — recommended for CLIO
+### CLIO — as a subagent (in-process Python)
 
 ```python
 from clio_author.integration.clio_adapter import ClioAuthorSubagent
@@ -301,26 +260,34 @@ Every `sub.run(action, payload)` returns a JSON-serializable
 `{"action", "content", "structured", "metadata"}` and **never raises** — failures surface in
 `metadata["error"]`. The adapter imports nothing from the host, so the coupling is one-directional.
 
-### As a tool (CLI / subprocess) — any language
+### Claude Code — as a plugin
+
+A real plugin (not a slash command) that registers the clio-author MCP server and an `author`
+subagent. See [`integration/claude-plugin/`](integration/claude-plugin/README.md):
 
 ```bash
-uv run clio-author run review --json '{"paper":"# My paper\n..."}'   # JSON on stdout; exit 0 ok / 1 error
+uv tool install 'clio-author[mcp]'                       # puts clio-author-mcp on PATH
+claude --plugin-dir integration/claude-plugin            # local dev
+# …or: /plugin marketplace add iowarp/clio-author  then  /plugin install clio-author@clio-author
 ```
 
-### As a slash command (Codex / Claude Code)
+### Codex — as an MCP server
 
-Both files are ready-to-use command prompts that drive the CLI and report the result — install, then
-run `/author <task>`:
-
-- **Codex** — install `integration/codex/author.md` as a Codex prompt/command.
-- **Claude Code** — copy `integration/claude/author.md` to `.claude/commands/author.md` (project) or
-  `~/.claude/commands/author.md` (user).
-
-### Over MCP (MCP-only hosts, e.g. CLIO's tool gateway)
+Codex has no tool-server plugin API; MCP is the path. Register it in one line (config in
+[`integration/codex/config.toml`](integration/codex/config.toml); guidance in
+[`integration/codex/AGENTS.md`](integration/codex/AGENTS.md)):
 
 ```bash
-uv sync --extra mcp
-uv run python -m clio_author.integration.mcp_bridge          # stdio; CLIO_MCP_TRANSPORT=http for HTTP
+uv tool install 'clio-author[mcp]'
+codex mcp add clio_author -- clio-author-mcp
+```
+
+### MCP / A2A / CLI directly
+
+```bash
+clio-author-mcp                                              # MCP (stdio; CLIO_MCP_TRANSPORT=http for HTTP)
+clio-author-a2a                                              # A2A Agent Card + message/send
+clio-author run review --json '{"paper":"# My paper\n..."}' # CLI: JSON on stdout, exit 0 ok / 1 error
 ```
 
 > **Avoid nesting deadlock:** don't set AUTHOR's nested `CLIO_LLM` to the *same* provider as the host
