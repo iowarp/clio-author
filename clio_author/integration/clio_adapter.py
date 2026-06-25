@@ -81,6 +81,10 @@ class ClioAuthorSubagent:
             "name": "clio-author",
             "version": _package_version(),
             "actions": [dict(action) for action in _ACTIONS],
+            "roles": [
+                {"role": name, "description": role.description}
+                for name, role in sorted(self._agent.roles.items())
+            ],
             "lifecycle": lifecycle_overview(),
         }
 

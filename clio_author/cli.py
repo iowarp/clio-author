@@ -901,6 +901,42 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_orchestrate)
     _add_json(p_orchestrate)
 
+    p_role = sub.add_parser(
+        "role",
+        help="Run a role-agent (a fixed policy over tools), e.g. `role verifier`.",
+    )
+    p_role.add_argument("name", help="Role name: verifier (more roles landing).")
+    p_role.add_argument("--text", default=None, help="Manuscript prose (inline).")
+    p_role.add_argument(
+        "--markdown-file", dest="markdown_file", default=None, help="Path to a Markdown manuscript."
+    )
+    p_role.add_argument(
+        "--bibtex-file", dest="bibtex_file", default=None, help="Path to a BibTeX file."
+    )
+    p_role.add_argument(
+        "--citations-file",
+        dest="citations_file",
+        default=None,
+        help="Path to JSON verified citations (cite's output).",
+    )
+    p_role.add_argument(
+        "--plan-file",
+        dest="plan_file",
+        default=None,
+        help="Path to a plan.json ({outline, plans}).",
+    )
+    p_role.add_argument(
+        "--claims-json", dest="claims_json", default=None, help="JSON list of intended claims."
+    )
+    p_role.add_argument(
+        "--out-dir",
+        dest="out_dir",
+        default=None,
+        help="Project dir; role memory lives under <out-dir>/memory.",
+    )
+    _add_format(p_role)
+    _add_json(p_role)
+
     p_run = sub.add_parser(
         "run",
         help="Dispatch any adapter action by name (generic escape hatch).",
@@ -1516,6 +1552,27 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
             payload["out_dir"] = args.out_dir
         payload["format"] = args.fmt
         return "orchestrate", payload
+    elif command == "role":
+        payload["role"] = args.name
+        if args.markdown_file is not None:
+            payload["markdown"] = _read_file(args.markdown_file, field="--markdown-file")
+        elif args.text is not None:
+            payload["text"] = args.text
+        if args.bibtex_file is not None:
+            payload["bibtex"] = _read_file(args.bibtex_file, field="--bibtex-file")
+        plan = _json_input(args.plan_file, None, field="plan (--plan-file)")
+        if plan is not None:
+            payload["plan"] = plan
+        citations = _json_input(args.citations_file, None, field="citations (--citations-file)")
+        if citations is not None:
+            payload["citations"] = citations
+        claims = _json_input(None, args.claims_json, field="claims (--claims-json)")
+        if claims is not None:
+            payload["claims"] = claims
+        if args.out_dir is not None:
+            payload["out_dir"] = args.out_dir
+        payload["format"] = args.fmt
+        return "role", payload
     elif command == "run":
         return args.action, payload
     elif command == "describe":
@@ -1636,6 +1693,8 @@ _SUBCOMMAND_OVERRIDE = {
 
 def _subcommand_for(action: str) -> str:
     """Map an action name to the CLI invocation a user would type."""
+    if action.startswith("role:"):
+        return f"role {action.split(':', 1)[1]}"
     if action in _RUN_ONLY:
         return f"run {action}"
     return _SUBCOMMAND_OVERRIDE.get(action, action)
