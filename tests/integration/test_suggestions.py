@@ -22,7 +22,9 @@ def test_every_action_has_an_entry_and_targets_are_real() -> None:
     assert set(NEXT_STEPS) == names  # lock-step: no action without a hint
     for src, nexts in NEXT_STEPS.items():
         for action, _why in nexts:
-            assert action in names, f"{src} suggests unknown action {action}"
+            # targets are real actions, or `role:<name>` role hints
+            ok = action.startswith("role:") or action in names
+            assert ok, f"{src} suggests unknown target {action}"
 
 
 def test_agent_attaches_suggestions_to_results() -> None:
@@ -36,7 +38,8 @@ def test_agent_attaches_suggestions_to_results() -> None:
         },
     )
     nxt = result["metadata"].get("suggested_next")
-    assert isinstance(nxt, list) and any(i["action"] == "ground" for i in nxt)
+    # cite_support now points at the verifier role (which rolls up the score).
+    assert isinstance(nxt, list) and any(i["action"] == "role:verifier" for i in nxt)
 
 
 def test_errors_get_no_suggestions() -> None:

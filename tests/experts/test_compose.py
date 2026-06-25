@@ -402,32 +402,23 @@ def test_adapter_compose_is_json_serializable() -> None:
     assert result["metadata"]["num_sections"] == 3
 
 
-def test_capabilities_lists_compose() -> None:
+def test_compose_not_a_user_facing_action() -> None:
+    # compose is now internal plumbing for the writer role: absent from the
+    # user-facing capability surface (but still reachable via `run` — below).
     sub = ClioAuthorSubagent()
     actions = {a["action"] for a in sub.capabilities()["actions"]}
-    assert "compose" in actions
+    assert "compose" not in actions
 
 
-def test_cli_compose_with_json_outline(capsys) -> None:  # type: ignore[no-untyped-def]
+def test_compose_still_reachable_via_run(capsys) -> None:  # type: ignore[no-untyped-def]
     from clio_author.cli import main
 
-    blob = json.dumps({"outline": _OUTLINE_3})
-    code = main(["compose", "--idea", "study things", "--json", blob])
-    captured = capsys.readouterr()
-    parsed = json.loads(captured.out)
+    blob = json.dumps({"idea": "study things", "outline": _OUTLINE_3})
+    code = main(["run", "compose", "--json", blob])
+    parsed = json.loads(capsys.readouterr().out)
     assert code == 0
     assert parsed["action"] == "compose"
     assert parsed["metadata"]["num_sections"] == 3
-
-
-def test_cli_compose_malformed_json(capsys) -> None:  # type: ignore[no-untyped-def]
-    from clio_author.cli import main
-
-    code = main(["compose", "--idea", "x", "--json", "{not json"])
-    captured = capsys.readouterr()
-    parsed = json.loads(captured.out)
-    assert code == 1
-    assert "error" in parsed
 
 
 def test_section_body_dedupes_leading_heading() -> None:

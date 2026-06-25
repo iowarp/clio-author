@@ -22,11 +22,8 @@ _ROUTED_ACTIONS = {
     "rebuttal",
     "cite",
     "write",
-    "compose",
     "describe_figures",
     "plot",
-    "write_review",
-    "figure_refine",
     "export",
     "revise",
     "coherence",
@@ -36,11 +33,9 @@ _ROUTED_ACTIONS = {
     "discover",
     "verify_work",
     "check_refs",
-    "section_review",
     "audit",
     "plan_check",
     "cite_support",
-    "ground",
     "orchestrate",
 }
 
@@ -52,8 +47,8 @@ def test_capabilities_shape_lists_all_actions() -> None:
     actions = {entry["action"] for entry in caps["actions"]}
     assert actions == _ROUTED_ACTIONS
     assert {"revise", "coherence", "kg", "orchestrate"} <= actions
-    assert {"research", "verify_work", "check_refs", "section_review", "audit"} <= actions
-    assert len(caps["actions"]) == 29
+    assert {"research", "verify_work", "check_refs", "audit"} <= actions
+    assert len(caps["actions"]) == 24
     for entry in caps["actions"]:
         assert {"action", "description", "payload_keys"} <= entry.keys()
         assert isinstance(entry["payload_keys"], list)

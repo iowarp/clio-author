@@ -194,14 +194,6 @@ ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["bibtex", "markdown", "text", "sections"],
     },
     {
-        "action": "section_review",
-        "description": (
-            "Layered review of ONE section: L1 reference check, L2 coherence, L3 "
-            "persona peer review, with a deterministically derived severity summary."
-        ),
-        "payload_keys": ["section", "text", "markdown", "bibtex", "persona", "out_dir"],
-    },
-    {
         "action": "audit",
         "description": (
             "Deterministic manuscript completeness audit: required sections "
@@ -233,26 +225,6 @@ ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["markdown", "text", "sections", "citations", "mode", "out_dir"],
     },
     {
-        "action": "ground",
-        "description": (
-            "Score a manuscript's grounding integrity: fraction of in-text "
-            "citations that resolve to a real bibliography entry, (with intended "
-            "claims) fraction of claims actually made + supported, and (with "
-            "verified citations) fraction of cited claims substantiated by their source."
-        ),
-        "payload_keys": [
-            "markdown",
-            "text",
-            "sections",
-            "bibtex",
-            "claims",
-            "section_plan",
-            "citations",
-            "mode",
-            "out_dir",
-        ],
-    },
-    {
         "action": "describe_figures",
         "description": "Fill in descriptions/captions for the figures in memory blocks.",
         "payload_keys": ["blocks", "figures", "context"],
@@ -263,37 +235,9 @@ ACTIONS: list[dict[str, Any]] = [
         "payload_keys": ["spec", "out_path"],
     },
     {
-        "action": "compose",
-        "description": "Draft a whole multi-section manuscript from an idea + experimental log.",
-        "payload_keys": [
-            "idea",
-            "experimental_log",
-            "outline",
-            "candidates",
-            "blocks",
-            "sources",
-            "review",
-            "max_rounds",
-            "plan",
-            "verify",
-            "out_dir",
-            "pdf",
-        ],
-    },
-    {
         "action": "export",
         "description": "Export a composed manuscript to LaTeX (paper.tex + references.bib).",
         "payload_keys": ["title", "sections", "markdown", "outline", "bibtex", "out_dir", "pdf"],
-    },
-    {
-        "action": "write_review",
-        "description": "Run a writer/reviewer critic-refine loop and return the final output.",
-        "payload_keys": ["outline", "section_plan", "blocks", "sources", "source", "max_rounds"],
-    },
-    {
-        "action": "figure_refine",
-        "description": "Run a figure visualizer/critic refine loop and return the final output.",
-        "payload_keys": ["spec", "out_path", "max_rounds"],
     },
     {
         "action": "orchestrate",
@@ -344,18 +288,13 @@ _LIFECYCLE: dict[str, tuple[list[str], bool]] = {
     "discover": (["frame"], False),
     "verify_work": (["strengthen"], False),
     "check_refs": (["strengthen"], False),
-    "section_review": (["strengthen", "referee"], False),
     "audit": (["strengthen", "respond"], False),
     "plan_check": (["plan"], False),
     "cite_support": (["strengthen"], False),
-    "ground": (["strengthen"], False),
     "describe_figures": (["draft"], True),
     "plot": (["draft"], False),
-    "compose": (["draft", "ship"], False),
     "export": (["ship"], False),
     "write": (["draft"], False),
-    "write_review": (["strengthen"], False),
-    "figure_refine": (["draft", "strengthen"], False),
     "orchestrate": (["drive"], False),
 }
 
@@ -395,14 +334,10 @@ NEXT_STEPS: dict[str, list[tuple[str, str]]] = {
     "cite": [
         ("cite_support", "check the cited sources actually support your claims"),
         ("check_refs", "lint the \\cite{} keys against the bibliography"),
-        ("compose", "draft a paper using the verified citations"),
+        ("role:writer", "draft the paper using the verified citations"),
     ],
-    "check_refs": [("ground", "roll citation + claim + support into one score")],
-    "cite_support": [("ground", "fold this into the overall grounding score")],
-    "ground": [
-        ("revise", "fix the weak spots the score surfaced"),
-        ("audit", "run the completeness checklist before shipping"),
-    ],
+    "check_refs": [("role:verifier", "roll citation + claim + support into one grounding score")],
+    "cite_support": [("role:verifier", "fold this into the overall grounding score")],
     "research": [
         ("plan", "turn the brief into section plans"),
         ("experiment", "design the evaluation"),
@@ -410,36 +345,29 @@ NEXT_STEPS: dict[str, list[tuple[str, str]]] = {
     "experiment": [("plan", "blueprint the paper around the evaluation plan")],
     "plan": [
         ("plan_check", "validate the plan BEFORE writing (cheap to fix now)"),
-        ("write", "draft a section from the plan"),
-        ("compose", "draft the whole paper from the plan"),
+        ("role:writer", "draft the whole paper from the plan"),
+        ("write", "draft a single section from the plan"),
     ],
     "plan_check": [
         ("plan", "regenerate the plan if issues were found"),
-        ("compose", "the plan is clean — draft the paper"),
+        ("role:writer", "the plan is clean — draft the paper"),
         ("write", "the plan is clean — draft a section"),
     ],
     "write": [
-        ("write_review", "loop writer ↔ reviewer to tighten the section"),
         ("verify_work", "confirm the planned claims were made + supported"),
         ("revise", "polish or address feedback"),
-    ],
-    "write_review": [("coherence", "check it fits the rest of the manuscript")],
-    "compose": [
-        ("coherence", "check cross-section consistency"),
-        ("ground", "score how grounded the manuscript is"),
-        ("audit", "run the completeness checklist"),
-        ("export", "ship to LaTeX / PDF"),
+        ("role:verifier", "check the section is grounded"),
     ],
     "revise": [
         ("coherence", "re-check consistency after editing"),
-        ("review", "re-review the draft"),
+        ("role:reviewer", "re-review the draft"),
     ],
     "coherence": [
         ("verify_work", "confirm claims are still made + supported"),
         ("audit", "final checklist"),
     ],
     "verify_work": [
-        ("ground", "roll claim integrity into one score"),
+        ("role:verifier", "roll claim integrity into one grounding score"),
         ("revise", "fill the gaps found"),
     ],
     "review": [
@@ -447,7 +375,6 @@ NEXT_STEPS: dict[str, list[tuple[str, str]]] = {
         ("rebuttal", "draft a point-by-point response"),
         ("meta_review", "aggregate several reviews"),
     ],
-    "section_review": [("revise", "fix the issues the layered review found")],
     "meta_review": [("rebuttal", "respond to the aggregated decision")],
     "rebuttal": [
         ("revise", "apply the rebuttal to the manuscript"),
@@ -456,10 +383,9 @@ NEXT_STEPS: dict[str, list[tuple[str, str]]] = {
     "audit": [("export", "ship to LaTeX / PDF once the checklist passes")],
     "describe_figures": [("plot", "generate any missing figures")],
     "plot": [
-        ("figure_refine", "iterate the figure with a critic"),
+        ("role:viz", "iterate the figure with a critic"),
         ("describe_figures", "caption it"),
     ],
-    "figure_refine": [("describe_figures", "caption the refined figure")],
     "export": [],
     "orchestrate": [],
 }
@@ -481,7 +407,9 @@ for _src, _nexts in NEXT_STEPS.items():
     if _src not in _ACTION_NAMES:  # pragma: no cover - guards a typo
         raise ValueError(f"NEXT_STEPS has an unknown source action: {_src!r}")
     for _nxt, _ in _nexts:
-        if _nxt not in _ACTION_NAMES:  # pragma: no cover - guards a typo
+        # ``role:<name>`` targets point at a role-agent (validated elsewhere); any
+        # other target must be a real action.
+        if not _nxt.startswith("role:") and _nxt not in _ACTION_NAMES:  # pragma: no cover
             raise ValueError(f"NEXT_STEPS[{_src!r}] points at unknown action: {_nxt!r}")
 _missing_next = _ACTION_NAMES - set(NEXT_STEPS)
 if _missing_next:  # pragma: no cover - guards a forgotten entry

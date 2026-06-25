@@ -179,15 +179,20 @@ def test_out_append_json_is_json_lines(capsys: pytest.CaptureFixture[str], tmp_p
     assert len(lines) == 2 and all(json.loads(ln)["action"] == "review" for ln in lines)
 
 
-def test_ground_command_citation_integrity(capsys: pytest.CaptureFixture[str]) -> None:
+def test_ground_reachable_via_run(capsys: pytest.CaptureFixture[str]) -> None:
+    # `ground` is now internal plumbing for the verifier role; reach it via `run`.
     code, result = _run(
         capsys,
         [
+            "run",
             "ground",
-            "--bibtex",
-            "@article{a,title={X},year={2020}}",
-            "--text",
-            "We build on \\cite{a} and also \\cite{ghost}.",
+            "--json",
+            json.dumps(
+                {
+                    "bibtex": "@article{a,title={X},year={2020}}",
+                    "text": "We build on \\cite{a} and also \\cite{ghost}.",
+                }
+            ),
         ],
     )
     assert code == 0
@@ -195,21 +200,21 @@ def test_ground_command_citation_integrity(capsys: pytest.CaptureFixture[str]) -
     assert result["metadata"]["citation_integrity"] == 0.5
 
 
-def test_compose_verify_attaches_grounding(capsys: pytest.CaptureFixture[str]) -> None:
+def test_verifier_role_rolls_up_grounding(capsys: pytest.CaptureFixture[str]) -> None:
+    # The user-facing path for grounding is now the verifier role.
     code, result = _run(
         capsys,
         [
-            "compose",
-            "--idea",
-            "a study",
-            "--outline-json",
-            '{"title":"T","sections":[{"title":"Intro","goal":"g"}]}',
-            "--verify",
+            "role",
+            "verifier",
+            "--text",
+            "We build on \\cite{a}.",
+            "--json",
+            json.dumps({"bibtex": "@article{a,title={X},year={2020}}"}),
         ],
     )
-    assert code == 0
-    assert result["action"] == "compose"
-    assert "grounding" in result["metadata"]
+    assert result["action"] == "role"
+    assert "grounding" in result["structured"]
 
 
 def test_revise_command_style_mode(capsys: pytest.CaptureFixture[str]) -> None:
@@ -236,7 +241,7 @@ def test_cli_clio_llm_env_accepted_for_capabilities(
     monkeypatch.setenv("CLIO_LLM", "claude")
     code, result = _run(capsys, ["capabilities"])
     assert code == 0
-    assert len(result["actions"]) == 29
+    assert len(result["actions"]) == 24
 
 
 def test_cli_invalid_clio_llm_degrades_to_error(
