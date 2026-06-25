@@ -28,7 +28,7 @@ phase of the work you're in.**
 
 ## What You Get
 
-- **29 actions across the author lifecycle** — frame · gather · plan · draft · strengthen · referee · respond · ship, all behind one interface
+- **24 tools + 7 roles across the author lifecycle** — frame · gather · plan · draft · strengthen · referee · respond · ship, all behind one interface
 - **Guided pipeline** — every command suggests what to run next (on stderr + as `metadata.suggested_next` for host agents)
 - **PDF/arXiv → clean scientific Markdown** with structured memory blocks (sections, figures, equations)
 - **Grounded peer review** — Accept/Reject, per-axis scores, strengths/weaknesses, optional vision on figures
@@ -107,54 +107,62 @@ at any phase**. Most jobs don't even need `ingest`: only `ask`, `kg`, `experimen
 |---|---|---|
 | **① Frame** | *What's my story; what exists?* | `research`, `discover`, `ask`, `kg`, `experiment` |
 | **② Gather** | *Pull in what I'll build on* | `ingest`, `gather`, `ask`, `kg`, `cite` |
-| **③ Plan** | *Blueprint the paper + evaluation* | `plan`, `experiment`, `research` |
-| **④ Draft** | *Write & illustrate* | `write`, `compose`, `plot`, `describe_figures`, `figure_refine` |
-| **⑤ Strengthen** | *Make my own paper bulletproof* | `review`, `revise`, `coherence`, `verify_work`, `check_refs`, `cite`, `cite_support`, `audit`, `ground`, `section_review`, `write_review` |
-| **⑥ Referee** | *Judge others' papers* | `review`, `section_review`, `meta_review` |
+| **③ Plan** | *Blueprint the paper + evaluation* | `plan`, `plan_check`, `experiment`, `research` · role `writer` |
+| **④ Draft** | *Write & illustrate* | `write`, `plot`, `describe_figures` · roles `writer`, `viz` |
+| **⑤ Strengthen** | *Make my own paper bulletproof* | `review`, `revise`, `coherence`, `verify_work`, `check_refs`, `cite`, `cite_support`, `audit` · roles `verifier`, `refiner` |
+| **⑥ Referee** | *Judge others' papers* | `review`, `meta_review` · role `reviewer` |
 | **⑦ Respond** | *Answer my reviewers* | `rebuttal`, `revise`, `audit` |
-| **⑧ Ship** | *Camera-ready* | `compose`, `export` |
+| **⑧ Ship** | *Camera-ready* | `export` · role `writer` |
 | **⟳ Drive** | *Run a multi-step job for me* | `orchestrate` |
 
 The full story, with copy-paste recipes per phase, is in **[`docs/LIFECYCLE.md`](docs/LIFECYCLE.md)**.
 
-### The 29 actions at a glance
+### Two layers: 24 tools + 7 roles
 
-**Two kinds.** Most actions are **tools** 🔧 — each does one specific job nothing else can. Six are
-**shortcuts** 🔗 — they don't add a new ability, they just **run several tools together** so you don't
-have to (the "Kind" column names what each one runs). If the list feels long, read the 🔧 tools first;
-the 🔗 shortcuts are just convenient bundles of them.
+**Tools** 🔧 each do one specific job nothing else can. **Roles** 🧩 are fixed policies that run several
+tools *for* you — the easy path through the pipeline (a role adds no new ability; it coordinates tools
+and shares project memory). `orchestrate` is the one planner that chains tools/roles toward a goal.
 
-| Action | Kind | What it's for |
-|--------|------|---------------|
-| `ingest` | 🔧 tool | **Read a paper.** arXiv id / URL / PDF / title → Markdown + blocks + figures. |
-| `gather` | 🔧 tool | **Build context.** Many sources (files/folders/globs/git/PDFs) → one merged `context.json`. |
-| `ask` | 🔧 tool | **Question answering.** Grounded answer from the paper's memory blocks. |
-| `kg` | 🔧 tool | **Map content.** Claims/methods/datasets/results graph; `--full` for the 6-stage pipeline. |
-| `discover` | 🔧 tool | **Find real papers.** Scholarly search (S2/OpenAlex/Crossref/arXiv); no LLM. |
-| `cite` | 🔧 tool | **Verify citations exist.** Check candidate titles against scholarly backends; suggestions only. |
-| `check_refs` | 🔧 tool | **Lint bibliography.** Malformed/duplicate entries, missing/uncited keys; no LLM. |
-| `cite_support` | 🔧 tool | **Citation faithfulness.** Does each cited source actually support the claim? vs. abstract or (`--deep`) full text. |
-| `verify_work` | 🔧 tool | **Claim check.** Did the prose make + back the claims you planned? VERIFIED/GAPS. |
-| `audit` | 🔧 tool | **Completeness checklist.** Sections, word counts, placeholders, coverage; no LLM. |
-| `research` | 🔧 tool | **Survey literature.** Foundational/recent/competing sources, gaps, synthesis. |
-| `experiment` | 🔧 tool | **Recreate evaluation.** Reference papers' design/experiments → grounded eval plan. |
-| `plan` | 🔧 tool | **Section blueprints.** Tasks, claims, sources, word budgets before drafting. |
-| `plan_check` | 🔧 tool | **Validate the plan before writing.** Deterministic: claim/citation coverage, word budgets, outline match; no LLM. |
-| `write` | 🔧 tool | **Draft a section.** Grounded in supplied source material. |
-| `revise` | 🔧 tool | **Revise prose.** `--mode feedback` (address review) or `style` (polish). Aliases: `edit`, `polish`. |
-| `coherence` | 🔧 tool | **Consistency check.** Terminology drift, contradictions, broken flow. |
-| `review` | 🔧 tool | **Peer review.** Accept/Reject + scores + critique; optional grounding and vision. |
-| `meta_review` | 🔧 tool | **Area-chair decision.** Aggregate several reviews; offline arithmetic. |
-| `rebuttal` | 🔧 tool | **Author rebuttal.** Point-by-point response grounded in the paper. |
-| `plot` | 🔧 tool | **Make a plot/diagram.** Matplotlib code (or real PNG with vision). |
-| `describe_figures` | 🔧 tool | **Caption figures.** Text or Gemini vision descriptions. |
-| `export` | 🔧 tool | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF. |
-| `ground` | 🔗 **shortcut** | **One grounding score.** Runs `check_refs` + `verify_work` + `cite_support` → a single integrity number. |
-| `section_review` | 🔗 **shortcut** | **Review one section in layers.** Runs `check_refs` + `coherence` + `review` on a section. |
-| `compose` | 🔗 **shortcut** | **Write a whole paper.** Runs `plan` + `cite` + `write` per section + a review loop + assemble. |
-| `write_review` | 🔗 **shortcut** | **Self-improve a draft.** Runs `write` ↔ `review` in a loop until it converges. |
-| `figure_refine` | 🔗 **shortcut** | **Self-improve a figure.** Runs `plot` ↔ critic in a loop. |
-| `orchestrate` | 🔗 **shortcut** | **Goal-driven.** Plans and runs a sequence of the tools above from a natural-language goal. |
+**The 24 tools:**
+
+| Action | What it's for |
+|--------|---------------|
+| `ingest` | **Read a paper.** arXiv id / URL / PDF / title → Markdown + blocks + figures. |
+| `gather` | **Build context.** Many sources (files/folders/globs/git/PDFs) → one merged `context.json`. |
+| `ask` | **Question answering.** Grounded answer from the paper's memory blocks. |
+| `kg` | **Map content.** Claims/methods/datasets/results graph; `--full` for the 6-stage pipeline. |
+| `discover` | **Find real papers.** Scholarly search (S2/OpenAlex/Crossref/arXiv); no LLM. |
+| `cite` | **Verify citations exist.** Check candidate titles against scholarly backends; suggestions only. |
+| `check_refs` | **Lint bibliography.** Malformed/duplicate entries, missing/uncited keys; no LLM. |
+| `cite_support` | **Citation faithfulness.** Does each cited source actually support the claim? vs. abstract or (`--deep`) full text. |
+| `verify_work` | **Claim check.** Did the prose make + back the claims you planned? VERIFIED/GAPS. |
+| `audit` | **Completeness checklist.** Sections, word counts, placeholders, coverage; no LLM. |
+| `research` | **Survey literature.** Foundational/recent/competing sources, gaps, synthesis. |
+| `experiment` | **Recreate evaluation.** Reference papers' design/experiments → grounded eval plan. |
+| `plan` | **Section blueprints.** Tasks, claims, sources, word budgets before drafting. |
+| `plan_check` | **Validate the plan before writing.** Deterministic: claim/citation coverage, word budgets, outline match; no LLM. |
+| `write` | **Draft a section.** Grounded in supplied source material. |
+| `revise` | **Revise prose.** `--mode feedback` (address review) or `style` (polish). Replaces the old `edit`/`polish`. |
+| `coherence` | **Consistency check.** Terminology drift, contradictions, broken flow. |
+| `review` | **Peer review.** Accept/Reject + scores + critique; optional grounding and vision. |
+| `meta_review` | **Area-chair decision.** Aggregate several reviews; offline arithmetic. |
+| `rebuttal` | **Author rebuttal.** Point-by-point response grounded in the paper. |
+| `plot` | **Make a plot/diagram.** Matplotlib code (or real PNG with vision). |
+| `describe_figures` | **Caption figures.** Text or Gemini vision descriptions. |
+| `export` | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF. |
+| `orchestrate` | **Goal-driven.** Plans and runs a sequence of tools/roles from a natural-language goal. |
+
+**The 7 roles** (`clio-author role <name>` — each runs the right tools, in order, and tells you what to run next):
+
+| Role | What it runs |
+|------|--------------|
+| `reader` | ingest/gather → kg (or ask) — understand sources |
+| `scholar` | discover · research · cite · experiment — find + verify the literature |
+| `writer` | plan → plan_check → draft the whole paper |
+| `verifier` | check_refs · cite_support · verify_work · audit · coherence → one grounding report |
+| `reviewer` | review (or per-section) · meta_review — referee it |
+| `refiner` | revise → coherence — apply feedback / polish |
+| `viz` | plot (with critic refinement) · describe_figures |
 
 Every action's **full command, every flag, and a runnable example** is in
 **[`docs/RUNBOOK.md`](docs/RUNBOOK.md)** (copy-paste, grouped by lifecycle phase). The action +
@@ -188,27 +196,26 @@ log instead of overwriting — each entry headed by the question + a trace line)
 
 **Plan & write**
 - `plan [--idea I | --idea-file FILE] [--log L | --log-file FILE] [--outline-json JSON | --outline-file FILE] [--blocks-file FILE] [--candidates-file FILE] [--out-dir DIR] [--sources …]`
+- `plan_check [--plan-file FILE | --plan-json JSON] [--word-target N]`
 - `write [--source T | --source-file FILE] [--outline TITLE] [--sources …]`
-- `compose [--idea I | --idea-file FILE] [--log L | --log-file FILE] [--outline-json JSON | --outline-file FILE] [--candidates-file FILE] [--review] [--max-rounds N] [--plan] [--latex] [--pdf] [--out-dir DIR] [--sources …]`
 - `revise [--mode {feedback,style}] [--text T | --text-file FILE] [--review-json JSON | --review-file FILE] [--critic-notes TEXT] [--voice V] [--target FILE]`
-- `polish [--text T | --text-file FILE] [--voice V] [--target FILE]` — alias of `revise --mode style`
 - `coherence [--sections-json JSON | --sections-file FILE] [--markdown-file FILE | --text T]`
+- `role writer [--idea I] [--sources …] [--out-dir DIR]` — plan → plan_check → draft the whole paper
 
 **Review & verify**
 - `review [--paper T | --paper-file FILE] [--ground] [--figures-json JSON | --figures-file FILE] [--sources …]`
-- `section-review [--text T | --text-file FILE] [--bibtex-file FILE] [--persona-json JSON]`
 - `verify-work [--text T | --text-file FILE] [--section-plan-json JSON | --section-plan-file FILE] [--claims-json JSON]`
 - `audit [--sections-json JSON | --sections-file FILE] [--markdown-file FILE] [--bibtex-file FILE]`
 - `cite_support [--markdown-file FILE | --text T] [--citations-file FILE | --citations-json JSON] [--deep] [--out-dir DIR]` — does each cited source actually support the claim? Feed it `cite`'s saved output; `--deep` checks full text.
-- `ground [--markdown-file FILE | --text T] [--bibtex-file FILE | --bibtex T] [--claims-json JSON] [--section-plan-file FILE] [--citations-file FILE | --citations-json JSON] [--deep] [--out-dir DIR]`
 - `rebuttal [--paper T | --paper-file FILE] [--review-json JSON | --review-file FILE]`
 - `run meta_review --json '{"reviews":[ … ]}'`  *(reports a `robustness` verdict: solid / borderline / split)*
-- `run write_review --json '{"outline":{…},"section_plan":{…},"blocks":{…},"max_rounds":N}'` — also `source` / `sources`
+- `role verifier [--markdown-file FILE | --text T] [--bibtex-file FILE] [--citations-file FILE] [--out-dir DIR]` — one grounding report (check_refs + cite_support + verify_work + audit + coherence)
+- `role reviewer …` · `role refiner …` — referee, then apply feedback
 
 **Figures**
 - `describe [--blocks-file FILE | --blocks-json JSON]` — fills figure descriptions (`describe_figures`)
 - `run plot --json '{"spec":{…},"out_path":"…"}'`
-- `run figure_refine --json '{"spec":{…},"out_path":"…","max_rounds":N}'`
+- `role viz [--json '{"spec":{…}}']` — plot, refine with a critic, and caption
 
 **Ship & drive**
 - `export [--title T] [--markdown-file FILE | --sections-json JSON | --sections-file FILE] [--bibtex-file FILE] [--out-dir DIR] [--pdf]`
@@ -362,8 +369,8 @@ uv run python scripts/benchmark_grounding.py     # see eval/grounding/ for cases
   (or `codex`/`ollama`).
 - **`cite`/`discover` returns nothing** — try `CLIO_SCHOLAR=openalex` or `arxiv`; for Semantic
   Scholar set `SEMANTIC_SCHOLAR_API_KEY`.
-- **`compose`/`export` produce no `.tex`** — `--latex` needs `--out-dir`; or use
-  `export --markdown-file` on an existing `paper.md`.
+- **`export` produces no `.tex`** — it needs `--out-dir`; run
+  `export --markdown-file` on an existing `paper.md` (e.g. from `role writer`).
 - **`--pdf` reports a `pdf_error`** — no LaTeX engine (tectonic/latexmk/pdflatex) on PATH; the export
   still succeeds, install one to compile PDF.
 - **A host invoking AUTHOR hangs** — don't point AUTHOR's nested `CLIO_LLM` at the *same* host (e.g.
