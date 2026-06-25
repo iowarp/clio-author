@@ -56,10 +56,28 @@ def test_empty_verifier_is_error_flagged() -> None:
     assert "error" in r["metadata"]
 
 
-def test_capabilities_lists_roles() -> None:
+def test_capabilities_lists_all_seven_roles() -> None:
     caps = ClioAuthorSubagent().capabilities()
     roles = {r["role"] for r in caps["roles"]}
-    assert "verifier" in roles
+    assert roles == {"reader", "scholar", "writer", "verifier", "reviewer", "refiner", "viz"}
+
+
+def test_all_roles_run_without_error_under_echo() -> None:
+    sub = ClioAuthorSubagent()
+    cases = {
+        "reader": {"source": "Some Paper"},
+        "scholar": {"topic": "rag", "query": "rag"},
+        "writer": {"idea": "a grounded writer"},
+        "verifier": {"text": "X \\cite{k}.", "bibtex": "@article{k,title={T},year={2020}}"},
+        "reviewer": {"paper": "## Intro\nWe do X."},
+        "refiner": {"text": "We do X.", "voice": "concise"},
+        "viz": {"spec": {"kind": "line", "title": "acc"}},
+    }
+    for role, extra in cases.items():
+        r = sub.run("role", {"role": role, **extra})
+        assert "error" not in r, f"{role} top-level error"
+        assert "error" not in r["metadata"], f"{role}: {r['metadata'].get('error')}"
+        assert r["structured"], f"{role} produced no report"
 
 
 def test_role_writes_report_to_project_memory(tmp_path) -> None:
