@@ -276,6 +276,7 @@ AUTHOR is meant to be **driven by a host agent**, four ways. Full setup for each
 | **Tool** (CLI / subprocess) | any language, any host | the `clio-author` console script |
 | **Slash command** | Codex, Claude Code | `integration/codex/author.md`, `integration/claude/author.md` |
 | **MCP** | MCP-only hosts | `clio_author.integration.mcp_bridge` (`uv sync --extra mcp`) |
+| **A2A** | any agent-to-agent host | `clio-author-a2a` server — Agent Card + `message/send`; one skill per tool + role (stdlib, no extra) |
 
 ### As a subagent (in-process Python) — recommended for CLIO
 
