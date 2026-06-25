@@ -21,6 +21,7 @@ returns the echo output.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -44,6 +45,8 @@ from clio_author.experts.orchestrate import run_orchestrate
 from clio_author.experts.paper_qa import PaperQAExpert
 from clio_author.experts.plan_check import PlanCheckExpert
 from clio_author.experts.planner import PlannerExpert
+from clio_author.memory import ProjectMemory
+from clio_author.roles import build_roles
 from clio_author.experts.polish import PolishExpert
 from clio_author.experts.rebuttal import RebuttalExpert
 from clio_author.experts.research import ResearchExpert
@@ -152,6 +155,9 @@ class ClioAuthorAgent:
         self.audit = AuditExpert(self.llm)
         self.plan_check = PlanCheckExpert(self.llm)
 
+        # Role-agents: fixed policies that delegate to the tools above.
+        self.roles = build_roles(self._dispatch_tool)
+
         # M0 echo wiring is preserved for the unknown/None-action fallthrough.
         self.engine = Engine()
         self.pattern = Sequential()
@@ -209,6 +215,8 @@ class ClioAuthorAgent:
         # at files, folders, globs, git repos, or PDFs.
         task = self._resolve_sources(action, task)
 
+        if action == "role":
+            return self._run_role(task)
         if action == "ingest":
             return self.ingestor.run(task, session)
         if action == "gather":
@@ -366,6 +374,35 @@ class ClioAuthorAgent:
                 }
             }
         )
+
+    def _dispatch_tool(self, action: str, payload: dict[str, Any]) -> AgentOutput:
+        """Run one tool ``action`` for a role and return its output (never a role)."""
+        sub = Task(id=uuid4().hex, description=action, payload={**payload, "action": action})
+        return self._route(action, sub)
+
+    @staticmethod
+    def _project_memory(payload: dict[str, Any]) -> ProjectMemory | None:
+        """Build a :class:`ProjectMemory` under ``out_dir``/``project`` when given."""
+        root = payload.get("out_dir") or payload.get("project")
+        if not root:
+            return None
+        try:
+            return ProjectMemory(Path(str(root)) / "memory")
+        except OSError:
+            return None
+
+    def _run_role(self, task: Task) -> AgentOutput:
+        """Dispatch ``task.payload['role']`` to the named role-agent. Never raises."""
+        name = str(task.payload.get("role") or "").strip()
+        role = self.roles.get(name)
+        if role is None:
+            known = ", ".join(sorted(self.roles)) or "(none)"
+            return AgentOutput(
+                agent="clio-author",
+                content="",
+                metadata={"error": f"unknown role {name!r}; known roles: {known}"},
+            )
+        return role.run(task.payload, self._project_memory(task.payload))
 
     def _cited_full_text(self, key: str, entry: dict[str, Any]) -> str | None:
         """Resolve a cited paper's full text for ``cite_support`` deep mode.
