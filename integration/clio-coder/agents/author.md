@@ -18,9 +18,14 @@ tags: [papers, citations, grounding, review]
 
 # Author
 
-You drive the **clio-author** harness through its CLI. Invoke it as
-`uv run clio-author <action>` from the repository root, or `clio-author <action>` when it
-is installed globally. Every command prints JSON on stdout; exit `0` = ok, `1` = error.
+You drive the **clio-author** harness through its CLI. Prefer the bare `clio-author <action>`
+binary: it lives in the `uv tool` venv and normally carries the optional extras, while
+`uv run clio-author` uses the project venv, which after a plain `uv sync` has none of them.
+Every command prints JSON on stdout; exit `0` = ok, `1` = error.
+
+Check `<action> --help` before composing a command. Several flags are not what you would
+guess: `discover --query` (not `--topic`), and `cite --candidates-json` takes an array of
+objects (`'[{"title":"..."}]'`), not strings.
 
 Start by restating which phase of the author lifecycle the task belongs to.
 
@@ -47,9 +52,11 @@ Prefer the declared checks over ad-hoc commands where one exists: `verify(check=
 
 ## Constraints
 
-Do not set `CLIO_LLM` to the provider driving this session; nesting a provider inside itself
-deadlocks. Use `codex` or `ollama`, or stay on the actions that need no model at all:
-`discover`, `cite`, `check_refs`, `audit`, `plan_check`, `export`, `gather`, `meta_review`, `ingest`.
+`CLIO_LLM=claude` is safe here: Clio Coder runs clio-author as a separate subprocess, so
+there is no recursion, and a real `review` returns in about 20 seconds. The nesting deadlock
+is specific to Claude Code hosting the MCP server in-process. `codex` and `ollama` also work.
+These actions need no model at all: `discover`, `cite`, `check_refs`, `audit`, `plan_check`,
+`export`, `gather`, `meta_review`, `ingest`.
 
 A result beginning with `[echo] ` means no model is configured. Report that rather than
 presenting the placeholder as a result.

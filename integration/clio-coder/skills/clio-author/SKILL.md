@@ -21,14 +21,26 @@ Clio Coder drives it as a **CLI over bash**. It is not an MCP server to this hos
 
 ## Invocation
 
-From the repository root every command is prefixed with `uv run`:
+**Prefer the bare `clio-author` binary over `uv run clio-author`.**
 
 ```bash
-uv run clio-author capabilities   # 24 actions, each with phase + needs_source
-uv run clio-author lifecycle      # phase -> actions map
+clio-author capabilities   # 24 actions, each with phase + needs_source
+clio-author lifecycle      # phase -> actions map
 ```
 
-After `uv tool install '.[pdf,scholar,viz,mcp]'` the `uv run` prefix drops.
+They are different installs with different capabilities:
+
+| Form | Venv | Extras |
+|---|---|---|
+| `clio-author` | the `uv tool` venv | whatever `uv tool install 'clio-author[...]'` added |
+| `uv run clio-author` | the project venv | whatever `uv sync --extra ...` added |
+
+A repo checkout after a plain `uv sync` has **no extras at all**, so `uv run clio-author ingest`
+fails on a missing dependency while the global `clio-author ingest` works. Check before assuming:
+
+```bash
+command -v clio-author && clio-author capabilities >/dev/null && echo "global ok"
+```
 
 Every command prints JSON on stdout. Exit `0` = ok, `1` = error.
 
@@ -94,8 +106,10 @@ result starts with `"[echo] ..."` the model is unset.
 export CLIO_LLM=codex      # or ollama, lmstudio, openrouter, litellm
 ```
 
-**Nesting rule:** never point `CLIO_LLM` at the same provider driving this Clio Coder
-session — the model recurses into itself and hangs.
+**Under Clio Coder, `CLIO_LLM=claude` is safe** and is the usual choice. Clio Coder drives
+clio-author as a separate subprocess, so there is no recursion: a real `review` returns in
+about 20 seconds. The nesting deadlock is specific to **Claude Code** hosting the MCP server
+in-process; it does not apply here. `codex` and `ollama` work too.
 
 These actions need **no model** and are instant and deterministic. Prefer them for
 demos and for grounded checks:
@@ -117,6 +131,18 @@ Each capability is opt-in and lives in the project venv:
 The first `ingest` downloads ~500 MB of Docling models. Do that **before** a demo.
 Without the `pdf` extra `ingest` fails cleanly with
 `"PyMuPDF is not installed. Install with: uv sync --extra pdf"`.
+
+## Flag traps
+
+Check `<action> --help` before composing a command; several flags are not what you would guess.
+
+- `discover --query "..."`, not `--topic`.
+- `cite --candidates-json` takes a JSON array of **objects**, not strings:
+  `'[{"title":"Attention Is All You Need"}]'`. A bare string fails with a pydantic
+  `model_type` validation error.
+- `verify-work --claims-json` takes an array of claim strings.
+- `--format prose` gives human-readable text; the default `structured` is JSON for hosts.
+- `--out FILE` saves alongside stdout on every action; `--append` builds a running log.
 
 ## Gotchas
 
