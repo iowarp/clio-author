@@ -8,8 +8,9 @@
   <img alt="Version" src="https://img.shields.io/badge/version-0.4.0-blue" />
   <img alt="Python" src="https://img.shields.io/badge/python-%E2%89%A53.12-3776ab" />
   <img alt="License" src="https://img.shields.io/badge/license-BSD--3--Clause-green" />
-  <img alt="Actions" src="https://img.shields.io/badge/actions-27-orange" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-635%20passing-brightgreen" />
+  <img alt="Actions" src="https://img.shields.io/badge/actions-24-orange" />
+  <img alt="Roles" src="https://img.shields.io/badge/roles-7-orange" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-683%20passing-brightgreen" />
   <img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey" />
 </p>
 
@@ -18,7 +19,8 @@
 AUTHOR is a standalone, pure-Python multi-agent harness for the scientific-paper lifecycle. It turns
 a paper — an arXiv link, a PDF, or just a title — into clean Markdown, then puts specialized AI agents
 to work: answering questions, verifying citations, reviewing, planning, drafting, illustrating, and
-exporting. It runs on its own, and a larger agent (such as CLIO) can call it as a **subagent**.
+exporting. It runs on its own, and a larger agent — Clio Coder, Claude Code, Codex, or any Python
+host — can drive it as a **subagent**.
 
 Think of it as a research collaborator that never sleeps. Hand it your idea and results, and it
 plans, drafts, and self-reviews a paper. Hand it someone else's PDF, and it gives you the kind of
@@ -36,7 +38,7 @@ phase of the work you're in.**
 - **Citations that are real** — a 4-backend scholarly cascade (Semantic Scholar / OpenAlex / Crossref / arXiv); never fabricated
 - **A content knowledge graph** of a paper's claims/methods/datasets/results (6-stage pipeline)
 - **Runs offline out of the box** (built-in echo model); add Claude / Codex / Ollama for real output
-- **Callable from any host** — in-process subagent, CLI, MCP, A2A, or a Claude Code plugin; imports nothing from the host
+- **Callable from any host** — in-process subagent, CLI, MCP, A2A, a Claude Code plugin, or a Clio Coder skill; imports nothing from the host
 
 > Requires **Python ≥ 3.12** · BSD-3-Clause. Why one package instead of a dozen tools? →
 > [`docs/MOTIVATION.md`](docs/MOTIVATION.md).
@@ -59,7 +61,7 @@ cd clio-author
 uv sync
 ```
 
-**3. Confirm it works** (lists the 27 things it can do — no model or network needed):
+**3. Confirm it works** (lists the 24 things it can do — no model or network needed):
 
 ```bash
 uv run clio-author capabilities      # what it can do
@@ -103,17 +105,17 @@ the **Writer** (producing your own paper) and the **Referee** (judging others') 
 at any phase**. Most jobs don't even need `ingest`: only `ask`, `kg`, `experiment`, and
 `describe_figures` operate on a processed paper; everything else works from text, an idea, or JSON.
 
-| Phase | Your question | Actions |
-|---|---|---|
-| **① Frame** | *What's my story; what exists?* | `research`, `discover`, `ask`, `kg`, `experiment` |
-| **② Gather** | *Pull in what I'll build on* | `ingest`, `gather`, `ask`, `kg`, `cite` |
-| **③ Plan** | *Blueprint the paper + evaluation* | `plan`, `plan_check`, `experiment`, `research` · role `writer` |
-| **④ Draft** | *Write & illustrate* | `write`, `plot`, `describe_figures` · roles `writer`, `viz` |
-| **⑤ Strengthen** | *Make my own paper bulletproof* | `review`, `revise`, `coherence`, `verify_work`, `check_refs`, `cite`, `cite_support`, `audit` · roles `verifier`, `refiner` |
-| **⑥ Referee** | *Judge others' papers* | `review`, `meta_review` · role `reviewer` |
-| **⑦ Respond** | *Answer my reviewers* | `rebuttal`, `revise`, `audit` |
-| **⑧ Ship** | *Camera-ready* | `export` · role `writer` |
-| **⟳ Drive** | *Run a multi-step job for me* | `orchestrate` |
+| Phase                   | Your question                        | Actions                                                                                                                                          |
+| ----------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **① Frame**      | *What's my story; what exists?*    | `research`, `discover`, `ask`, `kg`, `experiment`                                                                                      |
+| **② Gather**     | *Pull in what I'll build on*       | `ingest`, `gather`, `ask`, `kg`, `cite`                                                                                                |
+| **③ Plan**       | *Blueprint the paper + evaluation* | `plan`, `plan_check`, `experiment`, `research` · role `writer`                                                                        |
+| **④ Draft**      | *Write & illustrate*               | `write`, `plot`, `describe_figures` · roles `writer`, `viz`                                                                           |
+| **⑤ Strengthen** | *Make my own paper bulletproof*    | `review`, `revise`, `coherence`, `verify_work`, `check_refs`, `cite`, `cite_support`, `audit` · roles `verifier`, `refiner` |
+| **⑥ Referee**    | *Judge others' papers*             | `review`, `meta_review` · role `reviewer`                                                                                                 |
+| **⑦ Respond**    | *Answer my reviewers*              | `rebuttal`, `revise`, `audit`                                                                                                              |
+| **⑧ Ship**       | *Camera-ready*                     | `export` · role `writer`                                                                                                                    |
+| **⟳ Drive**      | *Run a multi-step job for me*      | `orchestrate`                                                                                                                                  |
 
 The full story, with copy-paste recipes per phase, is in **[`docs/LIFECYCLE.md`](docs/LIFECYCLE.md)**.
 
@@ -125,44 +127,44 @@ and shares project memory). `orchestrate` is the one planner that chains tools/r
 
 **The 24 tools:**
 
-| Action | What it's for |
-|--------|---------------|
-| `ingest` | **Read a paper.** arXiv id / URL / PDF / title → Markdown + blocks + figures. |
-| `gather` | **Build context.** Many sources (files/folders/globs/git/PDFs) → one merged `context.json`. |
-| `ask` | **Question answering.** Grounded answer from the paper's memory blocks. |
-| `kg` | **Map content.** Claims/methods/datasets/results graph; `--full` for the 6-stage pipeline. |
-| `discover` | **Find real papers.** Scholarly search (S2/OpenAlex/Crossref/arXiv); no LLM. |
-| `cite` | **Verify citations exist.** Check candidate titles against scholarly backends; suggestions only. |
-| `check_refs` | **Lint bibliography.** Malformed/duplicate entries, missing/uncited keys; no LLM. |
-| `cite_support` | **Citation faithfulness.** Does each cited source actually support the claim? vs. abstract or (`--deep`) full text. |
-| `verify_work` | **Claim check.** Did the prose make + back the claims you planned? VERIFIED/GAPS. |
-| `audit` | **Completeness checklist.** Sections, word counts, placeholders, coverage; no LLM. |
-| `research` | **Survey literature.** Foundational/recent/competing sources, gaps, synthesis. |
-| `experiment` | **Recreate evaluation.** Reference papers' design/experiments → grounded eval plan. |
-| `plan` | **Section blueprints.** Tasks, claims, sources, word budgets before drafting. |
-| `plan_check` | **Validate the plan before writing.** Deterministic: claim/citation coverage, word budgets, outline match; no LLM. |
-| `write` | **Draft a section.** Grounded in supplied source material. |
-| `revise` | **Revise prose.** `--mode feedback` (address review) or `style` (polish). Replaces the old `edit`/`polish`. |
-| `coherence` | **Consistency check.** Terminology drift, contradictions, broken flow. |
-| `review` | **Peer review.** Accept/Reject + scores + critique; optional grounding and vision. |
-| `meta_review` | **Area-chair decision.** Aggregate several reviews; offline arithmetic. |
-| `rebuttal` | **Author rebuttal.** Point-by-point response grounded in the paper. |
-| `plot` | **Make a plot/diagram.** Matplotlib code (or real PNG with vision). |
-| `describe_figures` | **Caption figures.** Text or Gemini vision descriptions. |
-| `export` | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF. |
-| `orchestrate` | **Goal-driven.** Plans and runs a sequence of tools/roles from a natural-language goal. |
+| Action               | What it's for                                                                                                               |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `ingest`           | **Read a paper.** arXiv id / URL / PDF / title → Markdown + blocks + figures.                                        |
+| `gather`           | **Build context.** Many sources (files/folders/globs/git/PDFs) → one merged `context.json`.                        |
+| `ask`              | **Question answering.** Grounded answer from the paper's memory blocks.                                               |
+| `kg`               | **Map content.** Claims/methods/datasets/results graph; `--full` for the 6-stage pipeline.                          |
+| `discover`         | **Find real papers.** Scholarly search (S2/OpenAlex/Crossref/arXiv); no LLM.                                          |
+| `cite`             | **Verify citations exist.** Check candidate titles against scholarly backends; suggestions only.                      |
+| `check_refs`       | **Lint bibliography.** Malformed/duplicate entries, missing/uncited keys; no LLM.                                     |
+| `cite_support`     | **Citation faithfulness.** Does each cited source actually support the claim? vs. abstract or (`--deep`) full text. |
+| `verify_work`      | **Claim check.** Did the prose make + back the claims you planned? VERIFIED/GAPS.                                     |
+| `audit`            | **Completeness checklist.** Sections, word counts, placeholders, coverage; no LLM.                                    |
+| `research`         | **Survey literature.** Foundational/recent/competing sources, gaps, synthesis.                                        |
+| `experiment`       | **Recreate evaluation.** Reference papers' design/experiments → grounded eval plan.                                  |
+| `plan`             | **Section blueprints.** Tasks, claims, sources, word budgets before drafting.                                         |
+| `plan_check`       | **Validate the plan before writing.** Deterministic: claim/citation coverage, word budgets, outline match; no LLM.    |
+| `write`            | **Draft a section.** Grounded in supplied source material.                                                            |
+| `revise`           | **Revise prose.** `--mode feedback` (address review) or `style` (polish). Replaces the old `edit`/`polish`.   |
+| `coherence`        | **Consistency check.** Terminology drift, contradictions, broken flow.                                                |
+| `review`           | **Peer review.** Accept/Reject + scores + critique; optional grounding and vision.                                    |
+| `meta_review`      | **Area-chair decision.** Aggregate several reviews; offline arithmetic.                                               |
+| `rebuttal`         | **Author rebuttal.** Point-by-point response grounded in the paper.                                                   |
+| `plot`             | **Make a plot/diagram.** Matplotlib code (or real PNG with vision).                                                   |
+| `describe_figures` | **Caption figures.** Text or Gemini vision descriptions.                                                              |
+| `export`           | **Ship LaTeX.** `paper.md` → `paper.tex` + `references.bib`; `--pdf` compiles PDF.                           |
+| `orchestrate`      | **Goal-driven.** Plans and runs a sequence of tools/roles from a natural-language goal.                               |
 
 **The 7 roles** (`clio-author role <name>` — each runs the right tools, in order, and tells you what to run next):
 
-| Role | What it runs |
-|------|--------------|
-| `reader` | ingest/gather → kg (or ask) — understand sources |
-| `scholar` | discover · research · cite · experiment — find + verify the literature |
-| `writer` | plan → plan_check → draft the whole paper |
+| Role         | What it runs                                                                            |
+| ------------ | --------------------------------------------------------------------------------------- |
+| `reader`   | ingest/gather → kg (or ask) — understand sources                                      |
+| `scholar`  | discover · research · cite · experiment — find + verify the literature              |
+| `writer`   | plan → plan_check → draft the whole paper                                             |
 | `verifier` | check_refs · cite_support · verify_work · audit · coherence → one grounding report |
-| `reviewer` | review (or per-section) · meta_review — referee it |
-| `refiner` | revise → coherence — apply feedback / polish |
-| `viz` | plot (with critic refinement) · describe_figures |
+| `reviewer` | review (or per-section) · meta_review — referee it                                    |
+| `refiner`  | revise → coherence — apply feedback / polish                                          |
+| `viz`      | plot (with critic refinement) · describe_figures                                       |
 
 Every action's **full command, every flag, and a runnable example** is in
 **[`docs/RUNBOOK.md`](docs/RUNBOOK.md)** (copy-paste, grouped by lifecycle phase). The action +
@@ -192,15 +194,15 @@ clio-author <command> --help      # exact flags for any command
 By default AUTHOR uses an **offline echo model**, so text actions return a placeholder. Pick a real
 one with `CLIO_LLM`:
 
-| `CLIO_LLM` | What it uses | How to get it |
-|---|---|---|
-| `echo` *(default)* | nothing — offline placeholder | already works |
-| `claude` | the `claude` CLI (no API key) | install Claude Code so `claude` is on your PATH |
-| `codex` | the `codex` CLI | install the Codex CLI |
-| `ollama` | a local Ollama server | install [Ollama](https://ollama.com), then `ollama pull llama3.1:8b` |
-| `lmstudio` | a local [LM Studio](https://lmstudio.ai) server (OpenAI-compatible) | load a model in LM Studio, start its server; URL via `CLIO_LMSTUDIO_URL` (default `http://localhost:1234/v1`) |
-| `openrouter` | the hosted [OpenRouter](https://openrouter.ai) gateway | set `OPENROUTER_API_KEY`; pick a model via `CLIO_LLM_MODEL` (default `openai/gpt-4o-mini`) |
-| `litellm` | a [LiteLLM](https://docs.litellm.ai) proxy (OpenAI-compatible) | run the proxy; URL via `CLIO_LITELLM_URL` (default `http://localhost:4000/v1`), optional `LITELLM_API_KEY` |
+| `CLIO_LLM`           | What it uses                                                      | How to get it                                                                                                    |
+| ---------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `echo` *(default)* | nothing — offline placeholder                                    | already works                                                                                                    |
+| `claude`             | the`claude` CLI (no API key)                                    | install Claude Code so`claude` is on your PATH                                                                 |
+| `codex`              | the`codex` CLI                                                  | install the Codex CLI                                                                                            |
+| `ollama`             | a local Ollama server                                             | install[Ollama](https://ollama.com), then `ollama pull llama3.1:8b`                                             |
+| `lmstudio`           | a local[LM Studio](https://lmstudio.ai) server (OpenAI-compatible) | load a model in LM Studio, start its server; URL via`CLIO_LMSTUDIO_URL` (default `http://localhost:1234/v1`) |
+| `openrouter`         | the hosted[OpenRouter](https://openrouter.ai) gateway              | set`OPENROUTER_API_KEY`; pick a model via `CLIO_LLM_MODEL` (default `openai/gpt-4o-mini`)                  |
+| `litellm`            | a[LiteLLM](https://docs.litellm.ai) proxy (OpenAI-compatible)      | run the proxy; URL via`CLIO_LITELLM_URL` (default `http://localhost:4000/v1`), optional `LITELLM_API_KEY`  |
 
 ```bash
 CLIO_LLM=claude uv run clio-author review --paper-file clio-out/2601.23265/paper.md --format prose
@@ -224,20 +226,51 @@ automatically. Never paste keys into commands, issues, or commits. See
 
 ---
 
-## Invoke it from a host — CLIO · Claude Code · Codex
+## Invoke it from a host — Clio Coder · Claude Code · Codex
 
 AUTHOR is meant to be **driven by a host agent**. Pick by host; full setup for each is in
 **[`integration/README.md`](integration/README.md)**.
 
-| Host | Wire it in with | Entry point |
-|---|---|---|
-| **CLIO** (Python) | **subagent** (recommended), or MCP / A2A | `ClioAuthorSubagent` · `clio-author-mcp` · `clio-author-a2a` |
-| **Claude Code** | a **plugin** (bundles the MCP server + an `author` subagent) | `integration/claude-plugin/` |
-| **Codex** | an **MCP server** in `~/.codex/config.toml` | `codex mcp add clio_author -- clio-author-mcp` |
-| any agent | **A2A** (Agent Card + `message/send`; one skill per tool + role) | `clio-author-a2a` |
-| any language | **CLI / subprocess** (JSON on stdout) | the `clio-author` console script |
+| Host                    | Wire it in with                                                          | Entry point                                                          |
+| ----------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| **Clio Coder**    | a**skill** (smallest unit), or the full extension + `author` agent | `integration/clio-coder/`                                        |
+| **Claude Code**   | a**plugin** (bundles the MCP server + an `author` subagent)      | `integration/claude-plugin/`                                       |
+| **Codex**         | an**MCP server** in `~/.codex/config.toml`                       | `codex mcp add clio_author -- clio-author-mcp`                     |
+| any Python host         | **in-process subagent**                                            | `ClioAuthorSubagent`                                               |
+| any agent               | **A2A** (Agent Card + `message/send`; one skill per tool + role) | `clio-author-a2a`                                                  |
+| any MCP host            | **MCP** (stdio or HTTP)                                            | `clio-author-mcp`                                                  |
+| any language            | **CLI / subprocess** (JSON on stdout)                              | the`clio-author` console script                                    |
 
-### CLIO — as a subagent (in-process Python)
+### Clio Coder — as a skill
+
+Clio Coder has **no MCP client**, so it drives the CLI directly. One command makes every Clio
+Coder session on your machine able to use AUTHOR:
+
+```bash
+uv tool install 'clio-author[pdf,scholar,viz]'      # puts `clio-author` on PATH
+clio-coder skills install \
+  https://github.com/iowarp/clio-author/tree/main/integration/clio-coder/skills/clio-author \
+  --user
+```
+
+Then, in any repository:
+
+```text
+/skill clio-author verify the citation "Attention Is All You Need"
+```
+
+For the full wiring — an `author` agent you can `/run`, an `/author-demo` prompt, and the demo
+acts as declared `verify` checks — install the extension instead:
+
+```bash
+clio-coder extensions install integration/clio-coder --project
+clio-coder extensions enable clio-author --project
+mkdir -p .clio-coder/agents && cp integration/clio-coder/agents/author.md .clio-coder/agents/
+```
+
+See [`integration/clio-coder/`](integration/clio-coder/README.md).
+
+### Any Python host — as a subagent (in-process)
 
 ```python
 from clio_author.integration.clio_adapter import ClioAuthorSubagent
@@ -304,7 +337,7 @@ uv sync --extra pdf        # real PDF/arXiv extraction (Docling + PyMuPDF) — n
 uv sync --extra rag        # real semantic search for `ask` (sentence-transformers + LanceDB)
 uv sync --extra scholar    # live citation backends for `cite`/`discover` (httpx + thefuzz)
 uv sync --extra viz        # actually render plot images (matplotlib)
-uv sync --extra mcp        # the MCP bridge so MCP-only hosts (e.g. CLIO) can invoke it (fastmcp)
+uv sync --extra mcp        # the MCP bridge for MCP hosts — Claude Code, Codex (fastmcp)
 uv sync --all-extras       # everything at once
 ```
 
@@ -354,6 +387,7 @@ uv run python scripts/benchmark_grounding.py     # see eval/grounding/ for cases
 - **Action & payload reference (library use)** → [`docs/USAGE.md`](docs/USAGE.md)
 - **Why AUTHOR — motivation, the gap, capability matrix** → [`docs/MOTIVATION.md`](docs/MOTIVATION.md)
 - **API keys & local env handling** → [`docs/SECURITY.md`](docs/SECURITY.md)
+- **Host wiring — Clio Coder, Claude Code, Codex, MCP, A2A** → [`integration/README.md`](integration/README.md)
 - **Design & architecture** → [`artifact/notes/DESIGN.md`](artifact/notes/DESIGN.md)
 - **Working in this repo (for agents/contributors)** → [`AGENTS.md`](AGENTS.md) · **Changes** → [`CHANGELOG.md`](CHANGELOG.md)
 

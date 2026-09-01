@@ -55,3 +55,15 @@ dist/
 
 # runbook example scratch
 /runbook-out/
+
+# Clio Coder session state and install artifacts.
+# `.clio-coder/agents/` and `.clio-coder/verifiers.yaml` ARE committed: they are the
+# project's agent recipes and its declared verification catalog. Everything else here
+# is machine-produced (session state, the codewiki index, generated artifacts) or a
+# copy the installer made of `integration/clio-coder/`.
+/.clio-coder/state.json
+/.clio-coder/codewiki.json
+/.clio-coder/extensions/
+/.clio-coder/skills/
+/.clio-coder/artifacts/
+/demo/

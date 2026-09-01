@@ -1,0 +1,10 @@
+manifestVersion: 1
+id: clio-author
+name: clio-author
+version: 0.4.0
+description: Drive the clio-author harness (24 tools + 7 roles) from Clio Coder over its CLI.
+resources:
+  prompts: prompts
+  skills: skills
+compatibility:
+  clio: ">=0.2.0"

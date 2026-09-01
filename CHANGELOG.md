@@ -7,6 +7,30 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Clio Coder integration (`integration/clio-coder/`).** Clio Coder has no MCP client — its
+  MCP proxy is marked design-reserved and unimplemented — so the Claude Code plugin and the
+  Codex `[mcp_servers]` config do not reach it. It drives the **CLI over `bash`** instead,
+  made discoverable through Clio-native project resources. Three delivery units, because a
+  Clio Coder extension carries prompts and skills only:
+  - a **skill** (`skills/clio-author/SKILL.md`) — the smallest useful unit, installable on
+    its own with `clio-coder skills install <github tree URL> --user`, giving any session
+    `/skill clio-author …` without a checkout;
+  - an **extension** (`clio-coder-extension.yaml`) bundling that skill plus an
+    `/author-demo` prompt template, installed with
+    `clio-coder extensions install integration/clio-coder --project`;
+  - an **`author` agent recipe** (`agents/author.md`) copied to `.clio-coder/agents/`, and a
+    reference `verifiers.yaml` turning the deterministic demo acts into declared `verify`
+    checks. Neither is carried by the extension format.
+
+### Fixed
+- **`integration/README.md` no longer claims CLIO can consume MCP or the in-process subagent.**
+  The host map listed `CLIO → subagent (or MCP / A2A)`; neither is reachable from Clio Coder.
+  Replaced with a Clio Coder row pointing at the CLI-backed extension.
+- **README counts corrected against the running code.** The badge and quickstart said 27
+  actions (`capabilities` reports **24**) and 635 passing tests (`uv run pytest -q` reports
+  **683 passed, 12 deselected**). Added a roles badge.
+- **`docs/USAGE.md`** no longer implies the `mcp` extra is how Clio Coder invokes AUTHOR;
+  **`docs/LIFECYCLE.md`** names Clio Coder instead of a generic "CLIO" host.
 - **`cite_support` — claim-to-source faithfulness (new action, 28 total).** `cite` proves a citation
   *exists* and `check_refs` proves the `\cite{key}` *resolves*, but neither checks that the cited paper
   actually *says* what the sentence claims. `cite_support` closes that gap: for each `claim … \cite{key}`

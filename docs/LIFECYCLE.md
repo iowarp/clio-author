@@ -3,7 +3,7 @@
 AUTHOR is **not** a linear "ingest → … → export" pipeline. It is a toolkit a
 *person* — an author — reaches into at different moments. This document tells the
 story of that author and maps every capability to the phase of work it serves, so
-you (or a host agent like CLIO) can pick the right action by **what you need to do
+you (or a host agent like Clio Coder) can pick the right action by **what you need to do
 right now**, not by remembering action names.
 
 Two things shape the whole design:

@@ -4,14 +4,33 @@ AUTHOR is designed to be **driven by a host agent**. Pick the wiring by host.
 
 | Mode | Best for | Entry point |
 |---|---|---|
-| **Subagent** (in-process Python) | **CLIO**, any Python host | `clio_author.integration.clio_adapter.ClioAuthorSubagent` |
-| **MCP** | **CLIO**, any MCP host | `clio-author-mcp` (`uv sync --extra mcp`) |
+| **Subagent** (in-process Python) | any Python host | `clio_author.integration.clio_adapter.ClioAuthorSubagent` |
+| **MCP** | any MCP host | `clio-author-mcp` (`uv sync --extra mcp`) |
 | **A2A** | any agent-to-agent host | `clio-author-a2a` (Agent Card + `message/send`) |
+| **Clio Coder extension** | **Clio Coder** | `integration/clio-coder/` (skill + `/author-demo` prompt + `author` agent recipe) |
 | **Claude Code plugin** | **Claude Code** | `integration/claude-plugin/` (bundles the MCP server + `author` subagent) |
 | **Codex (MCP)** | **Codex CLI** | `integration/codex/config.toml` (`codex mcp add clio_author -- clio-author-mcp`) |
 | **Tool** (CLI / subprocess) | any language | the `clio-author` console script (JSON on stdout) |
 
-**Host map:** CLIO → subagent (or MCP / A2A); Claude Code → the plugin; Codex → the MCP config.
+**Host map:** Clio Coder → the extension (CLI-backed); Claude Code → the plugin; Codex → the MCP config.
+
+> **Clio Coder does not speak MCP.** Its MCP/DB proxy is marked design-reserved and
+> unimplemented in `src/core/tool-names.ts`, so `clio-author-mcp` is unreachable from that host
+> and the `mcp` extra buys nothing there. Clio Coder drives the **CLI over `bash`**, made
+> discoverable through a skill, a prompt template, an agent recipe, and declared verifier checks.
+> See [`clio-coder/README.md`](clio-coder/README.md).
+
+## Clio Coder
+
+```bash
+clio-coder extensions install integration/clio-coder --project --force
+clio-coder extensions enable clio-author --project
+mkdir -p .clio-coder/agents && cp integration/clio-coder/agents/author.md .clio-coder/agents/
+```
+
+Then `/skill clio-author …`, `/author-demo`, or `/run author …`. The declared demo checks in
+`.clio-coder/verifiers.yaml` are operator-authored with `clio-coder verifiers add … --yes`,
+because that catalog is a protected execution grant an agent may not write.
 
 Discovery is uniform across modes: `capabilities()` / `clio-author capabilities` lists every action
 with its lifecycle `phase` + `needs_source` metadata, and `clio-author lifecycle` prints the
