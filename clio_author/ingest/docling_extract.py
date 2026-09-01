@@ -103,7 +103,7 @@ class ExtractionResult(BaseModel):
 # URL handling
 # --------------------------------------------------------------------------- #
 _ARXIV_ID_RE = re.compile(r"\d{4}\.\d{4,5}(?:v\d+)?")
-_BARE_ARXIV_RE = re.compile(r"^\d{4}\.\d{4,5}(?:v\d+)?$")
+_BARE_ARXIV_RE = re.compile(r"^(?:arxiv:)?\d{4}\.\d{4,5}(?:v\d+)?$", re.IGNORECASE)
 
 
 def _is_url(source: str) -> bool:
@@ -129,7 +129,7 @@ def resolve_arxiv_url(source: str) -> str:
 
     # Bare arXiv id, e.g. "2601.23265" or "2601.23265v2".
     if _BARE_ARXIV_RE.match(stripped):
-        return f"https://arxiv.org/pdf/{stripped}.pdf"
+        return f"https://arxiv.org/pdf/{stripped.split(':', 1)[-1]}.pdf"
 
     if _is_url(stripped):
         host = urlparse(stripped).netloc.lower()

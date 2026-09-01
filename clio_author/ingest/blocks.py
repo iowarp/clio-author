@@ -14,10 +14,12 @@ The enrichment block schemas mirror the paper-to-md project (MIT): https://githu
 
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 Detail = Literal["ref", "summary", "full"]
 """How much of a block :meth:`Block.to_context` should render."""
@@ -168,6 +170,19 @@ class MemoryBlocks(BaseModel):
     figures: list[FigureInfo] = Field(default_factory=list)
     equations: list[Equation] = Field(default_factory=list)
     code_blocks: list[CodeBlock] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _load_path(cls, data: Any) -> Any:
+        """Accept a path to a ``blocks.json`` file in place of the blocks themselves.
+
+        Lets a caller that cannot inline 50KB of JSON — an MCP or A2A host — pass
+        ``{"blocks": "paper/blocks.json"}`` and get the same result as the CLI's
+        ``--blocks-file``.
+        """
+        if isinstance(data, (str, Path)):
+            return json.loads(Path(data).read_text(encoding="utf-8"))
+        return data
 
     def all_blocks(self) -> list[Block]:
         """Every block across all kinds, in a stable kind-then-order sequence."""
