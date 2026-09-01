@@ -33,6 +33,8 @@ import re
 import tempfile
 import threading
 import time
+import importlib.util
+import warnings
 from pathlib import Path
 from typing import Any, Literal, Protocol, runtime_checkable
 from urllib.parse import urlencode
@@ -42,6 +44,37 @@ from xml.etree import ElementTree
 from pydantic import BaseModel, Field
 
 from clio_author.retrieval.rag import RetrievalDependencyError
+
+
+class ScholarConfigWarning(UserWarning):
+    """A scholar backend was asked for but cannot run as configured.
+
+    Raised as a warning, never an error: a missing optional dependency degrades the
+    cascade rather than aborting it. It exists so a *permanent* misconfiguration --
+    a key set for a backend whose extra is not installed -- is distinguishable from
+    the transient network failures the cascade also absorbs.
+
+    Silence with ``warnings.filterwarnings("ignore", category=ScholarConfigWarning)``.
+    """
+
+
+# Warn once per process per message: `cite` loops over every candidate, and a
+# missing extra would otherwise emit one identical warning per title.
+_warned: set[str] = set()
+
+
+def _warn_once(message: str) -> None:
+    """Emit ``message`` as a :class:`ScholarConfigWarning` at most once per process."""
+    if message in _warned:
+        return
+    _warned.add(message)
+    warnings.warn(message, ScholarConfigWarning, stacklevel=3)
+
+
+def _httpx_installed() -> bool:
+    """Whether ``httpx`` can be imported, without importing it for real use."""
+    return importlib.util.find_spec("httpx") is not None
+
 
 # Semantic Scholar graph API: title-search endpoint, fields, and limits.
 _S2_SEARCH_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
@@ -586,11 +619,19 @@ class CascadeScholarClient:
     def search_title(
         self, title: str, year_hint: int | None, cutoff_date: str | None
     ) -> list[S2Record]:
-        """Search each configured backend, ignoring backend failures."""
+        """Search each configured backend, ignoring backend failures.
+
+        A missing optional dependency is permanent rather than transient, so it warns
+        once instead of failing silently; every other failure is skipped quietly so a
+        rate-limited or unreachable backend still falls through to the next.
+        """
         merged: list[S2Record] = []
         for client in self.clients:
             try:
                 records = client.search_title(title, year_hint, cutoff_date)
+            except RetrievalDependencyError as exc:
+                _warn_once(f"{type(client).__name__} skipped: {exc}")
+                continue
             except Exception:  # noqa: BLE001 - fallback backends should not abort the cascade
                 continue
             if records:
@@ -613,6 +654,9 @@ class CascadeScholarClient:
                 break
             try:
                 records = client.search_query(query, limit=limit, cutoff_date=cutoff_date)
+            except RetrievalDependencyError as exc:
+                _warn_once(f"{type(client).__name__} skipped: {exc}")
+                continue
             except Exception:  # noqa: BLE001 - fallback backends should not abort the cascade
                 continue
             for record in records:
@@ -1144,6 +1188,7 @@ __all__ = [
     "CascadeScholarClient",
     "FakeScholarClient",
     "RetrievalDependencyError",
+    "ScholarConfigWarning",
     "fuzzy_ratio",
     "is_date_valid",
     "best_match",
@@ -1175,10 +1220,28 @@ def resolve_scholar_client(spec: str | None = None) -> ScholarClient | None:
     if name in ("off", "none", "offline", "disabled", ""):
         return None
     if name in ("auto", "cascade", "all"):
+        # A key set for a backend whose extra is missing is a silent no-op: the
+        # cascade still answers from OpenAlex/Crossref/arXiv, so nothing looks wrong
+        # while the credential the operator configured is never used.
+        if os.environ.get("SEMANTIC_SCHOLAR_API_KEY") and not _httpx_installed():
+            _warn_once(
+                "SEMANTIC_SCHOLAR_API_KEY is set but httpx is not installed, so the "
+                "Semantic Scholar backend is skipped and the key has no effect. "
+                "Install with: uv sync --extra scholar"
+            )
         return CascadeScholarClient(
             [SemanticScholarClient(), OpenAlexClient(), CrossrefClient(), ArxivScholarClient()]
         )
     if name in ("semantic", "semanticscholar", "semantic-scholar", "s2"):
+        # Pinned to a single backend, so there is no fallback to degrade into: say so
+        # at resolution time rather than at the first search.
+        if not _httpx_installed():
+            _warn_once(
+                "CLIO_SCHOLAR selects Semantic Scholar only, but httpx is not "
+                "installed, so every lookup will fail. Install with: "
+                "uv sync --extra scholar, or use CLIO_SCHOLAR=auto to fall back to "
+                "the no-key backends."
+            )
         return SemanticScholarClient()
     if name in ("openalex", "oa"):
         return OpenAlexClient()

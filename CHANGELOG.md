@@ -23,6 +23,16 @@ All notable changes to clio-author are documented here. The format is based on
     checks. Neither is carried by the extension format.
 
 ### Fixed
+- **A scholar backend that cannot run now says so instead of failing silently.** Setting
+  `SEMANTIC_SCHOLAR_API_KEY` without the `scholar` extra made the key a silent no-op: the
+  cascade absorbed `RetrievalDependencyError` exactly like a rate limit, results still arrived
+  from OpenAlex, and nothing indicated the configured credential was never used. The cascade
+  now separates a *permanent* missing-dependency failure from the transient ones it should
+  keep swallowing, and warns once per process with the install command. `resolve_scholar_client`
+  also warns at resolution time when a key is set but the extra is absent, and when
+  `CLIO_SCHOLAR=semantic` pins a backend that has no fallback to degrade into. New
+  `ScholarConfigWarning` category makes the diagnostic filterable; the cascade still never
+  raises.
 - **The A2A server now configures its subagent instead of running bare.** `serve()` built a
   plain `ClioAuthorSubagent()`, so over A2A every scholar action failed with
   `no scholar client configured` (`cite`, `discover`, `research`, grounded `review`) and every

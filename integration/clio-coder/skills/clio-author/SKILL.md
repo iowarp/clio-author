@@ -147,6 +147,10 @@ Check `<action> --help` before composing a command; several flags are not what y
 ## Gotchas
 
 - `orchestrate --inputs-json` takes file **content**, not paths.
+- **A key without its extra is a silent no-op.** `SEMANTIC_SCHOLAR_API_KEY` in `.env.local`
+  does nothing unless `httpx` is installed (`uv sync --extra scholar`); the cascade just
+  falls through to OpenAlex/Crossref/arXiv. Since 0.4.0 this emits a `ScholarConfigWarning`
+  naming the fix — do not ignore it.
 - Keys live in `.env.local` (git-ignored, auto-loaded). Never pass a key on the
   command line. `SEMANTIC_SCHOLAR_API_KEY` and `GEMINI_API_KEY` are both optional.
 - A global `uv tool install` has its **own venv**; `uv sync --extra ...` in the repo
