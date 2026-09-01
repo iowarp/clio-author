@@ -43,6 +43,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from clio_author.env_file import load_env, load_env_file, strip_env_quotes
+
 
 def _write_out(
     path: str, result: dict[str, Any], *, append: bool = False, label: str | None = None
@@ -975,49 +977,12 @@ def _load_kg_checkpoints(resume_dir: str) -> dict[str, Any]:
     return checkpoints
 
 
-def _load_env_file(path: Path) -> None:
-    """Load simple KEY=VALUE lines from ``path`` without overriding real env vars."""
-    if not path.exists():
-        return
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise ValueError(f"could not read env file {path!s}: {exc}") from exc
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("export "):
-            line = line[len("export ") :].strip()
-        if "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if not key or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
-            continue
-        os.environ.setdefault(key, _strip_env_quotes(value.strip()))
-
-
-def _strip_env_quotes(value: str) -> str:
-    """Strip one matching shell-style quote pair from an env-file value."""
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
-        return value[1:-1]
-    return value
-
-
-def _load_cli_env() -> None:
-    """Load env configuration for CLI runs.
-
-    ``CLIO_ENV_FILE=/path/to/file`` is explicit. Otherwise, load ``.env.local``
-    from the current working directory when present, then ``.env`` for users who
-    prefer that conventional name. Both are ignored by this repo's ``.gitignore``.
-    """
-    explicit = os.environ.get("CLIO_ENV_FILE")
-    if explicit:
-        _load_env_file(Path(explicit))
-        return
-    _load_env_file(Path(".env.local"))
-    _load_env_file(Path(".env"))
+# The env-file loaders live in `clio_author.env_file` so the A2A server and the MCP
+# bridge -- separate processes that never see the operator's shell -- load secrets the
+# same way the CLI does. Re-exported under the historical private names.
+_load_env_file = load_env_file
+_strip_env_quotes = strip_env_quotes
+_load_cli_env = load_env
 
 
 def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:

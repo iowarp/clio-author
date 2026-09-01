@@ -23,6 +23,18 @@ All notable changes to clio-author are documented here. The format is based on
     checks. Neither is carried by the extension format.
 
 ### Fixed
+- **The A2A server now configures its subagent instead of running bare.** `serve()` built a
+  plain `ClioAuthorSubagent()`, so over A2A every scholar action failed with
+  `no scholar client configured` (`cite`, `discover`, `research`, grounded `review`) and every
+  text action returned an `[echo]` placeholder — while the identical CLI call succeeded. The
+  new `build_subagent()` resolves `CLIO_LLM`, `CLIO_SCHOLAR`, `CLIO_VISION`, and `CLIO_RAG`
+  exactly as `cli.py` does, and loads the env file first so a server process picks up
+  `SEMANTIC_SCHOLAR_API_KEY` without the operator's shell. `handle_jsonrpc` keeps its bare
+  default and stays hermetic for embedding and tests. Verified live: `cite` over JSON-RPC now
+  returns `completed`, 1/2 verified, `citation_integrity: 0.5`, matching the CLI.
+- **Env-file loading moved to `clio_author/env_file.py`.** It was private to `cli.py`, so the
+  A2A server and MCP bridge — separate processes that never see the operator's shell — could
+  not read `.env.local` or `CLIO_ENV_FILE`. `cli.py` re-exports the historical private names.
 - **`integration/README.md` no longer claims CLIO can consume MCP or the in-process subagent.**
   The host map listed `CLIO → subagent (or MCP / A2A)`; neither is reachable from Clio Coder.
   Replaced with a Clio Coder row pointing at the CLI-backed extension.

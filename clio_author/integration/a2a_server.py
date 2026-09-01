@@ -71,6 +71,38 @@ def _task_from_result(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_subagent() -> ClioAuthorSubagent:
+    """Build a subagent configured from the same env vars the CLI reads.
+
+    A server is a separate process that never sees the operator's shell, so it loads
+    the env file itself and then resolves every client: ``CLIO_LLM`` selects the model
+    (default ``echo``, an offline placeholder), ``CLIO_SCHOLAR`` the citation backend,
+    ``CLIO_VISION`` the figure-agent image route, and ``CLIO_RAG`` the retriever.
+
+    Without this the server would construct a bare adapter, and every scholar action
+    (``cite``, ``discover``, ``research``, grounded ``review``) would fail with
+    ``no scholar client configured`` while every text action returned an ``[echo]``
+    placeholder -- even though the identical CLI call succeeds.
+    """
+    # Lazy: importing the retrieval stack at module scope would make the card and the
+    # pure handler pay for optional extras they never use.
+    import os
+
+    from clio_author.env_file import load_env
+    from clio_author.llm.providers import resolve_llm
+    from clio_author.llm.vision import resolve_vision_client
+    from clio_author.retrieval.rag import resolve_rag_retriever
+    from clio_author.retrieval.scholar import resolve_scholar_client
+
+    load_env()
+    return ClioAuthorSubagent(
+        llm=resolve_llm(os.environ.get("CLIO_LLM")),
+        scholar_client=resolve_scholar_client(os.environ.get("CLIO_SCHOLAR")),
+        vision=resolve_vision_client(os.environ.get("CLIO_VISION")),
+        retriever=resolve_rag_retriever(os.environ.get("CLIO_RAG")),
+    )
+
+
 def handle_jsonrpc(
     request: dict[str, Any], *, subagent: ClioAuthorSubagent | None = None
 ) -> dict[str, Any]:
@@ -80,6 +112,10 @@ def handle_jsonrpc(
     aliases): resolves the skill, runs the action through the adapter, and returns
     the result as a Task artifact. Unknown methods return a JSON-RPC method-not-found
     error. The adapter never raises, so this never throws on a domain error.
+
+    The default subagent is deliberately bare so this stays hermetic for tests and
+    for callers embedding the handler. :func:`serve` passes a configured one from
+    :func:`build_subagent`; production traffic never runs on the bare default.
     """
     sub = subagent or ClioAuthorSubagent()
     rid = request.get("id")
@@ -101,7 +137,7 @@ def serve(host: str = "127.0.0.1", port: int = 8080) -> None:  # pragma: no cove
     """Serve the Agent Card + JSON-RPC over a stdlib HTTP server (no deps)."""
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-    subagent = ClioAuthorSubagent()
+    subagent = build_subagent()
     card = build_agent_card(url=f"http://{host}:{port}/")
 
     class Handler(BaseHTTPRequestHandler):
@@ -146,4 +182,4 @@ def main() -> None:  # pragma: no cover - entry point
     )
 
 
-__all__ = ["handle_jsonrpc", "build_agent_card", "serve", "main"]
+__all__ = ["build_subagent", "handle_jsonrpc", "build_agent_card", "serve", "main"]
