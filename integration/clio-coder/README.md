@@ -17,10 +17,33 @@ carries `skills | prompts | themes` only:
 
 ## Prerequisite
 
-The skill drives a binary; it does not vendor one.
+The skill drives a binary; it does not vendor one. **clio-author is not published to PyPI**, so
+it installs from a checkout or straight from git — never by bare package name.
+
+From a clone (editable, so the tool tracks your working tree):
 
 ```bash
-uv tool install 'clio-author[pdf,scholar,viz]'
+git clone https://github.com/iowarp/clio-author && cd clio-author
+uv tool install --editable '.[pdf,scholar,viz]'
+```
+
+Or without a checkout:
+
+```bash
+uv tool install 'clio-author[pdf,scholar,viz] @ git+https://github.com/iowarp/clio-author'
+```
+
+> **Do not run `uv tool install 'clio-author[pdf,scholar,viz]'`.** With no source, uv resolves
+> the name against PyPI, finds nothing, and fails with *"there are no versions of
+> clio-author[pdf]"*. It removes the existing tool environment before it resolves, so running
+> it **uninstalls a working clio-author and leaves nothing behind**. Recover with the editable
+> command above.
+
+Confirm:
+
+```bash
+uv tool list | grep clio-author     # clio-author v0.4.0
+clio-author capabilities            # 24 actions, 7 roles
 ```
 
 `clio-author` must be on `PATH`, or the session must sit in a clone where `uv run clio-author`
