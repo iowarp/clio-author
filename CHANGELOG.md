@@ -23,6 +23,51 @@ All notable changes to clio-author are documented here. The format is based on
     checks. Neither is carried by the extension format.
 
 ### Fixed
+- **One entity no longer becomes two knowledge-graph nodes sharing an id.** `merge_node`
+  de-duplicated on `(type, normalised label)`, so the same entity extracted in a later batch
+  with a drifted type or label (`self_attention` as `concept`, then as `method`) produced two
+  nodes under one id. Node ids are the edge-reference key, so this left 43% of edges pointing
+  at an ambiguous endpoint on a real paper, over-counted `num_nodes`, and made `kg.html`
+  render a blank page — `vis.DataSet` rejects the whole node set on the first id collision,
+  and because vis-network is cross-origin the exception surfaced only as a bare
+  `"Script error."`. Identity now resolves on `id` first, then `(type, label)`; a differing
+  label is kept as an alias. The viewer also guards its own initialisation, naming the
+  duplicate ids (or a missing vis-network) in the page instead of rendering nothing.
+- **`kg` now asks for the grounding fields its schema already had.** `KG_PROMPT` never
+  requested `evidence` or `confidence`, so every node carried an empty evidence string and a
+  constant `1.0`, leaving `prune_below` with no signal to act on. Both prompts now request a
+  verbatim evidence span and a real confidence, and share one contract so they cannot drift.
+  On a real paper this moved evidence from 0/173 to 158/158 nodes, 97.5% of which are
+  verbatim spans found in the source text.
+- **`ask --all` now injects the whole paper it promises.** `render_scored` defaulted to
+  `detail="summary"`, truncating every block to 280 characters, so `--all` reported
+  `whole_paper: true` while the model saw roughly a fifth of the text. Added a `detail`
+  option (`ref`/`summary`/`full`); `--all` implies `full` (7,990 -> 41,798 characters on a
+  real paper), and the result now reports `detail` and `truncated`. `structured` gained the
+  accurately-named `injected_block_ids`, with `cited_block_ids` kept as an alias — neither is
+  parsed from the answer, so neither is per-answer provenance.
+- **Citation verification no longer reports a year it never checked.** Ties between backends
+  were broken by cascade order, so a record carrying a refreshed 2025 date outranked the real
+  2017 one for the same title; `severity: "exact"` was then reported although no year had been
+  supplied to check against. Selection is now deterministic (highest score, then earliest
+  year — the original publication year is the one a citation wants), and `GradedCitation`
+  carries `year_verified`, `year_conflict`, and `warnings`. `cite` surfaces
+  `citation_warnings` and states that `citation_integrity` measures whether a record is real,
+  not whether its metadata is correct.
+- **BibTeX entries match the record they describe.** An arXiv preprint rendered as
+  `@inproceedings` with `booktitle = {arXiv}`, and a record with no venue produced an
+  `@inproceedings` with no `booktitle` at all, which does not compile cleanly. Entry type now
+  follows the record: `@article`, `@misc` with `eprint`/`archivePrefix` for arXiv,
+  `@inproceedings` for a real venue, `@misc` with an explanatory note when the venue is
+  unknown.
+- **15 payload keys the experts honour are now declared in the manifest.** Keys such as
+  `ingest.out_dir`, `kg.max_sections`, and `research.limit`/`cutoff_date`/`discover` were read
+  from the payload but absent from `payload_keys`, so a host routing off the manifest could
+  not discover them. A contract test now re-derives every routed expert's payload reads and
+  fails on any undeclared key.
+- **`discover` distinguishes a backend that found nothing from one that never ran.**
+  `backends_tried` listed what was *configured*; the new `backend_outcomes` reports what each
+  backend actually did (`ok: 3`, `unavailable: ...`, `network error: ReadTimeout`, `http 401`).
 - **A scholar backend that cannot run now says so instead of failing silently.** Setting
   `SEMANTIC_SCHOLAR_API_KEY` without the `scholar` extra made the key a silent no-op: the
   cascade absorbed `RetrievalDependencyError` exactly like a rate limit, results still arrived

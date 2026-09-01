@@ -95,21 +95,47 @@ def _norm_label(label: str) -> str:
     return re.sub(r"\s+", " ", label.strip().lower())
 
 
+# The JSON contract is shared by :data:`KG_PROMPT` and :func:`ontology_to_prompt`.
+# Keeping it in one place stops the two prompts drifting apart -- they must agree,
+# because both are parsed by the same :func:`_extract_one`.
+_KG_JSON_CONTRACT = (
+    "Respond with a single fenced JSON block:\n"
+    "```json\n<json>\n```\n"
+    'The JSON object must have a "nodes" list (each node an object with '
+    '"id", "label", "type", and optional "description"/"section_path"/'
+    '"evidence"/"confidence") and an '
+    '"edges" list (each edge an object with "source", "target", "relation").\n'
+)
+
+# ``evidence`` and ``confidence`` exist on :class:`KGNode` and are what make a node
+# auditable (and what gives :meth:`KnowledgeGraph.prune_below` a signal to act on),
+# so the extractor has to be asked for them explicitly or they stay at their
+# defaults for every node.
+_KG_GROUNDING_CONTRACT = (
+    '"evidence" must be a SHORT VERBATIM span (<= 200 chars) copied from the '
+    "section that supports the node -- never paraphrased and never invented; omit "
+    'it rather than guess. "confidence" is your 0.0-1.0 certainty that the node is '
+    "actually stated in the text (1.0 = stated verbatim, lower = inferred).\n"
+)
+
+# Stable ids are load-bearing: :meth:`KnowledgeGraph.merge_node` treats a repeated
+# id as the same entity, which is how one concept discussed in several sections
+# collapses into a single node instead of fragmenting.
+_KG_ID_CONTRACT = (
+    "Use short stable ids: the SAME entity MUST get the SAME id every time it "
+    "appears, even in different sections. Only emit edges between ids you also "
+    "list as nodes. The JSON is parsed automatically, so keep the format precise."
+)
+
 KG_PROMPT = (
     "You are a scientific knowledge-graph extractor. Read the paper sections "
     "below and extract a CONTENT knowledge graph of the paper's claims, methods, "
     "datasets, results, metrics, concepts and tasks, plus the relations between "
     "them. This is the paper's content -- NOT a graph of cited papers.\n\n"
-    "Respond with a single fenced JSON block:\n"
-    "```json\n<json>\n```\n"
-    'The JSON object must have a "nodes" list (each node an object with '
-    '"id", "label", "type", and optional "description"/"section_path") and an '
-    '"edges" list (each edge an object with "source", "target", "relation").\n'
-    'Allowed node "type": claim, method, dataset, result, metric, concept, task. '
+    + _KG_JSON_CONTRACT
+    + 'Allowed node "type": claim, method, dataset, result, metric, concept, task. '
     'Allowed edge "relation": uses, evaluates_on, compared_against, reports, '
-    "part_of, related_to.\n"
-    "Use short stable ids; only emit edges between ids you also list as nodes. "
-    "The JSON is parsed automatically, so keep the format precise."
+    "part_of, related_to.\n" + _KG_GROUNDING_CONTRACT + _KG_ID_CONTRACT
 )
 
 
@@ -134,6 +160,29 @@ class KGEdge(BaseModel):
     relation: str
 
 
+def _absorb_node(existing: KGNode, node: KGNode) -> None:
+    """Fold ``node``'s information into ``existing`` in place, losing nothing.
+
+    The longer ``description`` wins and brings its ``section_path`` with it; an
+    empty ``section_path``/``evidence`` on the survivor is backfilled from the
+    incoming node; ``confidence`` takes the higher of the two; and a differing
+    ``label`` is recorded as an alias so the alternate surface form stays
+    searchable instead of being discarded.
+    """
+    if len(node.description) > len(existing.description):
+        existing.description = node.description
+        if node.section_path:
+            existing.section_path = node.section_path
+    if not existing.section_path and node.section_path:
+        existing.section_path = node.section_path
+    if not existing.evidence and node.evidence:
+        existing.evidence = node.evidence
+    existing.confidence = max(existing.confidence, node.confidence)
+    for alias in (*node.aliases, node.label):
+        if alias and alias != existing.label and alias not in existing.aliases:
+            existing.aliases.append(alias)
+
+
 class KnowledgeGraph(BaseModel):
     """A content knowledge graph: typed nodes plus typed relations."""
 
@@ -150,21 +199,27 @@ class KnowledgeGraph(BaseModel):
     def merge_node(self, node: KGNode) -> str:
         """Add ``node`` or merge it into an existing one; return the canonical id.
 
-        De-duplication key is ``(type, normalised label)``. When a node with that
-        key already exists, the longer ``description`` is kept and any new aliases
-        are unioned in; otherwise ``node`` is appended verbatim. Returns the id of
-        the surviving (canonical) node so callers can remap edges.
+        Identity is resolved on two keys, in order:
+
+        1. **``id``.** The extractor is told to reuse one stable id per entity, so
+           the same id arriving twice denotes the same thing even when ``type`` or
+           ``label`` drifted between batches (``self_attention`` typed ``concept``
+           in one section and ``method`` in another). Merging on id is what keeps
+           ids unique across the graph, and edges depend on that: two nodes sharing
+           an id make every edge touching that id ambiguous.
+        2. ``(type, normalised label)``, which catches one entity re-introduced
+           under a fresh id.
+
+        On a merge the longer ``description`` wins (carrying its ``section_path``),
+        a differing ``label`` is kept as an alias rather than dropped, missing
+        ``section_path``/``evidence`` are backfilled, and ``confidence`` takes the
+        higher of the two (a second sighting is corroboration, not doubt).
+        Returns the id of the surviving (canonical) node so callers can remap edges.
         """
         key = (node.type, _norm_label(node.label))
         for existing in self.nodes:
-            if (existing.type, _norm_label(existing.label)) == key:
-                if len(node.description) > len(existing.description):
-                    existing.description = node.description
-                    if node.section_path:
-                        existing.section_path = node.section_path
-                for alias in node.aliases:
-                    if alias and alias not in existing.aliases:
-                        existing.aliases.append(alias)
+            if existing.id == node.id or (existing.type, _norm_label(existing.label)) == key:
+                _absorb_node(existing, node)
                 return existing.id
         self.nodes.append(node)
         return node.id
@@ -403,15 +458,9 @@ def ontology_to_prompt(ontology: Ontology) -> str:
         "below and extract a CONTENT knowledge graph using the paper-specific "
         f"schema discovered for this paper (domain: {ontology.paper_domain}). "
         "This is the paper's content -- NOT a graph of cited papers.\n\n"
-        "Respond with a single fenced JSON block:\n"
-        "```json\n<json>\n```\n"
-        'The JSON object must have a "nodes" list (each node an object with '
-        '"id", "label", "type", and optional "description"/"section_path") and an '
-        '"edges" list (each edge an object with "source", "target", "relation").\n'
-        f'Allowed node "type":\n{entity_lines}\n'
-        f'Allowed edge "relation":\n{edge_lines}\n'
-        "Use short stable ids; only emit edges between ids you also list as nodes. "
-        "The JSON is parsed automatically, so keep the format precise."
+        + _KG_JSON_CONTRACT
+        + f'Allowed node "type":\n{entity_lines}\n'
+        f'Allowed edge "relation":\n{edge_lines}\n' + _KG_GROUNDING_CONTRACT + _KG_ID_CONTRACT
     )
 
 
@@ -606,8 +655,45 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   document.getElementById("meta").textContent =
     DATA.counts.nodes + " nodes · " + DATA.counts.edges + " relations";
 
-  const nodes = new vis.DataSet(DATA.nodes);
-  const edges = new vis.DataSet(DATA.edges);
+  // Anything that throws below leaves an empty <div id="net">, which looks
+  // identical to "the graph is empty" and gives the reader nothing to act on.
+  // vis-network is cross-origin, so its exceptions reach window.onerror masked
+  // as a bare "Script error." -- report in-page instead of failing silently.
+  function fail(message, detail) {
+    const net = document.getElementById("net");
+    if (!net) return;
+    net.innerHTML =
+      '<div style="padding:24px;font:14px/1.5 system-ui,sans-serif;color:#900">' +
+      '<strong>The graph could not be rendered.</strong><br>' +
+      message +
+      (detail ? '<pre style="white-space:pre-wrap;color:#444">' + detail + '</pre>' : '') +
+      '</div>';
+  }
+
+  if (typeof vis === "undefined") {
+    fail("The vis-network library did not load. This page fetches it from " +
+         "unpkg.com at view time, so it needs network access (and is blocked " +
+         "by an offline machine, a firewall, or a strict CSP).");
+    throw new Error("vis-network unavailable");
+  }
+
+  let nodes, edges;
+  try {
+    nodes = new vis.DataSet(DATA.nodes);
+    edges = new vis.DataSet(DATA.edges);
+  } catch (err) {
+    // The usual cause is a duplicate node id: vis.DataSet requires unique ids
+    // and rejects the whole set on the first collision.
+    const ids = DATA.nodes.map(function (n) { return n.id; });
+    const dupes = ids.filter(function (id, i) { return ids.indexOf(id) !== i; });
+    fail("The node data was rejected by vis-network." +
+         (dupes.length
+            ? " " + dupes.length + " duplicate node id(s) found: " +
+              dupes.slice(0, 10).join(", ")
+            : ""),
+         String(err && err.message ? err.message : err));
+    throw err;
+  }
   const container = document.getElementById("net");
   const options = {
     groups: DATA.groups,

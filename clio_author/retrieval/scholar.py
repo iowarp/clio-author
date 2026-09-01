@@ -185,6 +185,10 @@ class SemanticScholarClient:
         self.rate_state_path = (
             Path(rate_state_path) if rate_state_path is not None else _S2_RATE_STATE
         )
+        # Outcome of the most recent call. Every failure path here degrades to an
+        # empty list, which makes "the key was refused" and "there are genuinely no
+        # such papers" indistinguishable to the caller; this records which it was.
+        self.last_status: str = "not run"
         self._clock = _clock
         self._sleep = _sleep
 
@@ -254,18 +258,23 @@ class SemanticScholarClient:
                 response = httpx.get(
                     _S2_SEARCH_URL, headers=headers, params=params, timeout=self.timeout
                 )
-            except Exception:  # noqa: BLE001 - network failures degrade to no results
+            except Exception as exc:  # noqa: BLE001 - network failures degrade to no results
+                self.last_status = f"network error: {type(exc).__name__}"
                 return []
             if response.status_code == 200:
                 break
             if response.status_code != 429 or attempt == 1:
+                self.last_status = f"http {response.status_code}"
                 return []
         else:  # pragma: no cover - loop always returns or breaks
+            self.last_status = "http 429: retries exhausted"
             return []
         try:
             data = response.json().get("data", [])
         except Exception:  # noqa: BLE001 - malformed body degrades to no results
+            self.last_status = "malformed response body"
             return []
+        self.last_status = "ok"
         return [_record_from_s2(item) for item in data if item.get("title")]
 
     def _throttle(self) -> None:
@@ -615,6 +624,11 @@ class CascadeScholarClient:
 
     def __init__(self, clients: list[ScholarClient]) -> None:
         self.clients = clients
+        # Per-backend outcome of the most recent search, so a caller can report
+        # what actually ran rather than what was merely configured. A backend whose
+        # optional dependency is missing is skipped silently apart from a one-time
+        # warning, which otherwise looks identical to "searched and found nothing".
+        self.last_outcomes: dict[str, str] = {}
 
     def search_title(
         self, title: str, year_hint: int | None, cutoff_date: str | None
@@ -626,14 +640,19 @@ class CascadeScholarClient:
         rate-limited or unreachable backend still falls through to the next.
         """
         merged: list[S2Record] = []
+        self.last_outcomes = {}
         for client in self.clients:
+            name = type(client).__name__
             try:
                 records = client.search_title(title, year_hint, cutoff_date)
             except RetrievalDependencyError as exc:
-                _warn_once(f"{type(client).__name__} skipped: {exc}")
+                _warn_once(f"{name} skipped: {exc}")
+                self.last_outcomes[name] = f"unavailable: {exc}"
                 continue
             except Exception:  # noqa: BLE001 - fallback backends should not abort the cascade
+                self.last_outcomes[name] = "error"
                 continue
+            self.last_outcomes[name] = f"ok: {len(records)}" if records else "ok: 0"
             if records:
                 merged.extend(records)
         return merged
@@ -649,16 +668,23 @@ class CascadeScholarClient:
         """
         merged: list[S2Record] = []
         seen: set[str] = set()
+        self.last_outcomes = {}
         for client in self.clients:
+            name = type(client).__name__
             if len(merged) >= limit:
-                break
+                self.last_outcomes[name] = "not reached: limit already met"
+                continue
             try:
                 records = client.search_query(query, limit=limit, cutoff_date=cutoff_date)
             except RetrievalDependencyError as exc:
-                _warn_once(f"{type(client).__name__} skipped: {exc}")
+                _warn_once(f"{name} skipped: {exc}")
+                self.last_outcomes[name] = f"unavailable: {exc}"
                 continue
             except Exception:  # noqa: BLE001 - fallback backends should not abort the cascade
+                self.last_outcomes[name] = "error"
                 continue
+            status = getattr(client, "last_status", "ok")
+            self.last_outcomes[name] = f"ok: {len(records)}" if status == "ok" else str(status)
             for record in records:
                 key = _normalise_space(record.title).lower()
                 if not key or key in seen:
@@ -847,6 +873,33 @@ def is_date_valid(publication_date: str | None, year: int | None, cutoff_date: s
     return True
 
 
+def _selection_sort_key(pair: tuple[int, S2Record]) -> tuple[int, int]:
+    """Rank ``(score, record)`` best-first: highest score, then earliest year.
+
+    A record with no year sorts last among equals rather than winning by accident.
+    """
+    score, record = pair
+    return (-score, record.year if record.year is not None else 9999)
+
+
+def year_conflicts(records: list[S2Record], title: str, *, exact_score: int = 92) -> list[int]:
+    """Distinct years reported for ``title`` by records that match it closely.
+
+    Two backends holding the same paper under different years is a real and silent
+    failure mode: one of them is wrong, and picking either without saying so hands
+    the caller a confident citation with a bad date. Returns the sorted distinct
+    years (``[]`` when there is nothing to disagree about).
+    """
+    years = {
+        record.year
+        for record in records
+        if record.title
+        and record.year is not None
+        and fuzzy_ratio(title.lower(), record.title.lower()) >= exact_score
+    }
+    return sorted(years) if len(years) > 1 else []
+
+
 def best_match(
     query: Reference,
     records: list[S2Record],
@@ -865,8 +918,7 @@ def best_match(
     the record's year matches ``query.year_hint``. The highest-scoring record is
     returned only when its score is strictly greater than ``threshold``.
     """
-    best: S2Record | None = None
-    best_score = 0
+    eligible: list[tuple[int, S2Record]] = []
     for record in records:
         if not record.title:
             continue
@@ -877,10 +929,17 @@ def best_match(
         score = fuzzy_ratio(query.query_title.lower(), record.title.lower())
         if query.year_hint is not None and record.year == query.year_hint:
             score += year_bonus
-        if score > best_score:
-            best_score = score
-            best = record
-    if best is None or best_score <= threshold:
+        eligible.append((score, record))
+    if not eligible:
+        return None
+    # Ties used to be broken by cascade order, so whichever backend happened to be
+    # configured first won. That silently propagated a wrong year when two backends
+    # held the same paper with different dates (a metadata refresh dated 2025 beat
+    # the real 2017 record). Prefer the earliest year: for a citation the original
+    # publication year is the correct one, and it is deterministic besides.
+    eligible.sort(key=_selection_sort_key)
+    best_score, best = eligible[0]
+    if best_score <= threshold:
         return None
     key = mint_citation_key(best)
     return VerifiedCitation(
@@ -973,9 +1032,39 @@ def verified_coverage(
     return min_required, ratio, len(verified) >= min_required
 
 
+def _arxiv_id(record: S2Record) -> str | None:
+    """Return the bare arXiv id for ``record`` when it is an arXiv preprint."""
+    paper_id = record.paper_id or ""
+    if paper_id.startswith("arxiv:"):
+        return paper_id.split(":", 1)[1] or None
+    external = record.external_ids or {}
+    for name in ("ArXiv", "arxiv", "ARXIV"):
+        value = external.get(name)
+        if value:
+            return str(value)
+    return None
+
+
 def _bibtex(record: S2Record, key: str) -> str:
-    """Render a BibTeX entry (``@article`` if a journal is present else ``@inproceedings``)."""
-    entry_type = "article" if record.journal else "inproceedings"
+    """Render a BibTeX entry, choosing the entry type the record can actually support.
+
+    ``@article`` when there is a journal, ``@misc`` for an arXiv preprint (with
+    ``eprint``/``archivePrefix`` rather than a bogus ``booktitle = {arXiv}``),
+    ``@inproceedings`` when there is a real venue, and ``@misc`` as the fallback --
+    an ``@inproceedings`` with no ``booktitle`` is malformed and most styles will
+    either drop it or render an incomplete reference.
+    """
+    arxiv = _arxiv_id(record)
+    is_arxiv_venue = (record.venue or "").strip().lower() in {"arxiv", "arxiv.org"}
+    if record.journal:
+        entry_type = "article"
+    elif arxiv or is_arxiv_venue:
+        entry_type = "misc"
+    elif record.venue:
+        entry_type = "inproceedings"
+    else:
+        entry_type = "misc"
+
     fields: list[tuple[str, str]] = []
     if record.authors:
         fields.append(("author", " and ".join(record.authors)))
@@ -983,10 +1072,17 @@ def _bibtex(record: S2Record, key: str) -> str:
         fields.append(("title", record.title))
     if record.journal:
         fields.append(("journal", record.journal))
-    elif record.venue:
+    elif record.venue and entry_type == "inproceedings":
         fields.append(("booktitle", record.venue))
     if record.year is not None:
         fields.append(("year", str(record.year)))
+    if entry_type == "misc" and arxiv:
+        fields.append(("eprint", arxiv))
+        fields.append(("archivePrefix", "arXiv"))
+    if entry_type == "misc" and not arxiv and not record.journal:
+        # Say why the venue is absent instead of shipping a reference that looks
+        # complete but silently lost its publication venue.
+        fields.append(("note", "venue not reported by the scholarly backend"))
     body = ",\n".join(f"  {name} = {{{value}}}" for name, value in fields)
     return f"@{entry_type}{{{key},\n{body}\n}}"
 
@@ -1019,6 +1115,12 @@ class GradedCitation(BaseModel):
     matched_year: int | None = None
     citation_key: str | None = None
     alternatives: list[str] = Field(default_factory=list)
+    # ``severity`` answers "is this a real paper", not "is this metadata right".
+    # Without a supplied year there is nothing to check the matched year against,
+    # and reporting "exact" then reads as though the date had been confirmed.
+    year_verified: bool = False
+    year_conflict: list[int] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 def grade_reference(
@@ -1044,21 +1146,51 @@ def grade_reference(
             continue
         score = fuzzy_ratio(reference.query_title.lower(), record.title.lower())
         scored.append((score, record))
-    scored.sort(key=lambda pair: pair[0], reverse=True)
+    # Same deterministic tie-break as :func:`best_match`, so the graded verdict and
+    # the BibTeX cannot disagree about which record they are describing.
+    scored.sort(key=_selection_sort_key)
 
     if not scored or scored[0][0] <= threshold:
+        # ``warnings`` is documented as carrying every caveat for a candidate, so the
+        # most serious verdict of all must not be the one that arrives empty.
         return GradedCitation(
             candidate_title=reference.query_title,
             candidate_year=reference.year_hint,
             severity="major",
             score=float(scored[0][0]) if scored else 0.0,
             alternatives=[rec.title for _s, rec in scored[:max_alternatives] if rec.title],
+            year_verified=False,
+            warnings=[
+                "no real record matched this title above the similarity threshold "
+                "-- the citation may be fabricated or badly mistyped"
+            ],
         )
 
     best_score, best = scored[0]
     year_ok = reference.year_hint is None or best.year == reference.year_hint
     severity: Severity = "exact" if (best_score >= exact_score and year_ok) else "minor"
     alternatives = [rec.title for _s, rec in scored[1 : 1 + max_alternatives] if rec.title]
+
+    year_verified = reference.year_hint is not None and best.year == reference.year_hint
+    conflict = year_conflicts(
+        [rec for _s, rec in scored], reference.query_title, exact_score=exact_score
+    )
+    warnings: list[str] = []
+    if not year_verified:
+        warnings.append(
+            "year not verified: no year was supplied to check the matched record against"
+            if reference.year_hint is None
+            else f"year mismatch: asked for {reference.year_hint}, matched {best.year}"
+        )
+    if conflict:
+        warnings.append(
+            "backends disagree on the year for this title: "
+            + ", ".join(str(y) for y in conflict)
+            + f" (using {best.year})"
+        )
+    if best.year is None:
+        warnings.append("matched record has no year")
+
     return GradedCitation(
         candidate_title=reference.query_title,
         candidate_year=reference.year_hint,
@@ -1068,6 +1200,9 @@ def grade_reference(
         matched_year=best.year,
         citation_key=mint_citation_key(best),
         alternatives=alternatives,
+        year_verified=year_verified,
+        year_conflict=conflict,
+        warnings=warnings,
     )
 
 

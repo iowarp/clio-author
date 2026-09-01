@@ -1,0 +1,38 @@
+version: 1
+checks:
+  - id: author-capabilities
+    description: clio-author exposes its 24 actions and 7 roles
+    command:
+      - uv
+      - run
+      - clio-author
+      - capabilities
+    cwd: .
+    timeoutMs: 120000
+    tags:
+      - demo
+      - author
+  - id: test-author
+    description: Run the clio-author test suite
+    command:
+      - uv
+      - run
+      - pytest
+      - -q
+    cwd: .
+    timeoutMs: 120000
+    tags:
+      - test
+      - python
+  - id: author-grounding-benchmark
+    description: End-to-end grounding benchmark
+    command:
+      - uv
+      - run
+      - python
+      - scripts/benchmark_grounding.py
+    cwd: .
+    timeoutMs: 120000
+    tags:
+      - demo
+      - benchmark

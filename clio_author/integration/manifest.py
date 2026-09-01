@@ -24,7 +24,7 @@ ACTIONS: list[dict[str, Any]] = [
     {
         "action": "ingest",
         "description": "Convert an arXiv id / URL / PDF path into clean Markdown + memory blocks.",
-        "payload_keys": ["source"],
+        "payload_keys": ["source", "out_dir"],
     },
     {
         "action": "gather",
@@ -42,7 +42,7 @@ ACTIONS: list[dict[str, Any]] = [
             "papers and (with a new-paper idea) recreate a grounded evaluation "
             "plan: datasets, baselines, metrics, ablations, protocol, threats."
         ),
-        "payload_keys": ["blocks", "sources", "markdown", "text", "idea", "out_dir"],
+        "payload_keys": ["blocks", "sources", "markdown", "text", "paper", "idea", "out_dir"],
     },
     {
         "action": "ask",
@@ -51,12 +51,30 @@ ACTIONS: list[dict[str, Any]] = [
             "paper.md (markdown/text), or sources (a PDF/arXiv id is auto-ingested). "
             "k controls how many blocks are injected; all=True uses the whole paper."
         ),
-        "payload_keys": ["question", "blocks", "markdown", "text", "sources", "k", "all"],
+        "payload_keys": [
+            "question",
+            "blocks",
+            "markdown",
+            "text",
+            "sources",
+            "k",
+            "all",
+            "detail",
+        ],
     },
     {
         "action": "review",
         "description": "Produce a structured, persona-conditioned peer review of a paper.",
-        "payload_keys": ["paper", "persona", "ground", "figures", "blocks", "sources"],
+        "payload_keys": [
+            "paper",
+            "markdown",
+            "title",
+            "persona",
+            "ground",
+            "figures",
+            "blocks",
+            "sources",
+        ],
     },
     {
         "action": "meta_review",
@@ -69,12 +87,20 @@ ACTIONS: list[dict[str, Any]] = [
             "Draft an author rebuttal addressing a review point by point "
             "(grounded; invents nothing)."
         ),
-        "payload_keys": ["paper", "review", "review_text", "target"],
+        "payload_keys": [
+            "paper",
+            "draft",
+            "markdown",
+            "review",
+            "review_text",
+            "critic_notes",
+            "target",
+        ],
     },
     {
         "action": "cite",
         "description": "Verify citation candidates and emit suggestions only (never overwrites).",
-        "payload_keys": ["candidates", "out_dir"],
+        "payload_keys": ["candidates", "references", "out_dir"],
     },
     {
         "action": "write",
@@ -85,6 +111,7 @@ ACTIONS: list[dict[str, Any]] = [
             "blocks",
             "sources",
             "source",
+            "materials",
             "vision",
             "out_path",
         ],
@@ -132,6 +159,7 @@ ACTIONS: list[dict[str, Any]] = [
             "stages",
             "checkpoints",
             "max_edges",
+            "max_sections",
         ],
     },
     {
@@ -146,6 +174,7 @@ ACTIONS: list[dict[str, Any]] = [
             "outline",
             "blocks",
             "sources",
+            "source",
             "candidates",
             "out_dir",
         ],
@@ -165,6 +194,9 @@ ACTIONS: list[dict[str, Any]] = [
             "sources",
             "source",
             "depth",
+            "discover",
+            "limit",
+            "cutoff_date",
             "out_dir",
         ],
     },

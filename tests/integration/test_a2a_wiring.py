@@ -27,9 +27,7 @@ def test_build_subagent_resolves_every_client_from_the_environment(monkeypatch) 
     monkeypatch.setattr(
         vision_mod, "resolve_vision_client", lambda spec: seen.setdefault("vision", spec)
     )
-    monkeypatch.setattr(
-        rag_mod, "resolve_rag_retriever", lambda spec: seen.setdefault("rag", spec)
-    )
+    monkeypatch.setattr(rag_mod, "resolve_rag_retriever", lambda spec: seen.setdefault("rag", spec))
 
     monkeypatch.setenv("CLIO_ENV_FILE", str(Path("/nonexistent-env-file")))
     monkeypatch.setenv("CLIO_LLM", "echo")

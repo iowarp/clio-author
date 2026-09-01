@@ -185,7 +185,20 @@ def _build_parser() -> argparse.ArgumentParser:
         "--all",
         dest="all_blocks",
         action="store_true",
-        help="Inject the WHOLE paper (every block) — best for 'contributions/experiments' questions.",
+        help=(
+            "Inject the WHOLE paper (every block, at full text) — best for "
+            "'contributions/experiments' questions. Implies --detail full."
+        ),
+    )
+    p_ask.add_argument(
+        "--detail",
+        choices=["ref", "summary", "full"],
+        default=None,
+        help=(
+            "How much of each block to inject: full = whole block text, "
+            "summary = first 280 chars (default for top-k), ref = id + title only. "
+            "--all implies full."
+        ),
     )
     _add_format(p_ask)
     _add_json(p_ask)
@@ -273,7 +286,6 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_format(p_write)
     _add_json(p_write)
-
 
     p_plan = sub.add_parser("plan", help="Turn an idea or outline into per-section writing plans.")
     p_plan.add_argument("--idea", default=None, help="The research idea / thesis (inline).")
@@ -461,7 +473,6 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_format(p_check_refs)
     _add_json(p_check_refs)
 
-
     p_audit = sub.add_parser(
         "audit",
         help="Deterministic manuscript completeness audit (sections/budgets/placeholders/cites).",
@@ -492,7 +503,6 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_format(p_audit)
     _add_json(p_audit)
-
 
     p_cite_support = sub.add_parser(
         "cite_support",
@@ -571,7 +581,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Also compile paper.pdf from the .tex (needs --out-dir and a LaTeX engine).",
     )
     _add_json(p_export)
-
 
     p_revise = sub.add_parser(
         "revise",
@@ -1031,6 +1040,8 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
             payload["k"] = args.k
         if getattr(args, "all_blocks", False):
             payload["all"] = True
+        if getattr(args, "detail", None) is not None:
+            payload["detail"] = args.detail
         payload["format"] = args.fmt
     elif command == "review":
         if args.paper_file is not None:

@@ -9,7 +9,9 @@ from clio_author.ingest.blocks import MemoryBlocks, SectionBlock
 
 @pytest.fixture
 def blocks_file(tmp_path):
-    blocks = MemoryBlocks(sections=[SectionBlock(title="Intro", section_path="Intro", text="hello", start_line=1)])
+    blocks = MemoryBlocks(
+        sections=[SectionBlock(title="Intro", section_path="Intro", text="hello", start_line=1)]
+    )
     path = tmp_path / "blocks.json"
     path.write_text(blocks.model_dump_json(), encoding="utf-8")
     return path

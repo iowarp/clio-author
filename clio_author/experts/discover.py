@@ -90,7 +90,9 @@ class DiscoverExpert(BaseAgent):
         ``cutoff_date`` (optional ``"YYYY-MM"``), and ``out_dir`` (optional).
         With a configured :class:`ScholarClient` it calls :func:`discover_papers`
         and returns ``structured={"papers": [...], "count": N}``, a one-line
-        summary as ``content``, and ``metadata={count, backends_tried}``. When
+        summary as ``content``, and ``metadata={count, backends_tried,
+        backend_outcomes}`` (``backends_tried`` is what was *configured*;
+        ``backend_outcomes`` is what each one actually did). When
         ``out_dir`` is set it writes ``discovered.json`` and ``discovered.bib``
         there (best-effort). With no client it reports an error-flagged output.
         """
@@ -131,7 +133,12 @@ class DiscoverExpert(BaseAgent):
             agent=self.name,
             content=content,
             structured={"papers": papers, "count": len(papers)},
-            metadata={"count": len(papers), "backends_tried": backends_tried, "wrote": wrote},
+            metadata={
+                "count": len(papers),
+                "backends_tried": backends_tried,
+                "backend_outcomes": _backend_outcomes(self._scholar),
+                "wrote": wrote,
+            },
         )
         session.add(output)
         return output
@@ -210,11 +217,28 @@ def _write_discovered(
 
 
 def _backends_tried(client: ScholarClient) -> list[str]:
-    """Name the backend(s) a (possibly cascading) client will try."""
+    """Name the backend(s) a (possibly cascading) client is *configured* with.
+
+    Configuration is not availability: a backend whose optional dependency is
+    missing is skipped at search time. Use :func:`_backend_outcomes` for what
+    actually ran.
+    """
     clients = getattr(client, "clients", None)
     if isinstance(clients, list) and clients:
         return [type(sub).__name__ for sub in clients]
     return [type(client).__name__]
+
+
+def _backend_outcomes(client: ScholarClient) -> dict[str, str]:
+    """Per-backend outcome of the search just run (``{}`` when unrecorded).
+
+    Values are ``"ok: <n>"``, ``"unavailable: <reason>"``, ``"error"``, or
+    ``"not reached: ..."``. This is what distinguishes "searched and found
+    nothing" from "never ran because httpx is not installed" -- the two are
+    indistinguishable in ``backends_tried`` alone.
+    """
+    outcomes = getattr(client, "last_outcomes", None)
+    return dict(outcomes) if isinstance(outcomes, dict) else {}
 
 
 __all__ = ["DiscoverExpert", "DISCOVER_SYSTEM_PROMPT"]

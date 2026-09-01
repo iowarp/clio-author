@@ -18,7 +18,7 @@ from typing import Any
 from clio_author.harness.base import BaseAgent
 from clio_author.harness.session import SessionContext
 from clio_author.harness.types import AgentOutput, Message, Task
-from clio_author.ingest.blocks import MemoryBlocks, SectionBlock
+from clio_author.ingest.blocks import Detail, MemoryBlocks, SectionBlock
 from clio_author.llm.client import EchoLLMClient, LLMClient
 from clio_author.retrieval.rag import RagRetriever, render_scored
 
@@ -79,10 +79,13 @@ class PaperQAExpert(BaseAgent):
 
         Reads the question (``payload["question"]`` or ``task.description``) and
         the blocks (a :class:`MemoryBlocks` or its ``model_dump()`` dict). It
-        indexes the blocks, retrieves the top-``k``, injects them as context,
+        indexes the blocks, retrieves the top-``k``, renders them at ``detail``
+        (``all`` implies ``full``, so the whole paper really is whole), injects
+        them as context,
         and calls the LLM. Returns an :class:`AgentOutput` with the answer as
-        ``content``, ``structured={"cited_block_ids", "retrieved"}`` and
-        ``metadata={"k", "num_blocks"}``. Never raises: missing inputs or any
+        ``content``, ``structured={"injected_block_ids", "cited_block_ids",
+        "sources", "retrieved"}`` and ``metadata={"k", "num_blocks",
+        "whole_paper", "detail", "truncated", ...}``. Never raises: missing inputs or any
         failure produce an error-flagged output (appended once).
         """
         payload = task.payload
@@ -98,6 +101,7 @@ class PaperQAExpert(BaseAgent):
                 )
             num_blocks = len(blocks.all_blocks())
             k = self._resolve_k(payload, num_blocks)
+            detail = self._resolve_detail(payload)
 
             retriever = self._retriever or RagRetriever()
             # An injected shared retriever is re-indexed on every run and so is
@@ -105,7 +109,7 @@ class PaperQAExpert(BaseAgent):
             # Sequential/Engine path; relevant under a Parallel pattern).
             retriever.index(blocks)
             scored = retriever.search(question, k=k)
-            context, cited_block_ids = render_scored(scored)
+            context, injected_block_ids = render_scored(scored, detail)
 
             messages = [
                 Message(role="system", content=self.system_prompt),
@@ -123,14 +127,27 @@ class PaperQAExpert(BaseAgent):
             agent=self.name,
             content=answer,
             structured={
-                "cited_block_ids": cited_block_ids,
+                # The blocks put *into* the prompt. Named for what it is: these are
+                # not parsed back out of the answer, so at k >= num_blocks it is
+                # simply every block and carries no per-answer signal.
+                "injected_block_ids": injected_block_ids,
+                # Legacy alias, same value. Kept so existing callers keep working;
+                # "cited" overstates it, prefer ``injected_block_ids``.
+                "cited_block_ids": injected_block_ids,
                 "sources": sources,
                 "retrieved": [item.to_dict() for item in scored],
             },
             metadata={
                 "k": k,
                 "num_blocks": num_blocks,
+                # "every block was injected" -- which is not the same as "the whole
+                # text was injected": see ``detail``/``truncated`` below.
                 "whole_paper": k >= num_blocks,
+                "detail": detail,
+                # At any detail below "full" each block is abridged before it enters
+                # the prompt ("summary" caps every block at 280 chars), so the model
+                # sees section openings rather than section text.
+                "truncated": detail != "full",
                 "sources": sources,
                 "grounded_in": _grounded_in(sources),
             },
@@ -173,6 +190,30 @@ class PaperQAExpert(BaseAgent):
         if payload.get("all") or k <= 0:
             return max(num_blocks, 1)
         return min(k, num_blocks) if num_blocks else k
+
+    @staticmethod
+    def _resolve_detail(payload: dict[str, Any]) -> Detail:
+        """Detail level for context rendering: ``ref`` | ``summary`` | ``full``.
+
+        An explicit ``detail`` always wins. Otherwise ``all`` implies ``full``:
+        asking for the whole paper and receiving every block truncated to 280
+        characters is not what the flag promises. Bare top-k keeps ``summary``,
+        which is what makes a wide k affordable.
+
+        Returns the :data:`~clio_author.ingest.blocks.Detail` literal rather than a
+        bare ``str`` so a typo in a caller is a type error, not a silent fallback
+        to truncated context.
+        """
+        raw = payload.get("detail")
+        if isinstance(raw, str):
+            lowered = raw.lower()
+            if lowered == "ref":
+                return "ref"
+            if lowered == "summary":
+                return "summary"
+            if lowered == "full":
+                return "full"
+        return "full" if payload.get("all") else "summary"
 
 
 def _sources(scored: list[Any]) -> list[dict[str, Any]]:

@@ -141,11 +141,22 @@ class CitationExpert(BaseAgent):
                 "ratio": ratio,
                 "meets_90pct": meets,
             }
+            citation_warnings = [
+                {"title": g.candidate_title, "warnings": g.warnings} for g in graded if g.warnings
+            ]
             content = (
                 f"Verified {len(verified)}/{len(candidates)} candidate citations "
                 f"(>=90% target: {'met' if meets else 'not met'}). "
                 "Emitted suggestions only; no existing bibliography was modified."
             )
+            if citation_warnings:
+                # citation_integrity only says the papers are real. Metadata caveats
+                # have to travel with the result or they are simply never seen.
+                content += (
+                    f" {len(citation_warnings)} candidate(s) carry metadata warnings "
+                    "(see metadata.citation_warnings) -- check the year/venue before "
+                    "pasting the BibTeX."
+                )
         except _RefusedWriteError as exc:
             return self._error(session, str(exc))
         except Exception as exc:  # noqa: BLE001 - never raise; flag error on output
@@ -167,7 +178,13 @@ class CitationExpert(BaseAgent):
                 "num_verified": len(verified),
                 "meets_90pct": meets,
                 "severity_counts": grades["counts"],
+                # The fraction of candidates that map to a REAL record -- i.e. "none of
+                # these are fabricated". It says nothing about whether the year or
+                # venue is right; read citation_warnings for that.
                 "citation_integrity": grades["citation_integrity"],
+                "citation_integrity_means": "fraction of candidates matching a real record; not a metadata-correctness score",
+                "citation_warnings": citation_warnings,
+                "years_verified": sum(1 for g in graded if g.year_verified),
                 "wrote": wrote,
             },
         )
