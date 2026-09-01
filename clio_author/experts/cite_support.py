@@ -48,7 +48,7 @@ from clio_author.harness.base import BaseAgent
 from clio_author.harness.session import SessionContext
 from clio_author.harness.types import AgentOutput, Message, Task
 from clio_author.llm.client import EchoLLMClient, LLMClient
-from clio_author.tools.files import FileToolError, SafeFiles
+from clio_author.tools.files import SafeFiles, wants_overwrite, write_artifacts
 
 # A resolver maps a citation key + its normalized record to the cited paper's
 # full text (or None when it cannot be fetched). It is the network seam for
@@ -267,7 +267,7 @@ class CiteSupportExpert(BaseAgent):
             return self._error(session, str(exc))
 
         summary = _render_summary(result)
-        wrote = _maybe_write(task.payload, result, summary)
+        wrote, write_skipped = _maybe_write(task.payload, result, summary)
         output = AgentOutput(
             agent=self.name,
             content=summary,
@@ -278,6 +278,7 @@ class CiteSupportExpert(BaseAgent):
                 "num_pairs": len(result.items),
                 "mode": mode,
                 "wrote": wrote,
+                **({"write_skipped": write_skipped} if write_skipped else {}),
             },
         )
         session.add(output)
@@ -400,25 +401,25 @@ def render_cite_support_markdown(result: CiteSupportResult, summary: str) -> str
     return "\n".join(lines) + "\n"
 
 
-def _maybe_write(payload: dict[str, Any], result: CiteSupportResult, summary: str) -> list[str]:
+def _maybe_write(
+    payload: dict[str, Any], result: CiteSupportResult, summary: str
+) -> tuple[list[str], list[str]]:
     out_dir = payload.get("out_dir")
     if not out_dir:
-        return []
+        return [], []
     files = SafeFiles(Path(str(out_dir)))
     try:
         files.root.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        return []
-    wrote: list[str] = []
-    for name, content in (
-        ("cite_support.json", json.dumps(result.model_dump(), indent=2)),
-        ("cite_support.md", render_cite_support_markdown(result, summary)),
-    ):
-        try:
-            wrote.append(str(files.write_new(name, content)))
-        except FileToolError:
-            continue
-    return wrote
+    except OSError as exc:
+        return [], [f"{out_dir}: {exc}"]
+    return write_artifacts(
+        files,
+        (
+            ("cite_support.json", json.dumps(result.model_dump(), indent=2)),
+            ("cite_support.md", render_cite_support_markdown(result, summary)),
+        ),
+        overwrite=wants_overwrite(payload),
+    )
 
 
 __all__ = [

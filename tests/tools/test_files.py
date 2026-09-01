@@ -12,6 +12,8 @@ from clio_author.tools.files import (
     RefusedWriteError,
     SafeFiles,
     SymlinkRefusedError,
+    wants_overwrite,
+    write_artifacts,
 )
 
 
@@ -125,3 +127,61 @@ def test_apply_edit_no_stray_temp_files(tmp_path: Path) -> None:
 
     leftovers = [p.name for p in tmp_path.iterdir() if p.name.startswith(".")]
     assert leftovers == []
+
+
+def test_write_new_refuses_existing_file_by_default(tmp_path: Path) -> None:
+    files = SafeFiles(tmp_path)
+    files.write_new("paper.tex", "v1")
+
+    with pytest.raises(RefusedWriteError):
+        files.write_new("paper.tex", "v2")
+    assert (tmp_path / "paper.tex").read_text(encoding="utf-8") == "v1"
+
+
+def test_write_new_overwrite_replaces_content(tmp_path: Path) -> None:
+    files = SafeFiles(tmp_path)
+    files.write_new("paper.tex", "the old and longer content")
+
+    files.write_new("paper.tex", "v2", overwrite=True)
+    # O_TRUNC, so no tail of the longer previous content survives.
+    assert (tmp_path / "paper.tex").read_text(encoding="utf-8") == "v2"
+
+
+def test_write_new_overwrite_still_refuses_symlink(tmp_path: Path) -> None:
+    """``overwrite`` relaxes the clobber guard, never the symlink guard."""
+    outside = tmp_path.parent / "outside.txt"
+    outside.write_text("secret", encoding="utf-8")
+    files = SafeFiles(tmp_path)
+    (tmp_path / "link.txt").symlink_to(outside)
+
+    with pytest.raises(SymlinkRefusedError):
+        files.write_new("link.txt", "clobbered", overwrite=True)
+    assert outside.read_text(encoding="utf-8") == "secret"
+
+
+def test_write_artifacts_reports_skipped_instead_of_dropping(tmp_path: Path) -> None:
+    files = SafeFiles(tmp_path)
+    files.write_new("a.json", "existing")
+
+    wrote, skipped = write_artifacts(files, [("a.json", "new"), ("b.json", "new")])
+
+    assert [Path(p).name for p in wrote] == ["b.json"]
+    assert skipped == ["a.json: already exists"]
+    assert (tmp_path / "a.json").read_text(encoding="utf-8") == "existing"
+
+
+def test_write_artifacts_overwrite_writes_everything(tmp_path: Path) -> None:
+    files = SafeFiles(tmp_path)
+    files.write_new("a.json", "existing")
+
+    wrote, skipped = write_artifacts(files, [("a.json", "new"), ("b.json", "new")], overwrite=True)
+
+    assert len(wrote) == 2
+    assert skipped == []
+    assert (tmp_path / "a.json").read_text(encoding="utf-8") == "new"
+
+
+def test_wants_overwrite_reads_either_key() -> None:
+    assert wants_overwrite({"overwrite": True}) is True
+    assert wants_overwrite({"force": True}) is True
+    assert wants_overwrite({}) is False

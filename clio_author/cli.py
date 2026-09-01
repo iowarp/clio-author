@@ -916,6 +916,12 @@ def _build_parser() -> argparse.ArgumentParser:
             help="Append after existing --out content (a running log, with a question/trace header) "
             "instead of overwriting.",
         )
+        _p.add_argument(
+            "--force",
+            action="store_true",
+            help="Overwrite existing files in --out-dir. Without it a write to a path that already "
+            "exists is refused and reported in metadata.write_skipped.",
+        )
 
     return parser
 
@@ -1008,6 +1014,10 @@ def _payload_for(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
         if not isinstance(base, dict):
             raise ValueError("--json must be a JSON object")
         payload.update(base)
+
+    # `--force` -> the `overwrite` payload key every out_dir writer honours.
+    if getattr(args, "force", False):
+        payload["overwrite"] = True
 
     if command == "ingest":
         payload["source"] = args.source
@@ -1450,6 +1460,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     from clio_author.retrieval.rag import resolve_rag_retriever
     from clio_author.retrieval.scholar import resolve_scholar_client
 
+    _warn_stub_model(args.command, os.environ.get("CLIO_LLM"))
+
     try:
         # CLIO_LLM selects the model (default 'echo' = offline); CLIO_SCHOLAR
         # selects the citation backend (default 'auto' = real Semantic Scholar,
@@ -1482,8 +1494,74 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"[warning: could not write {out_file}: {exc}]", file=sys.stderr)
 
     print(json.dumps(result, indent=2))
+    _warn_result_flags(result)
     _print_suggestions(result)
     return 1 if _has_error(result) else 0
+
+
+# Commands that are fully deterministic: they never call the model, so running
+# them on the offline `echo` stub is correct, not a mistake.
+_NO_MODEL_COMMANDS = frozenset(
+    {
+        "capabilities",
+        "lifecycle",
+        "ingest",
+        "gather",
+        "discover",
+        "cite",
+        "check-refs",
+        "audit",
+        "plan_check",
+        "export",
+    }
+)
+
+
+def _warn_stub_model(command: str, clio_llm: str | None) -> None:
+    """Warn on stderr when a model-backed command is about to run on the stub.
+
+    ``CLIO_LLM`` defaults to ``echo``, an offline placeholder. A stub run exits
+    ``0`` and prints a well-formed result, so without this it is indistinguishable
+    from a real one -- e.g. ``kg`` returns an empty graph and still writes
+    ``kg.json``. Deterministic commands are exempt (see ``_NO_MODEL_COMMANDS``).
+    """
+    if command in _NO_MODEL_COMMANDS:
+        return
+    if (clio_llm or "echo").strip().lower() not in ("", "echo"):
+        return
+    print(
+        "[warning: CLIO_LLM is unset -> using the offline 'echo' stub; "
+        f"'{command}' will return a placeholder, not real output. "
+        "Set CLIO_LLM=claude|codex|ollama|lmstudio|openrouter|litellm for real results.]",
+        file=sys.stderr,
+    )
+
+
+def _warn_result_flags(result: dict[str, Any]) -> None:
+    """Warn on stderr about failures a successful-looking result would hide.
+
+    ``write_skipped`` (a refused write, e.g. re-running into a populated
+    ``out_dir``) and ``parse_error`` (an unparseable model response) both leave
+    exit code ``0`` and a plausible payload, so they are surfaced here.
+    """
+    meta = result.get("metadata")
+    if not isinstance(meta, dict):
+        return
+    skipped = meta.get("write_skipped")
+    if skipped:
+        joined = "; ".join(str(s) for s in skipped)
+        print(
+            f"[warning: {len(skipped)} file(s) NOT written (already exist) -> {joined}. "
+            "Re-run with --force to overwrite, or use a fresh --out-dir.]",
+            file=sys.stderr,
+        )
+    parse_error = meta.get("parse_error")
+    if parse_error:
+        print(
+            f"[warning: the model response could not be parsed ({parse_error}); "
+            "the result is empty. Check CLIO_LLM.]",
+            file=sys.stderr,
+        )
 
 
 # Actions reached via `run <action>` (no dedicated subcommand) / renamed subcommands,

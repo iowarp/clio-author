@@ -28,7 +28,7 @@ from clio_author.ingest.blocks import MemoryBlocks
 from clio_author.llm.client import EchoLLMClient, LLMClient
 from clio_author.retrieval.kg import KnowledgeGraph, build_kg_from_llm
 from clio_author.retrieval.kg_pipeline import run_kg_pipeline
-from clio_author.tools.files import FileToolError, SafeFiles
+from clio_author.tools.files import SafeFiles, wants_overwrite, write_artifacts
 
 KG_SYSTEM_PROMPT = (
     "You are the kg expert. You extract a content knowledge graph of a paper -- "
@@ -119,7 +119,7 @@ class KGExpert(BaseAgent):
                 max_edges = 500
             mermaid = graph.to_mermaid(max_edges=max_edges)
             html = graph.to_html()
-            wrote = self._maybe_write(task, graph, mermaid, html)
+            wrote, write_skipped = self._maybe_write(task, graph, mermaid, html)
         except Exception as exc:  # noqa: BLE001 - experts never raise
             return self._error(session, str(exc))
 
@@ -136,6 +136,8 @@ class KGExpert(BaseAgent):
             "num_edges": len(graph.edges),
             "wrote": wrote,
         }
+        if write_skipped:
+            metadata["write_skipped"] = write_skipped
         if pipeline is not None:
             metadata["pipeline"] = pipeline
         if ckpts is not None:
@@ -198,7 +200,9 @@ class KGExpert(BaseAgent):
         )
         return graph, report, checkpoints
 
-    def _maybe_write(self, task: Task, graph: KnowledgeGraph, mermaid: str, html: str) -> list[str]:
+    def _maybe_write(
+        self, task: Task, graph: KnowledgeGraph, mermaid: str, html: str
+    ) -> tuple[list[str], list[str]]:
         """Persist ``kg.json`` + ``kg.mmd`` + ``kg.html`` under ``out_dir`` when given.
 
         ``kg.html`` is the self-contained interactive viewer (the whole graph,
@@ -214,7 +218,7 @@ class KGExpert(BaseAgent):
         """
         out_dir = task.payload.get("out_dir")
         if not out_dir:
-            return []
+            return [], []
 
         # Derive a SafeFiles from out_dir when none was injected (CLI/adapter path).
         if self._files is not None:
@@ -226,21 +230,18 @@ class KGExpert(BaseAgent):
 
         try:
             (files.root / prefix).mkdir(parents=True, exist_ok=True)
-        except OSError:
-            return []
+        except OSError as exc:
+            return [], [f"{out_dir}: {exc}"]
 
-        wrote: list[str] = []
-        for name, text in (
-            (f"{prefix}kg.json", json.dumps(graph.to_dict(), indent=2)),
-            (f"{prefix}kg.mmd", mermaid),
-            (f"{prefix}kg.html", html),
-        ):
-            try:
-                path = files.write_new(name, text)
-                wrote.append(str(path))
-            except FileToolError:
-                continue
-        return wrote
+        return write_artifacts(
+            files,
+            (
+                (f"{prefix}kg.json", json.dumps(graph.to_dict(), indent=2)),
+                (f"{prefix}kg.mmd", mermaid),
+                (f"{prefix}kg.html", html),
+            ),
+            overwrite=wants_overwrite(task.payload),
+        )
 
 
 __all__ = ["KGExpert", "KG_SYSTEM_PROMPT"]

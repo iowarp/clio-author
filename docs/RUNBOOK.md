@@ -6,6 +6,9 @@ one at a time and inspect each result. Arranged as a paper's life — **read →
 
 - Every command prints a JSON result on **stdout** (logs → stderr; add `2>/dev/null` for clean JSON).
   Exit code `0` = ok, `1` = error.
+- **Two things exit `0` but are not what you wanted, so they warn on stderr:** running a model-backed
+  action on the default offline `echo` stub (set `CLIO_LLM`), and a write refused because the file
+  already exists (`metadata.write_skipped`; re-run with `--force` or use a fresh `--out-dir`).
 - **Every** subcommand accepts `--out FILE` (also save the result — prose for `.md`/`.txt`, full
   JSON for `.json`). Text actions and most file-reading subcommands also accept `--json '{...}'`
   (merge extra payload keys) — see the per-subcommand tables below for which flags each one takes.
@@ -63,6 +66,7 @@ GEMINI_API_KEY=...
 |---|---|
 | `--out FILE` | also write the result — prose `content` for `.md`/`.txt`, full JSON for `.json` |
 | `--append` | with `--out`, **append** after existing content instead of overwriting — builds a running log: each entry gets a `## <question>` header + a `_trace:` line (action · metadata · timestamp). (`.json` + `--append` → JSON Lines.) |
+| `--force` | **overwrite existing files in `--out-dir`.** Without it a write to a path that already exists is refused; the refusal is reported in `metadata.write_skipped` and as a stderr warning (payload key: `overwrite`, alias `force`) |
 | `--json '{...}'` | merge a JSON object into the action payload (available on all subcommands except `capabilities`) |
 | `-h` / `--help` | show that subcommand's exact flags |
 

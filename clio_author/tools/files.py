@@ -15,7 +15,9 @@ from __future__ import annotations
 import errno
 import os
 import tempfile
+from collections.abc import Iterable, Mapping
 from pathlib import Path
+from typing import Any
 
 
 class FileToolError(RuntimeError):
@@ -97,12 +99,17 @@ class SafeFiles:
         with os.fdopen(fd, "r", encoding="utf-8") as handle:
             return handle.read()
 
-    def write_new(self, rel: str | os.PathLike[str], text: str) -> Path:
-        """Create ``rel`` with ``text``; never clobber, never follow a symlink.
+    def write_new(self, rel: str | os.PathLike[str], text: str, *, overwrite: bool = False) -> Path:
+        """Create ``rel`` with ``text``; never follow a symlink.
 
         Opens with ``O_CREAT | O_EXCL | O_WRONLY | O_NOFOLLOW`` so an existing
         file or a symlink at the path causes an ``OSError`` that is re-raised as
         :class:`RefusedWriteError` (or :class:`SymlinkRefusedError`).
+
+        With ``overwrite=True`` the ``O_EXCL`` guard is swapped for ``O_TRUNC``, so
+        an existing regular file is replaced. The symlink refusal is **not**
+        relaxed: ``O_NOFOLLOW`` plus the explicit ``is_symlink`` check still apply,
+        so overwriting can never be redirected outside ``root``.
         """
         path = self._resolve(rel)
         # ``O_EXCL`` makes a symlink fail with ``EEXIST`` (not ``ELOOP``), so the
@@ -111,7 +118,8 @@ class SafeFiles:
         # follow the link, so a dangling link is also caught.
         if path.is_symlink():
             raise SymlinkRefusedError(f"refusing to follow symlink: {path}")
-        flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | _O_NOFOLLOW
+        exclusivity = os.O_TRUNC if overwrite else os.O_EXCL
+        flags = os.O_CREAT | exclusivity | os.O_WRONLY | _O_NOFOLLOW
         try:
             fd = os.open(path, flags, 0o644)
         except OSError as exc:
@@ -183,6 +191,49 @@ _O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 _SYMLINK_ERRNOS = {getattr(errno, name) for name in ("ELOOP", "EMLINK") if hasattr(errno, name)}
 
 
+def write_artifacts(
+    files: SafeFiles,
+    items: Iterable[tuple[str, str]],
+    *,
+    overwrite: bool = False,
+) -> tuple[list[str], list[str]]:
+    """Write ``(relative_path, text)`` pairs; return ``(wrote, skipped)``.
+
+    The shared persist helper for every action that has an ``out_dir``. A refused
+    write (an existing file, without ``overwrite``) lands in ``skipped`` as
+    ``"<rel>: <reason>"`` instead of vanishing, so the caller can surface it in
+    ``metadata["write_skipped"]`` -- a silently empty ``wrote`` list is
+    indistinguishable from a successful run, which is exactly the failure this
+    helper exists to prevent.
+
+    Never raises: every refusal is captured. Writes are attempted for every item,
+    so one refusal does not hide the rest.
+    """
+    wrote: list[str] = []
+    skipped: list[str] = []
+    for rel, text in items:
+        try:
+            wrote.append(str(files.write_new(rel, text, overwrite=overwrite)))
+        except FileToolError as exc:
+            skipped.append(f"{rel}: {_refusal_reason(exc)}")
+    return wrote, skipped
+
+
+def _refusal_reason(exc: FileToolError) -> str:
+    """A short, path-free reason for a refused write (paths are already in ``rel``)."""
+    if isinstance(exc, SymlinkRefusedError):
+        return "refused: path is a symlink"
+    cause = exc.__cause__
+    if isinstance(cause, OSError) and cause.errno == errno.EEXIST:
+        return "already exists"
+    return str(exc)
+
+
+def wants_overwrite(payload: Mapping[str, Any]) -> bool:
+    """Read the ``overwrite`` (alias ``force``) flag out of an action payload."""
+    return bool(payload.get("overwrite") or payload.get("force"))
+
+
 __all__ = [
     "SafeFiles",
     "FileToolError",
@@ -190,4 +241,6 @@ __all__ = [
     "RefusedWriteError",
     "EditNotApplicableError",
     "SymlinkRefusedError",
+    "write_artifacts",
+    "wants_overwrite",
 ]

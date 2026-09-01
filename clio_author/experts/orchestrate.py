@@ -32,7 +32,7 @@ from clio_author.experts.reviewer import _extract_json_object
 from clio_author.harness.session import SessionContext
 from clio_author.harness.types import AgentOutput, Message, Task
 from clio_author.llm.client import LLMClient
-from clio_author.tools.files import FileToolError, SafeFiles
+from clio_author.tools.files import SafeFiles, wants_overwrite, write_artifacts
 
 ORCHESTRATE_SYSTEM_PROMPT = (
     "You are the orchestrator. Given a goal and the available actions, output a "
@@ -154,9 +154,13 @@ def _run_orchestrate(
         "errors": errors,
     }
 
-    wrote = _maybe_write(out_dir, files, structured)
+    wrote, write_skipped = _maybe_write(
+        out_dir, files, structured, overwrite=wants_overwrite(payload)
+    )
     if wrote:
         metadata["wrote"] = wrote
+    if write_skipped:
+        metadata["write_skipped"] = write_skipped
 
     out = AgentOutput(
         agent="orchestrate",
@@ -267,7 +271,9 @@ def _maybe_write(
     out_dir: Any,
     files: SafeFiles | None,
     structured: dict[str, Any],
-) -> list[str]:
+    *,
+    overwrite: bool = False,
+) -> tuple[list[str], list[str]]:
     """Persist ``orchestrate.json`` under ``out_dir`` when given (mirrors kg).
 
     When a :class:`SafeFiles` was injected, ``out_dir`` is a subdirectory under
@@ -276,7 +282,7 @@ def _maybe_write(
     a refused or failed write is skipped.
     """
     if not out_dir:
-        return []
+        return [], []
 
     if files is not None:
         prefix = f"{out_dir}/"
@@ -286,14 +292,14 @@ def _maybe_write(
 
     try:
         (files.root / prefix).mkdir(parents=True, exist_ok=True)
-    except OSError:
-        return []
+    except OSError as exc:
+        return [], [f"{out_dir}: {exc}"]
 
-    try:
-        path = files.write_new(f"{prefix}orchestrate.json", json.dumps(structured, indent=2))
-    except FileToolError:
-        return []
-    return [str(path)]
+    return write_artifacts(
+        files,
+        ((f"{prefix}orchestrate.json", json.dumps(structured, indent=2)),),
+        overwrite=overwrite,
+    )
 
 
 def _error(session: SessionContext | None, message: str) -> AgentOutput:

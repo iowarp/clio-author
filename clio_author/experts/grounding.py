@@ -39,7 +39,7 @@ from clio_author.experts.cite_support import CiteSupportExpert
 from clio_author.experts.verify_work import VerifyWorkExpert
 from clio_author.harness.session import SessionContext
 from clio_author.harness.types import AgentOutput, Task
-from clio_author.tools.files import FileToolError, SafeFiles
+from clio_author.tools.files import SafeFiles, wants_overwrite, write_artifacts
 
 
 def run_grounding(
@@ -215,7 +215,7 @@ def _run_grounding(
         "claims": claims,
         "support": support,
     }
-    wrote = _maybe_write(payload, structured, summary)
+    wrote, write_skipped = _maybe_write(payload, structured, summary)
     out = AgentOutput(
         agent="grounding",
         content=summary,
@@ -226,6 +226,7 @@ def _run_grounding(
             "claim_integrity": claim_integrity,
             "support_integrity": support_integrity,
             "wrote": wrote,
+            **({"write_skipped": write_skipped} if write_skipped else {}),
         },
     )
     if session is not None:
@@ -278,25 +279,25 @@ def render_grounding_markdown(structured: dict[str, Any], summary: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _maybe_write(payload: dict[str, Any], structured: dict[str, Any], summary: str) -> list[str]:
+def _maybe_write(
+    payload: dict[str, Any], structured: dict[str, Any], summary: str
+) -> tuple[list[str], list[str]]:
     out_dir = payload.get("out_dir")
     if not out_dir:
-        return []
+        return [], []
     files = SafeFiles(Path(str(out_dir)))
     try:
         files.root.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        return []
-    wrote: list[str] = []
-    for name, content in (
-        ("grounding.json", json.dumps(structured, indent=2)),
-        ("grounding.md", render_grounding_markdown(structured, summary)),
-    ):
-        try:
-            wrote.append(str(files.write_new(name, content)))
-        except FileToolError:
-            continue
-    return wrote
+    except OSError as exc:
+        return [], [f"{out_dir}: {exc}"]
+    return write_artifacts(
+        files,
+        (
+            ("grounding.json", json.dumps(structured, indent=2)),
+            ("grounding.md", render_grounding_markdown(structured, summary)),
+        ),
+        overwrite=wants_overwrite(payload),
+    )
 
 
 __all__ = ["run_grounding", "render_grounding_markdown"]

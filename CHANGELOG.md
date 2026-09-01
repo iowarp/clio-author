@@ -7,6 +7,24 @@ All notable changes to clio-author are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`--force` / `overwrite`: opt-in overwriting for `out_dir` artifacts.** `SafeFiles.write_new`
+  gained an `overwrite` flag (`O_EXCL` → `O_TRUNC`); the symlink refusal is **not** relaxed, so an
+  overwrite can never be redirected outside the sandbox root. Exposed as `--force` on every
+  subcommand and as the `overwrite` payload key (alias `force`), honoured by `kg`, `export`,
+  `compose`, `plan`, `experiment`, `orchestrate`, `cite_support` and `ground`.
+- **`metadata.write_skipped`: refused writes are reported, not swallowed.** New shared
+  `write_artifacts()` helper returns `(wrote, skipped)` and replaces eight hand-rolled
+  `except FileToolError: continue` loops. Previously a re-run into a populated `out_dir` returned
+  `"wrote": []` with exit `0` while `content` still reported success — indistinguishable from a
+  real write, and it left stale artifacts in place (an `export` re-run kept the old `paper.tex`
+  while printing the new LaTeX).
+- **Two stderr warnings for failures that exit `0`.** (1) A model-backed command running on the
+  default offline `echo` stub now warns; the 10 genuinely deterministic commands
+  (`capabilities`, `lifecycle`, `ingest`, `gather`, `discover`, `cite`, `check-refs`, `audit`,
+  `plan_check`, `export`) are exempt. Previously `kg` on the stub printed
+  `"Extracted knowledge graph with 0 nodes"`, wrote empty `kg.json`/`kg.mmd`/`kg.html`, buried
+  `parse_error` in metadata and exited `0`. (2) `write_skipped` and `parse_error` are surfaced on
+  stderr after any run.
 - **Clio Coder integration (`integration/clio-coder/`).** Clio Coder has no MCP client — its
   MCP proxy is marked design-reserved and unimplemented — so the Claude Code plugin and the
   Codex `[mcp_servers]` config do not reach it. It drives the **CLI over `bash`** instead,

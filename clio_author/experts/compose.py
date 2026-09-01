@@ -35,7 +35,7 @@ from clio_author.harness.session import SessionContext
 from clio_author.harness.types import AgentOutput, Message, Task
 from clio_author.ingest.blocks import MemoryBlocks
 from clio_author.llm.client import LLMClient
-from clio_author.tools.files import FileToolError, SafeFiles
+from clio_author.tools.files import SafeFiles, wants_overwrite, write_artifacts
 
 COMPOSE_SYSTEM_PROMPT = (
     "You are the lead author. You turn a research idea and an experimental log "
@@ -194,12 +194,17 @@ def _run_compose(
     want_pdf = bool(payload.get("pdf", False))
     want_latex = bool(payload.get("latex", False)) or want_pdf
     wrote: list[str] = []
+    write_skipped: list[str] = []
     latex_written = False
+    overwrite = wants_overwrite(payload)
     if files is not None:
-        wrote = _persist(files, manuscript, sections)
+        wrote, write_skipped = _persist(files, manuscript, sections, overwrite=overwrite)
         if want_latex:
-            latex_wrote = _persist_latex(files, outline, sections, suggested_bibtex)
+            latex_wrote, latex_skipped = _persist_latex(
+                files, outline, sections, suggested_bibtex, overwrite=overwrite
+            )
             wrote.extend(latex_wrote)
+            write_skipped.extend(latex_skipped)
             latex_written = True
             if want_pdf:
                 _compile_compose_pdf(latex_wrote, wrote, metadata)
@@ -238,6 +243,7 @@ def _run_compose(
             "num_sections": len(sections),
             "reviewed": review,
             "wrote": wrote,
+            **({"write_skipped": write_skipped} if write_skipped else {}),
             "section_errors": section_errors,
             "latex": latex_written,
         }
@@ -427,28 +433,28 @@ def _persist(
     files: SafeFiles,
     manuscript: str,
     sections: list[dict[str, Any]],
-) -> list[str]:
-    """Write ``paper.md`` and ``sections/NN-slug.md`` via ``write_new``.
+    *,
+    overwrite: bool = False,
+) -> tuple[list[str], list[str]]:
+    """Write ``paper.md`` and ``sections/NN-slug.md``; return ``(wrote, skipped)``.
 
-    Best-effort: a refusal (e.g. an existing file) is skipped rather than
-    aborting the compose, so a re-run does not lose the in-memory manuscript.
+    Never aborts the compose: a refused write (an existing file, without
+    ``overwrite``) is reported in the second list so the caller can surface it,
+    rather than being dropped -- an empty ``wrote`` with no explanation is
+    indistinguishable from success.
     """
-    wrote: list[str] = []
-    try:
-        wrote.append(str(files.write_new("paper.md", manuscript)))
-    except FileToolError:
-        pass
     # write_new does not create parent dirs; mint the sections/ folder once.
     (files.root / "sections").mkdir(parents=True, exist_ok=True)
+    items = [("paper.md", manuscript)]
     for index, section in enumerate(sections, start=1):
         slug = _slug(section.get("section_path") or section.get("title") or "section")
-        rel = f"sections/{index:02d}-{slug}.md"
-        body = _section_body(section["title"], section["draft"]) + "\n"
-        try:
-            wrote.append(str(files.write_new(rel, body)))
-        except FileToolError:
-            continue
-    return wrote
+        items.append(
+            (
+                f"sections/{index:02d}-{slug}.md",
+                _section_body(section["title"], section["draft"]) + "\n",
+            )
+        )
+    return write_artifacts(files, items, overwrite=overwrite)
 
 
 def _persist_latex(
@@ -456,13 +462,14 @@ def _persist_latex(
     outline: PaperOutline,
     sections: list[dict[str, Any]],
     suggested_bibtex: str,
-) -> list[str]:
+    *,
+    overwrite: bool = False,
+) -> tuple[list[str], list[str]]:
     """Build a LaTeX document and write ``paper.tex`` (+ ``references.bib``).
 
-    Best-effort/never-raise, mirroring :func:`_persist`: a refused or failed
-    write is skipped rather than aborting the compose.
+    Never raises, mirroring :func:`_persist`: a LaTeX build failure returns
+    empty, and a refused write is reported in the returned ``skipped`` list.
     """
-    wrote: list[str] = []
     bib = suggested_bibtex or None
     try:
         latex = to_latex_document(
@@ -471,17 +478,11 @@ def _persist_latex(
             bibtex=bib,
         )
     except Exception:  # noqa: BLE001 - LaTeX export is best-effort
-        return wrote
-    try:
-        wrote.append(str(files.write_new("paper.tex", latex)))
-    except FileToolError:
-        pass
+        return [], []
+    items = [("paper.tex", latex)]
     if bib:
-        try:
-            wrote.append(str(files.write_new("references.bib", bib.rstrip("\n") + "\n")))
-        except FileToolError:
-            pass
-    return wrote
+        items.append(("references.bib", bib.rstrip("\n") + "\n"))
+    return write_artifacts(files, items, overwrite=overwrite)
 
 
 def _compile_compose_pdf(

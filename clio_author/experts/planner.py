@@ -35,7 +35,7 @@ from clio_author.harness.session import SessionContext
 from clio_author.harness.types import AgentOutput, Message, Task
 from clio_author.ingest.blocks import MemoryBlocks
 from clio_author.llm.client import EchoLLMClient, LLMClient
-from clio_author.tools.files import FileToolError, SafeFiles
+from clio_author.tools.files import SafeFiles, wants_overwrite, write_artifacts
 
 PLANNER_SYSTEM_PROMPT = (
     "You are the planning expert. For one paper section you produce a concrete "
@@ -132,7 +132,7 @@ class PlannerExpert(BaseAgent):
                 plan_errors += 1
 
         num_tasks = sum(len(plan.tasks) for plan in plans)
-        wrote = self._maybe_write(task, outline, plans)
+        wrote, write_skipped = self._maybe_write(task, outline, plans)
 
         summary = f"Planned {len(plans)} sections, {num_tasks} tasks total."
         output = AgentOutput(
@@ -146,6 +146,7 @@ class PlannerExpert(BaseAgent):
                 "num_sections": len(plans),
                 "num_tasks": num_tasks,
                 "wrote": wrote,
+                **({"write_skipped": write_skipped} if write_skipped else {}),
                 "plan_errors": plan_errors,
             },
         )
@@ -304,7 +305,7 @@ class PlannerExpert(BaseAgent):
 
     def _maybe_write(
         self, task: Task, outline: PaperOutline, plans: list[SectionPlan]
-    ) -> list[str]:
+    ) -> tuple[list[str], list[str]]:
         """Persist ``plan.json`` under ``out_dir`` when given.
 
         Mirrors :meth:`clio_author.experts.kg.KGExpert._maybe_write`: when the
@@ -315,7 +316,7 @@ class PlannerExpert(BaseAgent):
         """
         out_dir = task.payload.get("out_dir")
         if not out_dir:
-            return []
+            return [], []
 
         if self._files is not None:
             files = self._files
@@ -326,20 +327,18 @@ class PlannerExpert(BaseAgent):
 
         try:
             (files.root / prefix).mkdir(parents=True, exist_ok=True)
-        except OSError:
-            return []
+        except OSError as exc:
+            return [], [f"{out_dir}: {exc}"]
 
         structured = {
             "outline": outline.model_dump(),
             "plans": [plan.model_dump() for plan in plans],
         }
-        wrote: list[str] = []
-        try:
-            path = files.write_new(f"{prefix}plan.json", json.dumps(structured, indent=2))
-            wrote.append(str(path))
-        except FileToolError:
-            pass
-        return wrote
+        return write_artifacts(
+            files,
+            ((f"{prefix}plan.json", json.dumps(structured, indent=2)),),
+            overwrite=wants_overwrite(task.payload),
+        )
 
 
 __all__ = ["PlannerExpert", "PLANNER_SYSTEM_PROMPT"]

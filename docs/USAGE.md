@@ -65,6 +65,13 @@ The CLI exits `1` when the result has a top-level `error` or `metadata.error`, e
 > clio-author polish --text-file draft.md --voice concise --format prose --out polished.md
 > ```
 >
+> **Overwriting an `out_dir` (`overwrite` / `--force`).** Writes never clobber by default: a path
+> that already exists is refused, the refusal is listed in `metadata["write_skipped"]` (e.g.
+> `"kg.json: already exists"`), and the CLI warns on stderr. Pass `overwrite: true` in the payload
+> (`--force` on the CLI) to replace existing files. The symlink refusal is never relaxed. Actions
+> that honour it: `kg`, `export`, `compose`, `plan`, `experiment`, `orchestrate`, `cite_support`,
+> `ground`.
+>
 > The structured-artifact actions (`ingest`, `cite`, `kg`, `compose`, `export`) still write their
 > primary artifacts via `out_dir`/`out_path` payload keys (see individual action entries). `--out`
 > complements those — it is the one place to capture the adapter result dict itself.

@@ -26,7 +26,7 @@ from typing import Any
 from clio_author.experts.write_models import PaperOutline
 from clio_author.harness.session import SessionContext
 from clio_author.harness.types import AgentOutput, Task
-from clio_author.tools.files import FileToolError, SafeFiles
+from clio_author.tools.files import SafeFiles, wants_overwrite, write_artifacts
 
 # The command-bearing specials (\ ~ ^) expand to LaTeX commands that themselves
 # contain braces, so they are routed through sentinels first, the simple specials
@@ -394,11 +394,13 @@ def _run_export(
     )
 
     wrote: list[str] = []
+    write_skipped: list[str] = []
     if files is not None:
-        wrote = _persist(files, latex, bib)
+        wrote, write_skipped = _persist(files, latex, bib, overwrite=wants_overwrite(payload))
 
     metadata: dict[str, Any] = {
         "wrote": wrote,
+        **({"write_skipped": write_skipped} if write_skipped else {}),
         "format": "latex",
         "num_sections": len(sections),
     }
@@ -503,19 +505,19 @@ def _split_markdown(markdown: str) -> tuple[str, list[dict[str, str]]]:
     return title, sections
 
 
-def _persist(files: SafeFiles, latex: str, bibtex: str | None) -> list[str]:
-    """Write ``paper.tex`` (+ ``references.bib``) via ``write_new``. Best-effort."""
-    wrote: list[str] = []
-    try:
-        wrote.append(str(files.write_new("paper.tex", latex)))
-    except FileToolError:
-        pass
+def _persist(
+    files: SafeFiles, latex: str, bibtex: str | None, *, overwrite: bool = False
+) -> tuple[list[str], list[str]]:
+    """Write ``paper.tex`` (+ ``references.bib``); return ``(wrote, skipped)``.
+
+    A refused write (an existing file, without ``overwrite``) is reported in the
+    second list rather than dropped, so a re-run into a populated ``out_dir``
+    cannot look like a successful write.
+    """
+    items = [("paper.tex", latex)]
     if bibtex:
-        try:
-            wrote.append(str(files.write_new("references.bib", bibtex.rstrip("\n") + "\n")))
-        except FileToolError:
-            pass
-    return wrote
+        items.append(("references.bib", bibtex.rstrip("\n") + "\n"))
+    return write_artifacts(files, items, overwrite=overwrite)
 
 
 def _error(session: SessionContext | None, message: str) -> AgentOutput:

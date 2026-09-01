@@ -367,7 +367,11 @@ uv run python scripts/benchmark_grounding.py     # see eval/grounding/ for cases
 - **`ingest` says a dependency is missing** — run `uv sync --extra pdf`. The first run downloads
   ~500 MB of Docling models once.
 - **Output looks like a placeholder** — you're on the default echo model; set `CLIO_LLM=claude`
-  (or `codex`/`ollama`).
+  (or `codex`/`ollama`). Since v0.4.1 the CLI warns on stderr when a model-backed action runs on
+  the stub, so this no longer passes silently.
+- **A re-run wrote nothing** — writes never clobber. A path that already exists is refused and
+  listed in `metadata.write_skipped` (with a stderr warning). Re-run with **`--force`** to
+  overwrite, or point `--out-dir` at a fresh directory.
 - **`cite`/`discover` returns nothing** — try `CLIO_SCHOLAR=openalex` or `arxiv`; for Semantic
   Scholar set `SEMANTIC_SCHOLAR_API_KEY`.
 - **`export` produces no `.tex`** — it needs `--out-dir`; run

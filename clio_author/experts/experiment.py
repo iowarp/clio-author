@@ -38,7 +38,7 @@ from clio_author.harness.session import SessionContext
 from clio_author.harness.types import AgentOutput, Message, Task
 from clio_author.ingest.blocks import MemoryBlocks
 from clio_author.llm.client import EchoLLMClient, LLMClient
-from clio_author.tools.files import FileToolError, SafeFiles
+from clio_author.tools.files import SafeFiles, wants_overwrite, write_artifacts
 
 EXPERIMENT_SYSTEM_PROMPT = (
     "You are the experiment-design analyst. From a paper's text you extract its "
@@ -150,7 +150,7 @@ class ExperimentExpert(BaseAgent):
         if idea:
             plan = self._recreate_plan(idea, designs)
 
-        wrote = self._maybe_write(payload, designs, plan)
+        wrote, write_skipped = self._maybe_write(payload, designs, plan)
 
         if plan is not None:
             content = render_plan_markdown(plan)
@@ -171,6 +171,7 @@ class ExperimentExpert(BaseAgent):
                 "has_plan": plan is not None,
                 "summary": summary,
                 "wrote": wrote,
+                **({"write_skipped": write_skipped} if write_skipped else {}),
             },
         )
         session.add(output)
@@ -245,7 +246,7 @@ class ExperimentExpert(BaseAgent):
         payload: dict[str, Any],
         designs: list[PaperDesign],
         plan: EvaluationPlan | None,
-    ) -> list[str]:
+    ) -> tuple[list[str], list[str]]:
         """Persist design/plan artifacts under ``out_dir`` (best-effort, no clobber).
 
         Mirrors :meth:`PlannerExpert._maybe_write`: when constructed with a
@@ -254,7 +255,7 @@ class ExperimentExpert(BaseAgent):
         """
         out_dir = payload.get("out_dir")
         if not out_dir:
-            return []
+            return [], []
         if self._files is not None:
             files = self._files
             prefix = f"{out_dir}/"
@@ -263,10 +264,9 @@ class ExperimentExpert(BaseAgent):
             prefix = ""
         try:
             (files.root / prefix).mkdir(parents=True, exist_ok=True)
-        except OSError:
-            return []
+        except OSError as exc:
+            return [], [f"{out_dir}: {exc}"]
 
-        wrote: list[str] = []
         artifacts: list[tuple[str, str]] = [
             (
                 "experiment_designs.json",
@@ -277,13 +277,11 @@ class ExperimentExpert(BaseAgent):
         if plan is not None:
             artifacts.append(("evaluation_plan.json", json.dumps(plan.model_dump(), indent=2)))
             artifacts.append(("evaluation_plan.md", render_plan_markdown(plan)))
-        for name, content in artifacts:
-            try:
-                path = files.write_new(f"{prefix}{name}", content)
-                wrote.append(str(path))
-            except FileToolError:
-                continue
-        return wrote
+        return write_artifacts(
+            files,
+            ((f"{prefix}{name}", content) for name, content in artifacts),
+            overwrite=wants_overwrite(payload),
+        )
 
 
 # --------------------------------------------------------------------------- #

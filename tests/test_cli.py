@@ -471,3 +471,67 @@ def test_plan_action_with_outline_prints_json(capsys: pytest.CaptureFixture[str]
     assert result["action"] == "plan"
     assert result["structured"]["plans"]
     assert result["metadata"]["num_sections"] == 1
+
+
+def _run_with_stderr(capsys: pytest.CaptureFixture[str], argv: list[str]) -> tuple[int, dict, str]:
+    """Run the CLI and return ``(exit_code, parsed stdout, stderr)``."""
+    code = main(argv)
+    captured = capsys.readouterr()
+    return code, json.loads(captured.out), captured.err
+
+
+def test_stub_model_warning_on_a_model_backed_command(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An echo-stub run exits 0 with a plausible payload; say so on stderr."""
+    monkeypatch.delenv("CLIO_LLM", raising=False)
+    _, _, err = _run_with_stderr(capsys, ["review", "--paper", "# Paper\nBody."])
+
+    assert "offline 'echo' stub" in err
+
+
+def test_no_stub_warning_for_deterministic_commands(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`audit` never calls the model, so running it on the stub is correct."""
+    monkeypatch.delenv("CLIO_LLM", raising=False)
+    _, _, err = _run_with_stderr(capsys, ["audit", "--markdown-file", os.devnull])
+
+    assert "echo" not in err
+
+
+def test_no_stub_warning_when_a_real_model_is_selected(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CLIO_LLM", "ollama")
+    _, _, err = _run_with_stderr(capsys, ["review", "--paper", "# Paper\nBody."])
+
+    assert "echo" not in err
+
+
+def test_write_skipped_is_warned_and_force_overwrites(
+    capsys: pytest.CaptureFixture[str], tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A re-run into a populated out_dir must not look like a successful write."""
+    monkeypatch.delenv("CLIO_LLM", raising=False)
+    out_dir = str(tmp_path / "ship")
+    argv = [
+        "export",
+        "--title",
+        "T",
+        "--sections-json",
+        '[{"title":"Intro","draft":"v1"}]',
+        "--out-dir",
+        out_dir,
+    ]
+    _, first, _ = _run_with_stderr(capsys, argv)
+    assert first["metadata"]["wrote"]
+
+    _, second, err = _run_with_stderr(capsys, argv)
+    assert second["metadata"]["wrote"] == []
+    assert second["metadata"]["write_skipped"] == ["paper.tex: already exists"]
+    assert "NOT written" in err
+
+    _, third, _ = _run_with_stderr(capsys, [*argv, "--force"])
+    assert third["metadata"]["wrote"]
+    assert "write_skipped" not in third["metadata"]
