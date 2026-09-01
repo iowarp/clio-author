@@ -56,6 +56,10 @@ dist/
 # runbook example scratch
 /runbook-out/
 
+# Demo scripts: live operator notes, kept local and out of git.
+/DEMO.md
+/integration/clio-coder/DEMO-CLIO-CODER.md
+
 # Clio Coder session state and install artifacts.
 # `.clio-coder/agents/` and `.clio-coder/verifiers.yaml` ARE committed: they are the
 # project's agent recipes and its declared verification catalog. Everything else here

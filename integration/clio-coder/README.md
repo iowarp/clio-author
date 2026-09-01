@@ -118,6 +118,13 @@ clio-coder skills install https://github.com/iowarp/clio-author --project
 
 `raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>` works too.
 
+> **The URL must point at a branch that actually carries the path.** The installer clones the
+> repo and reports
+> `has no integration/clio-coder/skills/clio-author; the source-url may name a path that branch
+> does not carry`
+> when it does not — which is what you get if you point it at a branch predating this
+> integration, or at a fork that has not picked it up.
+
 ### From a clone
 
 ```bash
