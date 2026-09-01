@@ -3,7 +3,10 @@
     "clio-author": {
       "command": "clio-author-mcp",
       "args": [],
-      "env": { "PYTHONUNBUFFERED": "1" }
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "CLIO_LLM": "codex"
+      }
     }
   }
 }
