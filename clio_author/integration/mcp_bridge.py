@@ -28,10 +28,33 @@ import json
 import os
 from typing import Any
 
+from clio_author.env_file import load_env
 from clio_author.integration.clio_adapter import ClioAuthorSubagent
 from clio_author.llm.providers import resolve_llm
 from clio_author.llm.vision import resolve_vision_client
+from clio_author.retrieval.rag import resolve_rag_retriever
 from clio_author.retrieval.scholar import resolve_scholar_client
+
+
+def build_subagent() -> ClioAuthorSubagent:
+    """Build a subagent configured from the same env vars the CLI reads.
+
+    The host selects models via ``CLIO_LLM``; ``CLIO_SCHOLAR``, ``CLIO_VISION``, and
+    ``CLIO_RAG`` select the citation backend, the figure-agent image route, and the
+    retriever. A bridge is a separate process launched by the host, so it loads the
+    env file itself -- the operator's shell never reaches it -- and a key kept in
+    ``.env.local`` would otherwise be invisible to every action that needs one.
+
+    Kept separate from :func:`build_server` so the wiring is testable without
+    ``fastmcp`` installed.
+    """
+    load_env()
+    return ClioAuthorSubagent(
+        llm=resolve_llm(os.environ.get("CLIO_LLM")),
+        scholar_client=resolve_scholar_client(os.environ.get("CLIO_SCHOLAR")),
+        vision=resolve_vision_client(os.environ.get("CLIO_VISION")),
+        retriever=resolve_rag_retriever(os.environ.get("CLIO_RAG")),
+    )
 
 
 def build_server() -> Any:
@@ -44,12 +67,7 @@ def build_server() -> Any:
             "uv run --with fastmcp python -m clio_author.integration.mcp_bridge"
         ) from exc
 
-    # The host selects models via the same env vars the CLI uses.
-    subagent = ClioAuthorSubagent(
-        llm=resolve_llm(os.environ.get("CLIO_LLM")),
-        scholar_client=resolve_scholar_client(os.environ.get("CLIO_SCHOLAR")),
-        vision=resolve_vision_client(os.environ.get("CLIO_VISION")),
-    )
+    subagent = build_subagent()
 
     server = FastMCP(name="clio-author")
 

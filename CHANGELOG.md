@@ -32,6 +32,11 @@ All notable changes to clio-author are documented here. The format is based on
   `SEMANTIC_SCHOLAR_API_KEY` without the operator's shell. `handle_jsonrpc` keeps its bare
   default and stays hermetic for embedding and tests. Verified live: `cite` over JSON-RPC now
   returns `completed`, 1/2 verified, `citation_integrity: 0.5`, matching the CLI.
+- **The MCP bridge now loads the env file and passes a retriever.** It already resolved the
+  llm, scholar, and vision clients, but never called the env loader — so a key in
+  `.env.local` was invisible to a bridge the host launched — and never passed
+  `resolve_rag_retriever(CLIO_RAG)` the way `cli.py` does. Wiring moved into
+  `build_subagent()` so it is testable without `fastmcp` installed.
 - **Env-file loading moved to `clio_author/env_file.py`.** It was private to `cli.py`, so the
   A2A server and MCP bridge — separate processes that never see the operator's shell — could
   not read `.env.local` or `CLIO_ENV_FILE`. `cli.py` re-exports the historical private names.
